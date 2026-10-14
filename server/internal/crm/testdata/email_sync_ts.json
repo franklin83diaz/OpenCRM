@@ -1,0 +1,4236 @@
+[
+ {
+  "name": "people import, then live, then a failed read",
+  "connected": [
+   "gmail"
+  ],
+  "seed": [
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-ada', 'Ada', '', ' ADA@Acme.example ', NULL)",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-bob', 'Bob', '', 'bob@beta.example', NULL)",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-team', 'Team', '', 'team@acme.example', NULL)",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-none', 'No', '', NULL, NULL)",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-empty', 'Empty', '', '', NULL)",
+   "INSERT INTO email_accounts (mailbox, enabled, visibility, auto_create, exclude_group) VALUES ('me@mine.example', 1, 'subject', 'none', 1)"
+  ],
+  "rules": [
+   {
+    "action": "GMAIL_GET_PROFILE",
+    "data": {
+     "emailAddress": " Me@Mine.example "
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "queryHas": "from:ada@acme.example",
+    "args": {
+     "page_token": null
+    },
+    "data": {
+     "messages": [
+      {
+       "messageId": "m1",
+       "threadId": "t-m1",
+       "messageTimestamp": "2026-10-01T09:30:00Z",
+       "sender": "Ada Lovelace <ada@acme.example>",
+       "to": "me@mine.example",
+       "subject": "Hello",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "m2",
+       "threadId": "t-m2",
+       "messageTimestamp": "2026-10-02T10:00:00Z",
+       "sender": "Me <me@mine.example>",
+       "to": "ada@acme.example, Bob Stone <bob@beta.example>, outsider@else.example",
+       "subject": "Re: Hello",
+       "labelIds": [
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "m3",
+       "threadId": "t-m3",
+       "messageTimestamp": "2026-10-02T11:00:00Z",
+       "sender": "team@acme.example",
+       "to": "me@mine.example",
+       "subject": "Newsletter",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "m4",
+       "messageTimestamp": "2026-10-02T12:00:00Z",
+       "sender": "ada@acme.example"
+      }
+     ],
+     "nextPageToken": "pA2"
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "args": {
+     "page_token": "pA2"
+    },
+    "data": {
+     "messages": [
+      {
+       "messageId": "m5",
+       "threadId": "t-m5",
+       "messageTimestamp": "2026-10-03T09:00:00Z",
+       "sender": "me@mine.example",
+       "to": "ada@acme.example",
+       "subject": "Draft",
+       "labelIds": [
+        "DRAFT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "m6",
+       "threadId": "t-m6",
+       "messageTimestamp": "2026-12-01T00:00:00Z",
+       "sender": "me@mine.example",
+       "to": "ada@acme.example",
+       "subject": "Scheduled",
+       "labelIds": [
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "m7",
+       "threadId": "t-m7",
+       "messageTimestamp": "2026-10-03T10:00:00Z",
+       "sender": "Outsider <outsider@else.example>",
+       "to": "me@mine.example",
+       "subject": "Hi",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "m8",
+       "threadId": "t-m8",
+       "messageTimestamp": "2026-10-03T11:00:00Z",
+       "sender": "me@mine.example",
+       "to": "ada@acme.example",
+       "subject": "Unsent",
+       "labelIds": [],
+       "preview": {
+        "body": "never stored"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "queryHas": "after:17",
+    "args": {
+     "page_token": null
+    },
+    "once": true,
+    "data": {
+     "messages": [
+      {
+       "messageId": "m9",
+       "threadId": "t-m9",
+       "messageTimestamp": "2026-10-14T11:30:00Z",
+       "sender": "Ada <ada@acme.example>",
+       "to": "me@mine.example",
+       "subject": "Live one",
+       "labelIds": [
+        "INBOX",
+        "CATEGORY_PROMOTIONS"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "m10",
+       "threadId": "t-m10",
+       "messageTimestamp": "2026-10-14T11:40:00Z",
+       "sender": "New Person <new@else.example>",
+       "to": "me@mine.example",
+       "subject": "Hello there",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "m1",
+       "threadId": "t-m1",
+       "messageTimestamp": "2026-10-01T09:30:00Z",
+       "sender": "Ada Lovelace <ada@acme.example>",
+       "to": "me@mine.example",
+       "subject": "Hello (edited)",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      }
+     ],
+     "nextPageToken": "pL2"
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "args": {
+     "page_token": "pL2"
+    },
+    "data": {
+     "messages": [
+      {
+       "messageId": "m11",
+       "threadId": "t-m11",
+       "messageTimestamp": "2026-10-14T12:10:00Z",
+       "sender": "me@mine.example",
+       "to": "bob@beta.example",
+       "subject": "Update",
+       "labelIds": [
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "m12",
+       "threadId": "t-m12",
+       "messageTimestamp": "2026-10-14T12:30:00Z",
+       "sender": "me@mine.example",
+       "to": "bob@beta.example",
+       "subject": "Later",
+       "labelIds": [
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "queryHas": "after:17",
+    "error": "Gmail is unavailable (503)"
+   }
+  ],
+  "steps": [
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:15:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:30:00.000Z"
+   }
+  ],
+  "dumps": [
+   "SELECT mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject FROM email_messages ORDER BY mailbox, id",
+   "SELECT mailbox, message_id, contact_id, sent_at FROM email_message_contacts ORDER BY mailbox, message_id, contact_id",
+   "SELECT mailbox, contact_id, email FROM email_contact_imports ORDER BY mailbox, contact_id",
+   "SELECT id, first_name, last_name, email, company_id, last_contacted_at FROM contacts ORDER BY id",
+   "SELECT id, name, domain FROM companies ORDER BY name",
+   "SELECT mailbox, enabled, labels, history, visibility, auto_create, exclude_group, exclude_personal, blocklist, phase, import_cursor, synced_until, contacts_created, last_run_at, last_error, running_until, job_id, next_run_at FROM email_accounts ORDER BY mailbox"
+  ],
+  "expect": {
+   "results": [
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":0,\"stored\":4,\"forgotten\":0,\"more\":false}",
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":0,\"stored\":4,\"forgotten\":0,\"more\":false}",
+    "{\"status\":\"error\",\"phase\":\"live\",\"step\":\"live\",\"created\":0,\"stored\":0,\"error\":\"Gmail is unavailable (503)\"}"
+   ],
+   "calls": [
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "{from:ada@acme.example to:ada@acme.example from:bob@beta.example to:bob@beta.example from:team@acme.example to:team@acme.example} -in:chats after:2025/10/14",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "{from:ada@acme.example to:ada@acme.example from:bob@beta.example to:bob@beta.example from:team@acme.example to:team@acme.example} -in:chats after:2025/10/14",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false,
+      "page_token": "pA2"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "-in:chats after:1791975600",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "-in:chats after:1791975600",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false,
+      "page_token": "pL2"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "-in:chats after:1791976200",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    }
+   ],
+   "statements": [
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:01:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:00:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id, lower(trim(email)) AS email FROM contacts\n              WHERE email IS NOT NULL AND email != '' AND id > ?\n              ORDER BY id LIMIT ?",
+     "params": [
+      "",
+      20
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "m1",
+      "t-m1",
+      "2026-10-01T09:30:00Z",
+      "received",
+      "ada@acme.example",
+      "Ada Lovelace",
+      "[\"me@mine.example\"]",
+      "Hello"
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "m1",
+      "c-ada",
+      "2026-10-01T09:30:00Z"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "m2",
+      "t-m2",
+      "2026-10-02T10:00:00Z",
+      "sent",
+      "me@mine.example",
+      "Me",
+      "[\"ada@acme.example\",\"bob@beta.example\",\"outsider@else.example\"]",
+      "Re: Hello"
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "m2",
+      "c-ada",
+      "2026-10-02T10:00:00Z"
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "m2",
+      "c-bob",
+      "2026-10-02T10:00:00Z"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "c-ada",
+      "ada@acme.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "c-bob",
+      "bob@beta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "c-team",
+      "team@acme.example"
+     ]
+    },
+    {
+     "sql": "SELECT id, lower(trim(email)) AS email FROM contacts\n              WHERE email IS NOT NULL AND email != '' AND id > ?\n              ORDER BY id LIMIT ?",
+     "params": [
+      "c-team",
+      20
+     ]
+    },
+    {
+     "sql": "UPDATE contacts SET last_contacted_at =\n         (SELECT MAX(l.sent_at) FROM email_message_contacts l WHERE l.contact_id = contacts.id)\n       WHERE id IN (?, ?)",
+     "params": [
+      "c-ada",
+      "c-bob"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"done\"}",
+      "2026-10-14T12:00:00.000Z",
+      0,
+      "2026-10-14T12:00:00.000Z",
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:16:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:15:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id FROM email_messages WHERE mailbox = ? AND sent_at > ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-14T12:20:00.000Z"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "m9",
+      "t-m9",
+      "2026-10-14T11:30:00Z",
+      "received",
+      "ada@acme.example",
+      "Ada",
+      "[\"me@mine.example\"]",
+      "Live one"
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "m9",
+      "c-ada",
+      "2026-10-14T11:30:00Z"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "m1",
+      "t-m1",
+      "2026-10-01T09:30:00Z",
+      "received",
+      "ada@acme.example",
+      "Ada Lovelace",
+      "[\"me@mine.example\"]",
+      "Hello (edited)"
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "m1",
+      "c-ada",
+      "2026-10-01T09:30:00Z"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "m11",
+      "t-m11",
+      "2026-10-14T12:10:00Z",
+      "sent",
+      "me@mine.example",
+      null,
+      "[\"bob@beta.example\"]",
+      "Update"
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "m11",
+      "c-bob",
+      "2026-10-14T12:10:00Z"
+     ]
+    },
+    {
+     "sql": "UPDATE contacts SET last_contacted_at =\n         (SELECT MAX(l.sent_at) FROM email_message_contacts l WHERE l.contact_id = contacts.id)\n       WHERE id IN (?, ?)",
+     "params": [
+      "c-ada",
+      "c-bob"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"done\"}",
+      "2026-10-14T12:10:00Z",
+      0,
+      "2026-10-14T12:15:00.000Z",
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:31:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:30:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id FROM email_messages WHERE mailbox = ? AND sent_at > ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-14T12:35:00.000Z"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET import_cursor = ?, contacts_created = contacts_created + ?, last_run_at = ?, last_error = ?, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "{\"step\":\"live\",\"check\":\"done\"}",
+      0,
+      "2026-10-14T12:30:00.000Z",
+      "Gmail is unavailable (503)",
+      "me@mine.example"
+     ]
+    }
+   ],
+   "dumps": [
+    [
+     {
+      "mailbox": "me@mine.example",
+      "id": "m1",
+      "thread_id": "t-m1",
+      "sent_at": "2026-10-01T09:30:00Z",
+      "direction": "received",
+      "from_email": "ada@acme.example",
+      "from_name": "Ada Lovelace",
+      "to_emails": "[\"me@mine.example\"]",
+      "subject": "Hello (edited)"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "m11",
+      "thread_id": "t-m11",
+      "sent_at": "2026-10-14T12:10:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[\"bob@beta.example\"]",
+      "subject": "Update"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "m2",
+      "thread_id": "t-m2",
+      "sent_at": "2026-10-02T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": "Me",
+      "to_emails": "[\"ada@acme.example\",\"bob@beta.example\",\"outsider@else.example\"]",
+      "subject": "Re: Hello"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "m9",
+      "thread_id": "t-m9",
+      "sent_at": "2026-10-14T11:30:00Z",
+      "direction": "received",
+      "from_email": "ada@acme.example",
+      "from_name": "Ada",
+      "to_emails": "[\"me@mine.example\"]",
+      "subject": "Live one"
+     }
+    ],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "m1",
+      "contact_id": "c-ada",
+      "sent_at": "2026-10-01T09:30:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "m11",
+      "contact_id": "c-bob",
+      "sent_at": "2026-10-14T12:10:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "m2",
+      "contact_id": "c-ada",
+      "sent_at": "2026-10-02T10:00:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "m2",
+      "contact_id": "c-bob",
+      "sent_at": "2026-10-02T10:00:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "m9",
+      "contact_id": "c-ada",
+      "sent_at": "2026-10-14T11:30:00Z"
+     }
+    ],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "c-ada",
+      "email": "ada@acme.example"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "c-bob",
+      "email": "bob@beta.example"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "c-team",
+      "email": "team@acme.example"
+     }
+    ],
+    [
+     {
+      "id": "c-ada",
+      "first_name": "Ada",
+      "last_name": "",
+      "email": " ADA@Acme.example ",
+      "company_id": null,
+      "last_contacted_at": "2026-10-14T11:30:00Z"
+     },
+     {
+      "id": "c-bob",
+      "first_name": "Bob",
+      "last_name": "",
+      "email": "bob@beta.example",
+      "company_id": null,
+      "last_contacted_at": "2026-10-14T12:10:00Z"
+     },
+     {
+      "id": "c-empty",
+      "first_name": "Empty",
+      "last_name": "",
+      "email": "",
+      "company_id": null,
+      "last_contacted_at": null
+     },
+     {
+      "id": "c-none",
+      "first_name": "No",
+      "last_name": "",
+      "email": null,
+      "company_id": null,
+      "last_contacted_at": null
+     },
+     {
+      "id": "c-team",
+      "first_name": "Team",
+      "last_name": "",
+      "email": "team@acme.example",
+      "company_id": null,
+      "last_contacted_at": null
+     }
+    ],
+    [],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "enabled": 1,
+      "labels": "[]",
+      "history": "12m",
+      "visibility": "subject",
+      "auto_create": "none",
+      "exclude_group": 1,
+      "exclude_personal": 1,
+      "blocklist": "[]",
+      "phase": "live",
+      "import_cursor": "{\"step\":\"live\",\"check\":\"done\"}",
+      "synced_until": "2026-10-14T12:10:00Z",
+      "contacts_created": 0,
+      "last_run_at": "2026-10-14T12:30:00.000Z",
+      "last_error": "Gmail is unavailable (503)",
+      "running_until": null,
+      "job_id": null,
+      "next_run_at": null
+     }
+    ]
+   ]
+  }
+ },
+ {
+  "name": "sent and received import creates contacts",
+  "connected": [
+   "googlesuper",
+   "slack"
+  ],
+  "seed": [
+   "INSERT INTO companies (id, name, domain) VALUES ('co-beta', 'Beta Ltd', 'https://www.Beta.example/')",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-ada', 'Ada', '', 'ada@acme.example', NULL)",
+   "INSERT INTO email_accounts (mailbox, enabled, visibility, auto_create, exclude_group, exclude_personal, blocklist, labels, history) VALUES ('me@mine.example', 1, 'metadata', 'sent_and_received', 1, 1, '[\"@Blocked.example\", \" spam@x.example \", 5, \"\"]', '[\"Clients\", \"Big Deals\", 7]', '3m')"
+  ],
+  "rules": [
+   {
+    "action": "GOOGLESUPER_GET_PROFILE",
+    "data": {
+     "emailAddress": "me@mine.example"
+    }
+   },
+   {
+    "action": "GOOGLESUPER_FETCH_EMAILS",
+    "queryHas": "in:sent -in:chats",
+    "args": {
+     "page_token": null
+    },
+    "data": {
+     "messages": [
+      {
+       "messageId": "s1",
+       "threadId": "t-s1",
+       "messageTimestamp": "2026-09-01T10:00:00Z",
+       "sender": "me@mine.example",
+       "to": "Bob <bob@beta.example>, Carol <carol@gmail.com>, dave@mine.example, team@zeta.example, x@blocked.example, \"Lovelace, Ada\" <ada@acme.example>",
+       "subject": "Proposal",
+       "labelIds": [
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "s2",
+       "threadId": "t-s2",
+       "messageTimestamp": "2026-09-02T10:00:00Z",
+       "sender": "me@mine.example",
+       "to": "Erin O'Neil <ERIN@Gamma.example>",
+       "subject": "Intro",
+       "labelIds": [
+        "SENT",
+        "IMPORTANT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      }
+     ],
+     "nextPageToken": "pS2"
+    }
+   },
+   {
+    "action": "GOOGLESUPER_FETCH_EMAILS",
+    "args": {
+     "page_token": "pS2"
+    },
+    "data": {
+     "messages": [
+      {
+       "messageId": "s3",
+       "threadId": "t-s3",
+       "messageTimestamp": "2026-09-03T10:00:00Z",
+       "sender": "me@mine.example",
+       "to": "frank@beta.example",
+       "subject": "Follow up",
+       "labelIds": [
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "s4",
+       "threadId": "t-s4",
+       "messageTimestamp": "2026-09-03T11:00:00Z",
+       "sender": "me@mine.example",
+       "to": "ghost@ghost.example",
+       "subject": "Draft",
+       "labelIds": [
+        "DRAFT",
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "action": "GOOGLESUPER_FETCH_EMAILS",
+    "queryHas": "-in:sent -category:promotions",
+    "data": {
+     "messages": [
+      {
+       "messageId": "r1",
+       "threadId": "t-r1",
+       "messageTimestamp": "2026-09-04T10:00:00Z",
+       "sender": "Hal Jordan <hal@eta.example>",
+       "to": "me@mine.example",
+       "subject": "Question",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "r2",
+       "threadId": "t-r2",
+       "messageTimestamp": "2026-09-04T11:00:00Z",
+       "sender": "noreply@eta.example",
+       "to": "me@mine.example",
+       "subject": "Receipt",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "r3",
+       "threadId": "t-r3",
+       "messageTimestamp": "2026-09-04T12:00:00Z",
+       "sender": "Ivy <ivy@iota.example>",
+       "to": "me@mine.example",
+       "subject": "Digest",
+       "labelIds": [
+        "INBOX",
+        "CATEGORY_UPDATES"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "r4",
+       "threadId": "t-r4",
+       "messageTimestamp": "2026-09-04T13:00:00Z",
+       "sender": "spam@x.example",
+       "to": "me@mine.example",
+       "subject": "Buy",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "r5",
+       "threadId": "t-r5",
+       "messageTimestamp": "2026-09-04T14:00:00Z",
+       "sender": "\"Lovelace, Ada\" <ada@acme.example>",
+       "to": "me@mine.example",
+       "subject": "Thanks",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "action": "GOOGLESUPER_FETCH_EMAILS",
+    "queryHas": "{from:",
+    "data": {
+     "messages": [
+      {
+       "messageId": "s1",
+       "threadId": "t-s1",
+       "messageTimestamp": "2026-09-01T10:00:00Z",
+       "sender": "me@mine.example",
+       "to": "Bob <bob@beta.example>, \"Lovelace, Ada\" <ada@acme.example>, x@blocked.example",
+       "subject": "Proposal",
+       "labelIds": [
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "r1",
+       "threadId": "t-r1",
+       "messageTimestamp": "2026-09-04T10:00:00Z",
+       "sender": "Hal Jordan <hal@eta.example>",
+       "to": "me@mine.example",
+       "subject": "Question",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "r5",
+       "threadId": "t-r5",
+       "messageTimestamp": "2026-09-04T14:00:00Z",
+       "sender": "\"Lovelace, Ada\" <ada@acme.example>",
+       "to": "me@mine.example",
+       "subject": "Thanks",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "r6",
+       "threadId": "t-r6",
+       "messageTimestamp": "2026-09-05T10:00:00Z",
+       "sender": "x@blocked.example",
+       "to": "ada@acme.example",
+       "subject": "Blocked sender",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "steps": [
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:00:00.000Z"
+   }
+  ],
+  "dumps": [
+   "SELECT mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject FROM email_messages ORDER BY mailbox, id",
+   "SELECT mailbox, message_id, contact_id, sent_at FROM email_message_contacts ORDER BY mailbox, message_id, contact_id",
+   "SELECT mailbox, contact_id, email FROM email_contact_imports ORDER BY mailbox, contact_id",
+   "SELECT id, first_name, last_name, email, company_id, last_contacted_at FROM contacts ORDER BY id",
+   "SELECT id, name, domain FROM companies ORDER BY name",
+   "SELECT mailbox, enabled, labels, history, visibility, auto_create, exclude_group, exclude_personal, blocklist, phase, import_cursor, synced_until, contacts_created, last_run_at, last_error, running_until, job_id, next_run_at FROM email_accounts ORDER BY mailbox"
+  ],
+  "expect": {
+   "results": [
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":4,\"stored\":4,\"forgotten\":0,\"more\":false}"
+   ],
+   "calls": [
+    {
+     "service": "googlesuper",
+     "action": "GOOGLESUPER_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "googlesuper",
+     "action": "GOOGLESUPER_FETCH_EMAILS",
+     "args": {
+      "query": "in:sent -in:chats {label:clients label:big-deals} after:2026/07/16",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "googlesuper",
+     "action": "GOOGLESUPER_FETCH_EMAILS",
+     "args": {
+      "query": "in:sent -in:chats {label:clients label:big-deals} after:2026/07/16",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false,
+      "page_token": "pS2"
+     }
+    },
+    {
+     "service": "googlesuper",
+     "action": "GOOGLESUPER_FETCH_EMAILS",
+     "args": {
+      "query": "-in:sent -category:promotions -category:social -category:updates -category:forums -in:chats {label:clients label:big-deals} after:2026/07/16",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "googlesuper",
+     "action": "GOOGLESUPER_FETCH_EMAILS",
+     "args": {
+      "query": "{from:bob@beta.example to:bob@beta.example from:erin@gamma.example to:erin@gamma.example from:frank@beta.example to:frank@beta.example from:hal@eta.example to:hal@eta.example from:ada@acme.example to:ada@acme.example} -in:chats {label:clients label:big-deals} after:2026/07/16",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    }
+   ],
+   "statements": [
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:01:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:00:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id FROM companies\n      WHERE lower(replace(replace(replace(rtrim(domain,'/'),'https://',''),'http://',''),'www.','')) = ?\n      LIMIT 1",
+     "params": [
+      "beta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES (?, ?, ?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000001",
+      "Bob",
+      "",
+      "bob@beta.example",
+      "co-beta"
+     ]
+    },
+    {
+     "sql": "SELECT id FROM companies\n      WHERE lower(replace(replace(replace(rtrim(domain,'/'),'https://',''),'http://',''),'www.','')) = ?\n      LIMIT 1",
+     "params": [
+      "gamma.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO companies (id, name, domain) VALUES (?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000002",
+      "Gamma",
+      "gamma.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES (?, ?, ?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000003",
+      "Erin",
+      "O'Neil",
+      "erin@gamma.example",
+      "00000000-0000-4000-8000-000000000002"
+     ]
+    },
+    {
+     "sql": "SELECT id FROM companies\n      WHERE lower(replace(replace(replace(rtrim(domain,'/'),'https://',''),'http://',''),'www.','')) = ?\n      LIMIT 1",
+     "params": [
+      "beta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES (?, ?, ?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000004",
+      "frank",
+      "",
+      "frank@beta.example",
+      "co-beta"
+     ]
+    },
+    {
+     "sql": "SELECT id FROM companies\n      WHERE lower(replace(replace(replace(rtrim(domain,'/'),'https://',''),'http://',''),'www.','')) = ?\n      LIMIT 1",
+     "params": [
+      "eta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO companies (id, name, domain) VALUES (?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000005",
+      "Eta",
+      "eta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES (?, ?, ?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000006",
+      "Hal",
+      "Jordan",
+      "hal@eta.example",
+      "00000000-0000-4000-8000-000000000005"
+     ]
+    },
+    {
+     "sql": "SELECT id, lower(trim(email)) AS email FROM contacts\n              WHERE email IS NOT NULL AND email != '' AND id > ?\n              ORDER BY id LIMIT ?",
+     "params": [
+      "",
+      20
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "s1",
+      "t-s1",
+      "2026-09-01T10:00:00Z",
+      "sent",
+      "me@mine.example",
+      null,
+      "[\"bob@beta.example\",\"ada@acme.example\",\"x@blocked.example\"]",
+      null
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "s1",
+      "00000000-0000-4000-8000-000000000001",
+      "2026-09-01T10:00:00Z"
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "s1",
+      "c-ada",
+      "2026-09-01T10:00:00Z"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "r1",
+      "t-r1",
+      "2026-09-04T10:00:00Z",
+      "received",
+      "hal@eta.example",
+      "Hal Jordan",
+      "[\"me@mine.example\"]",
+      null
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "r1",
+      "00000000-0000-4000-8000-000000000006",
+      "2026-09-04T10:00:00Z"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "r5",
+      "t-r5",
+      "2026-09-04T14:00:00Z",
+      "received",
+      "ada@acme.example",
+      "Lovelace, Ada",
+      "[\"me@mine.example\"]",
+      null
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "r5",
+      "c-ada",
+      "2026-09-04T14:00:00Z"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "00000000-0000-4000-8000-000000000001",
+      "bob@beta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "00000000-0000-4000-8000-000000000003",
+      "erin@gamma.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "00000000-0000-4000-8000-000000000004",
+      "frank@beta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "00000000-0000-4000-8000-000000000006",
+      "hal@eta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "c-ada",
+      "ada@acme.example"
+     ]
+    },
+    {
+     "sql": "SELECT id, lower(trim(email)) AS email FROM contacts\n              WHERE email IS NOT NULL AND email != '' AND id > ?\n              ORDER BY id LIMIT ?",
+     "params": [
+      "c-ada",
+      20
+     ]
+    },
+    {
+     "sql": "UPDATE contacts SET last_contacted_at =\n         (SELECT MAX(l.sent_at) FROM email_message_contacts l WHERE l.contact_id = contacts.id)\n       WHERE id IN (?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000001",
+      "c-ada",
+      "00000000-0000-4000-8000-000000000006"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"done\"}",
+      "2026-10-14T12:00:00.000Z",
+      4,
+      "2026-10-14T12:00:00.000Z",
+      "me@mine.example"
+     ]
+    }
+   ],
+   "dumps": [
+    [
+     {
+      "mailbox": "me@mine.example",
+      "id": "r1",
+      "thread_id": "t-r1",
+      "sent_at": "2026-09-04T10:00:00Z",
+      "direction": "received",
+      "from_email": "hal@eta.example",
+      "from_name": "Hal Jordan",
+      "to_emails": "[\"me@mine.example\"]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "r5",
+      "thread_id": "t-r5",
+      "sent_at": "2026-09-04T14:00:00Z",
+      "direction": "received",
+      "from_email": "ada@acme.example",
+      "from_name": "Lovelace, Ada",
+      "to_emails": "[\"me@mine.example\"]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s1",
+      "thread_id": "t-s1",
+      "sent_at": "2026-09-01T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[\"bob@beta.example\",\"ada@acme.example\",\"x@blocked.example\"]",
+      "subject": null
+     }
+    ],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "r1",
+      "contact_id": "00000000-0000-4000-8000-000000000006",
+      "sent_at": "2026-09-04T10:00:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "r5",
+      "contact_id": "c-ada",
+      "sent_at": "2026-09-04T14:00:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "s1",
+      "contact_id": "00000000-0000-4000-8000-000000000001",
+      "sent_at": "2026-09-01T10:00:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "s1",
+      "contact_id": "c-ada",
+      "sent_at": "2026-09-01T10:00:00Z"
+     }
+    ],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "00000000-0000-4000-8000-000000000001",
+      "email": "bob@beta.example"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "00000000-0000-4000-8000-000000000003",
+      "email": "erin@gamma.example"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "00000000-0000-4000-8000-000000000004",
+      "email": "frank@beta.example"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "00000000-0000-4000-8000-000000000006",
+      "email": "hal@eta.example"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "c-ada",
+      "email": "ada@acme.example"
+     }
+    ],
+    [
+     {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "first_name": "Bob",
+      "last_name": "",
+      "email": "bob@beta.example",
+      "company_id": "co-beta",
+      "last_contacted_at": "2026-09-01T10:00:00Z"
+     },
+     {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "first_name": "Erin",
+      "last_name": "O'Neil",
+      "email": "erin@gamma.example",
+      "company_id": "00000000-0000-4000-8000-000000000002",
+      "last_contacted_at": null
+     },
+     {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "first_name": "frank",
+      "last_name": "",
+      "email": "frank@beta.example",
+      "company_id": "co-beta",
+      "last_contacted_at": null
+     },
+     {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "first_name": "Hal",
+      "last_name": "Jordan",
+      "email": "hal@eta.example",
+      "company_id": "00000000-0000-4000-8000-000000000005",
+      "last_contacted_at": "2026-09-04T10:00:00Z"
+     },
+     {
+      "id": "c-ada",
+      "first_name": "Ada",
+      "last_name": "",
+      "email": "ada@acme.example",
+      "company_id": null,
+      "last_contacted_at": "2026-09-04T14:00:00Z"
+     }
+    ],
+    [
+     {
+      "id": "co-beta",
+      "name": "Beta Ltd",
+      "domain": "https://www.Beta.example/"
+     },
+     {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "name": "Eta",
+      "domain": "eta.example"
+     },
+     {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "Gamma",
+      "domain": "gamma.example"
+     }
+    ],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "enabled": 1,
+      "labels": "[\"Clients\", \"Big Deals\", 7]",
+      "history": "3m",
+      "visibility": "metadata",
+      "auto_create": "sent_and_received",
+      "exclude_group": 1,
+      "exclude_personal": 1,
+      "blocklist": "[\"@Blocked.example\", \" spam@x.example \", 5, \"\"]",
+      "phase": "live",
+      "import_cursor": "{\"step\":\"live\",\"check\":\"done\"}",
+      "synced_until": "2026-10-14T12:00:00.000Z",
+      "contacts_created": 4,
+      "last_run_at": "2026-10-14T12:00:00.000Z",
+      "last_error": null,
+      "running_until": null,
+      "job_id": null,
+      "next_run_at": null
+     }
+    ]
+   ]
+  }
+ },
+ {
+  "name": "sent import without received, people and group addresses allowed",
+  "connected": [
+   "gmail"
+  ],
+  "seed": [
+   "INSERT INTO email_accounts (mailbox, enabled, auto_create, exclude_group, exclude_personal, labels, history) VALUES ('me@mine.example', 1, 'sent', 0, 0, '[\"Solo\"]', 'all')"
+  ],
+  "rules": [
+   {
+    "action": "GMAIL_GET_PROFILE",
+    "data": {
+     "emailAddress": "me@mine.example"
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "queryHas": "in:sent",
+    "data": {
+     "messages": [
+      {
+       "messageId": "s1",
+       "threadId": "t-s1",
+       "messageTimestamp": "2026-09-01T10:00:00Z",
+       "sender": "me@mine.example",
+       "to": "Carol <carol@gmail.com>, team@zeta.example, Mixed Case <Mixed@Zeta.example>",
+       "subject": "Hi",
+       "labelIds": [
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "queryHas": "{from:",
+    "data": {
+     "messages": []
+    }
+   }
+  ],
+  "steps": [
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:00:00.000Z"
+   }
+  ],
+  "dumps": [
+   "SELECT mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject FROM email_messages ORDER BY mailbox, id",
+   "SELECT mailbox, message_id, contact_id, sent_at FROM email_message_contacts ORDER BY mailbox, message_id, contact_id",
+   "SELECT mailbox, contact_id, email FROM email_contact_imports ORDER BY mailbox, contact_id",
+   "SELECT id, first_name, last_name, email, company_id, last_contacted_at FROM contacts ORDER BY id",
+   "SELECT id, name, domain FROM companies ORDER BY name",
+   "SELECT mailbox, enabled, labels, history, visibility, auto_create, exclude_group, exclude_personal, blocklist, phase, import_cursor, synced_until, contacts_created, last_run_at, last_error, running_until, job_id, next_run_at FROM email_accounts ORDER BY mailbox"
+  ],
+  "expect": {
+   "results": [
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":3,\"stored\":0,\"forgotten\":0,\"more\":false}"
+   ],
+   "calls": [
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "in:sent -in:chats label:solo",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "{from:carol@gmail.com to:carol@gmail.com from:team@zeta.example to:team@zeta.example from:mixed@zeta.example to:mixed@zeta.example} -in:chats label:solo",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    }
+   ],
+   "statements": [
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:01:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:00:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES (?, ?, ?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000001",
+      "Carol",
+      "",
+      "carol@gmail.com",
+      null
+     ]
+    },
+    {
+     "sql": "SELECT id FROM companies\n      WHERE lower(replace(replace(replace(rtrim(domain,'/'),'https://',''),'http://',''),'www.','')) = ?\n      LIMIT 1",
+     "params": [
+      "zeta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO companies (id, name, domain) VALUES (?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000002",
+      "Zeta",
+      "zeta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES (?, ?, ?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000003",
+      "team",
+      "",
+      "team@zeta.example",
+      "00000000-0000-4000-8000-000000000002"
+     ]
+    },
+    {
+     "sql": "SELECT id FROM companies\n      WHERE lower(replace(replace(replace(rtrim(domain,'/'),'https://',''),'http://',''),'www.','')) = ?\n      LIMIT 1",
+     "params": [
+      "zeta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES (?, ?, ?, ?, ?)",
+     "params": [
+      "00000000-0000-4000-8000-000000000004",
+      "Mixed",
+      "Case",
+      "mixed@zeta.example",
+      "00000000-0000-4000-8000-000000000002"
+     ]
+    },
+    {
+     "sql": "SELECT id, lower(trim(email)) AS email FROM contacts\n              WHERE email IS NOT NULL AND email != '' AND id > ?\n              ORDER BY id LIMIT ?",
+     "params": [
+      "",
+      20
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "00000000-0000-4000-8000-000000000001",
+      "carol@gmail.com"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "00000000-0000-4000-8000-000000000003",
+      "team@zeta.example"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n               ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "00000000-0000-4000-8000-000000000004",
+      "mixed@zeta.example"
+     ]
+    },
+    {
+     "sql": "SELECT id, lower(trim(email)) AS email FROM contacts\n              WHERE email IS NOT NULL AND email != '' AND id > ?\n              ORDER BY id LIMIT ?",
+     "params": [
+      "00000000-0000-4000-8000-000000000004",
+      20
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"done\"}",
+      "2026-10-14T12:00:00.000Z",
+      3,
+      "2026-10-14T12:00:00.000Z",
+      "me@mine.example"
+     ]
+    }
+   ],
+   "dumps": [
+    [],
+    [],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "00000000-0000-4000-8000-000000000001",
+      "email": "carol@gmail.com"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "00000000-0000-4000-8000-000000000003",
+      "email": "team@zeta.example"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "00000000-0000-4000-8000-000000000004",
+      "email": "mixed@zeta.example"
+     }
+    ],
+    [
+     {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "first_name": "Carol",
+      "last_name": "",
+      "email": "carol@gmail.com",
+      "company_id": null,
+      "last_contacted_at": null
+     },
+     {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "first_name": "team",
+      "last_name": "",
+      "email": "team@zeta.example",
+      "company_id": "00000000-0000-4000-8000-000000000002",
+      "last_contacted_at": null
+     },
+     {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "first_name": "Mixed",
+      "last_name": "Case",
+      "email": "mixed@zeta.example",
+      "company_id": "00000000-0000-4000-8000-000000000002",
+      "last_contacted_at": null
+     }
+    ],
+    [
+     {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "Zeta",
+      "domain": "zeta.example"
+     }
+    ],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "enabled": 1,
+      "labels": "[\"Solo\"]",
+      "history": "all",
+      "visibility": "metadata",
+      "auto_create": "sent",
+      "exclude_group": 0,
+      "exclude_personal": 0,
+      "blocklist": "[]",
+      "phase": "live",
+      "import_cursor": "{\"step\":\"live\",\"check\":\"done\"}",
+      "synced_until": "2026-10-14T12:00:00.000Z",
+      "contacts_created": 3,
+      "last_run_at": "2026-10-14T12:00:00.000Z",
+      "last_error": null,
+      "running_until": null,
+      "job_id": null,
+      "next_run_at": null
+     }
+    ]
+   ]
+  }
+ },
+ {
+  "name": "live rewinds a future mark, forgets future rows, checks stored sent mail",
+  "connected": [
+   "gmail"
+  ],
+  "seed": [
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-ada', 'Ada', '', 'ada@acme.example', NULL)",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-bob', 'Bob', '', 'bob@beta.example', NULL)",
+   "INSERT INTO email_accounts (mailbox, enabled, phase, visibility, auto_create, synced_until, import_cursor, contacts_created) VALUES ('me@mine.example', 1, 'live', 'everything', 'sent', '2026-11-20T00:00:00.000Z', '{\"step\":\"live\"}', 2)",
+   "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject) VALUES\n        ('me@mine.example', 'f1', 't-f1', '2026-12-25T09:00:00Z', 'sent', 'me@mine.example', NULL, '[\"ada@acme.example\"]', 'Scheduled'),\n        ('me@mine.example', 's-draft', 't1', '2026-10-05T10:00:00Z', 'sent', 'me@mine.example', NULL, '[\"ada@acme.example\"]', 'Draft'),\n        ('me@mine.example', 's-gone', 't2', '2026-10-04T10:00:00Z', 'sent', 'me@mine.example', NULL, '[\"bob@beta.example\"]', 'Gone'),\n        ('me@mine.example', 's-nf', 't2', '2026-10-04T09:00:00Z', 'sent', 'me@mine.example', NULL, '[\"bob@beta.example\"]', 'Not found'),\n        ('me@mine.example', 's-code', 't2', '2026-10-04T08:00:00Z', 'sent', 'me@mine.example', NULL, '[\"bob@beta.example\"]', 'Code'),\n        ('me@mine.example', 's-ok', 't3', '2026-10-03T10:00:00Z', 'sent', 'me@mine.example', NULL, '[\"ada@acme.example\"]', 'Fine'),\n        ('me@mine.example', 's-ok2', 't3', '2026-10-03T10:00:00Z', 'sent', 'me@mine.example', NULL, '[\"ada@acme.example\"]', 'Fine too'),\n        ('me@mine.example', 'r-1', 't4', '2026-10-06T10:00:00Z', 'received', 'ada@acme.example', 'Ada', '[\"me@mine.example\"]', 'Hi')",
+   "INSERT INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES\n        ('me@mine.example', 'f1', 'c-ada', '2026-12-25T09:00:00Z'),\n        ('me@mine.example', 's-draft', 'c-ada', '2026-10-05T10:00:00Z'),\n        ('me@mine.example', 's-gone', 'c-bob', '2026-10-04T10:00:00Z'),\n        ('me@mine.example', 's-nf', 'c-bob', '2026-10-04T09:00:00Z'),\n        ('me@mine.example', 's-code', 'c-bob', '2026-10-04T08:00:00Z'),\n        ('me@mine.example', 's-ok', 'c-ada', '2026-10-03T10:00:00Z'),\n        ('me@mine.example', 's-ok2', 'c-ada', '2026-10-03T10:00:00Z'),\n        ('me@mine.example', 'r-1', 'c-ada', '2026-10-06T10:00:00Z')",
+   "UPDATE contacts SET last_contacted_at = '2026-12-25T09:00:00Z' WHERE id = 'c-ada'"
+  ],
+  "rules": [
+   {
+    "action": "GMAIL_GET_PROFILE",
+    "data": {
+     "emailAddress": "me@mine.example"
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "queryHas": "after:17",
+    "data": {
+     "messages": []
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+    "args": {
+     "message_id": "s-draft"
+    },
+    "data": {
+     "labelIds": [
+      "DRAFT"
+     ]
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+    "args": {
+     "message_id": "s-gone"
+    },
+    "error": "Requested entity was not found."
+   },
+   {
+    "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+    "args": {
+     "message_id": "s-nf"
+    },
+    "error": "NOT_FOUND: no such message"
+   },
+   {
+    "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+    "args": {
+     "message_id": "s-code"
+    },
+    "error": "{\"error\":{\"code\":\t404}}"
+   },
+   {
+    "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+    "args": {
+     "message_id": "s-ok2"
+    },
+    "data": {
+     "labelIds": [
+      "SENT",
+      "INBOX"
+     ]
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+    "args": {
+     "message_id": "s-ok"
+    },
+    "data": {
+     "labelIds": "SENT"
+    }
+   }
+  ],
+  "steps": [
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:15:00.000Z"
+   }
+  ],
+  "dumps": [
+   "SELECT mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject FROM email_messages ORDER BY mailbox, id",
+   "SELECT mailbox, message_id, contact_id, sent_at FROM email_message_contacts ORDER BY mailbox, message_id, contact_id",
+   "SELECT mailbox, contact_id, email FROM email_contact_imports ORDER BY mailbox, contact_id",
+   "SELECT id, first_name, last_name, email, company_id, last_contacted_at FROM contacts ORDER BY id",
+   "SELECT id, name, domain FROM companies ORDER BY name",
+   "SELECT mailbox, enabled, labels, history, visibility, auto_create, exclude_group, exclude_personal, blocklist, phase, import_cursor, synced_until, contacts_created, last_run_at, last_error, running_until, job_id, next_run_at FROM email_accounts ORDER BY mailbox"
+  ],
+  "expect": {
+   "results": [
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":0,\"stored\":0,\"forgotten\":5,\"more\":false}",
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":0,\"stored\":0,\"forgotten\":0,\"more\":false}"
+   ],
+   "calls": [
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "-in:chats after:1789383600",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s-draft",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s-gone",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s-nf",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s-code",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s-ok2",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s-ok",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "-in:chats after:1789383600",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    }
+   ],
+   "statements": [
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:01:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:00:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id FROM email_messages WHERE mailbox = ? AND sent_at > ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-14T12:05:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT DISTINCT contact_id FROM email_message_contacts WHERE mailbox = ? AND message_id IN (?)",
+     "params": [
+      "me@mine.example",
+      "f1"
+     ]
+    },
+    {
+     "sql": "DELETE FROM email_message_contacts WHERE mailbox = ? AND message_id IN (?)",
+     "params": [
+      "me@mine.example",
+      "f1"
+     ]
+    },
+    {
+     "sql": "DELETE FROM email_messages WHERE mailbox = ? AND id IN (?)",
+     "params": [
+      "me@mine.example",
+      "f1"
+     ]
+    },
+    {
+     "sql": "SELECT id, sent_at FROM email_messages\n      WHERE mailbox = ? AND direction = 'sent' AND (sent_at < ? OR (sent_at = ? AND id < ?))\n      ORDER BY sent_at DESC, id DESC LIMIT ?",
+     "params": [
+      "me@mine.example",
+      "9999-12-31T23:59:59Z",
+      "9999-12-31T23:59:59Z",
+      "",
+      20
+     ]
+    },
+    {
+     "sql": "SELECT DISTINCT contact_id FROM email_message_contacts WHERE mailbox = ? AND message_id IN (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "s-draft",
+      "s-gone",
+      "s-nf",
+      "s-code"
+     ]
+    },
+    {
+     "sql": "DELETE FROM email_message_contacts WHERE mailbox = ? AND message_id IN (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "s-draft",
+      "s-gone",
+      "s-nf",
+      "s-code"
+     ]
+    },
+    {
+     "sql": "DELETE FROM email_messages WHERE mailbox = ? AND id IN (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "s-draft",
+      "s-gone",
+      "s-nf",
+      "s-code"
+     ]
+    },
+    {
+     "sql": "UPDATE contacts SET last_contacted_at =\n         (SELECT MAX(l.sent_at) FROM email_message_contacts l WHERE l.contact_id = contacts.id)\n       WHERE id IN (?, ?)",
+     "params": [
+      "c-ada",
+      "c-bob"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"done\"}",
+      "2026-09-14T12:00:00.000Z",
+      0,
+      "2026-10-14T12:00:00.000Z",
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:16:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:15:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id FROM email_messages WHERE mailbox = ? AND sent_at > ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-14T12:20:00.000Z"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"done\"}",
+      "2026-09-14T12:00:00.000Z",
+      0,
+      "2026-10-14T12:15:00.000Z",
+      "me@mine.example"
+     ]
+    }
+   ],
+   "dumps": [
+    [
+     {
+      "mailbox": "me@mine.example",
+      "id": "r-1",
+      "thread_id": "t4",
+      "sent_at": "2026-10-06T10:00:00Z",
+      "direction": "received",
+      "from_email": "ada@acme.example",
+      "from_name": "Ada",
+      "to_emails": "[\"me@mine.example\"]",
+      "subject": "Hi"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s-ok",
+      "thread_id": "t3",
+      "sent_at": "2026-10-03T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[\"ada@acme.example\"]",
+      "subject": "Fine"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s-ok2",
+      "thread_id": "t3",
+      "sent_at": "2026-10-03T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[\"ada@acme.example\"]",
+      "subject": "Fine too"
+     }
+    ],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "r-1",
+      "contact_id": "c-ada",
+      "sent_at": "2026-10-06T10:00:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "s-ok",
+      "contact_id": "c-ada",
+      "sent_at": "2026-10-03T10:00:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "s-ok2",
+      "contact_id": "c-ada",
+      "sent_at": "2026-10-03T10:00:00Z"
+     }
+    ],
+    [],
+    [
+     {
+      "id": "c-ada",
+      "first_name": "Ada",
+      "last_name": "",
+      "email": "ada@acme.example",
+      "company_id": null,
+      "last_contacted_at": "2026-10-06T10:00:00Z"
+     },
+     {
+      "id": "c-bob",
+      "first_name": "Bob",
+      "last_name": "",
+      "email": "bob@beta.example",
+      "company_id": null,
+      "last_contacted_at": null
+     }
+    ],
+    [],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "enabled": 1,
+      "labels": "[]",
+      "history": "12m",
+      "visibility": "everything",
+      "auto_create": "sent",
+      "exclude_group": 1,
+      "exclude_personal": 1,
+      "blocklist": "[]",
+      "phase": "live",
+      "import_cursor": "{\"step\":\"live\",\"check\":\"done\"}",
+      "synced_until": "2026-09-14T12:00:00.000Z",
+      "contacts_created": 2,
+      "last_run_at": "2026-10-14T12:15:00.000Z",
+      "last_error": null,
+      "running_until": null,
+      "job_id": null,
+      "next_run_at": null
+     }
+    ]
+   ]
+  }
+ },
+ {
+  "name": "a failed sent-mail check stops without forgetting, then finishes",
+  "connected": [
+   "gmail"
+  ],
+  "seed": [
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-ada', 'Ada', '', 'ada@acme.example', NULL)",
+   "INSERT INTO email_accounts (mailbox, enabled, phase, auto_create, synced_until, import_cursor) VALUES ('me@mine.example', 1, 'live', 'sent', '2026-10-14T11:00:00.000Z', '{\"step\":\"live\",\"check\":\"2026-10-04T10:00:00Z|s-gone\"}')",
+   "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject) VALUES\n        ('me@mine.example', 's-a', 't1', '2026-10-03T10:00:00Z', 'sent', 'me@mine.example', NULL, '[\"ada@acme.example\"]', NULL),\n        ('me@mine.example', 's-b', 't2', '2026-10-02T10:00:00Z', 'sent', 'me@mine.example', NULL, '[\"ada@acme.example\"]', NULL),\n        ('me@mine.example', 's-c', 't3', '2026-10-05T10:00:00Z', 'sent', 'me@mine.example', NULL, '[\"ada@acme.example\"]', NULL)"
+  ],
+  "rules": [
+   {
+    "action": "GMAIL_GET_PROFILE",
+    "data": {
+     "emailAddress": "me@mine.example"
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "queryHas": "after:17",
+    "data": {
+     "messages": []
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+    "args": {
+     "message_id": "s-a"
+    },
+    "data": {
+     "labelIds": [
+      "SENT"
+     ]
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+    "args": {
+     "message_id": "s-b"
+    },
+    "once": true,
+    "error": "Rate limit exceeded"
+   },
+   {
+    "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+    "args": {
+     "message_id": "s-b"
+    },
+    "data": {
+     "labelIds": []
+    }
+   }
+  ],
+  "steps": [
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:15:00.000Z"
+   }
+  ],
+  "dumps": [
+   "SELECT mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject FROM email_messages ORDER BY mailbox, id",
+   "SELECT mailbox, message_id, contact_id, sent_at FROM email_message_contacts ORDER BY mailbox, message_id, contact_id",
+   "SELECT mailbox, contact_id, email FROM email_contact_imports ORDER BY mailbox, contact_id",
+   "SELECT id, first_name, last_name, email, company_id, last_contacted_at FROM contacts ORDER BY id",
+   "SELECT id, name, domain FROM companies ORDER BY name",
+   "SELECT mailbox, enabled, labels, history, visibility, auto_create, exclude_group, exclude_personal, blocklist, phase, import_cursor, synced_until, contacts_created, last_run_at, last_error, running_until, job_id, next_run_at FROM email_accounts ORDER BY mailbox"
+  ],
+  "expect": {
+   "results": [
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":0,\"stored\":0,\"forgotten\":0,\"more\":false}",
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":0,\"stored\":0,\"forgotten\":1,\"more\":false}"
+   ],
+   "calls": [
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "-in:chats after:1791972000",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s-a",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s-b",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "-in:chats after:1791972000",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s-b",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    }
+   ],
+   "statements": [
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:01:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:00:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id FROM email_messages WHERE mailbox = ? AND sent_at > ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-14T12:05:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, sent_at FROM email_messages\n      WHERE mailbox = ? AND direction = 'sent' AND (sent_at < ? OR (sent_at = ? AND id < ?))\n      ORDER BY sent_at DESC, id DESC LIMIT ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-04T10:00:00Z",
+      "2026-10-04T10:00:00Z",
+      "s-gone",
+      20
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"2026-10-03T10:00:00Z|s-a\"}",
+      "2026-10-14T11:00:00.000Z",
+      0,
+      "2026-10-14T12:00:00.000Z",
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:16:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:15:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id FROM email_messages WHERE mailbox = ? AND sent_at > ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-14T12:20:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, sent_at FROM email_messages\n      WHERE mailbox = ? AND direction = 'sent' AND (sent_at < ? OR (sent_at = ? AND id < ?))\n      ORDER BY sent_at DESC, id DESC LIMIT ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-03T10:00:00Z",
+      "2026-10-03T10:00:00Z",
+      "s-a",
+      20
+     ]
+    },
+    {
+     "sql": "SELECT DISTINCT contact_id FROM email_message_contacts WHERE mailbox = ? AND message_id IN (?)",
+     "params": [
+      "me@mine.example",
+      "s-b"
+     ]
+    },
+    {
+     "sql": "DELETE FROM email_message_contacts WHERE mailbox = ? AND message_id IN (?)",
+     "params": [
+      "me@mine.example",
+      "s-b"
+     ]
+    },
+    {
+     "sql": "DELETE FROM email_messages WHERE mailbox = ? AND id IN (?)",
+     "params": [
+      "me@mine.example",
+      "s-b"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"done\"}",
+      "2026-10-14T11:00:00.000Z",
+      0,
+      "2026-10-14T12:15:00.000Z",
+      "me@mine.example"
+     ]
+    }
+   ],
+   "dumps": [
+    [
+     {
+      "mailbox": "me@mine.example",
+      "id": "s-a",
+      "thread_id": "t1",
+      "sent_at": "2026-10-03T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[\"ada@acme.example\"]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s-c",
+      "thread_id": "t3",
+      "sent_at": "2026-10-05T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[\"ada@acme.example\"]",
+      "subject": null
+     }
+    ],
+    [],
+    [],
+    [
+     {
+      "id": "c-ada",
+      "first_name": "Ada",
+      "last_name": "",
+      "email": "ada@acme.example",
+      "company_id": null,
+      "last_contacted_at": null
+     }
+    ],
+    [],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "enabled": 1,
+      "labels": "[]",
+      "history": "12m",
+      "visibility": "metadata",
+      "auto_create": "sent",
+      "exclude_group": 1,
+      "exclude_personal": 1,
+      "blocklist": "[]",
+      "phase": "live",
+      "import_cursor": "{\"step\":\"live\",\"check\":\"done\"}",
+      "synced_until": "2026-10-14T11:00:00.000Z",
+      "contacts_created": 0,
+      "last_run_at": "2026-10-14T12:15:00.000Z",
+      "last_error": null,
+      "running_until": null,
+      "job_id": null,
+      "next_run_at": null
+     }
+    ]
+   ]
+  }
+ },
+ {
+  "name": "25 sent rows are checked over two runs",
+  "connected": [
+   "gmail"
+  ],
+  "seed": [
+   "INSERT INTO email_accounts (mailbox, enabled, phase, auto_create, synced_until, import_cursor) VALUES ('me@mine.example', 1, 'live', 'sent', '2026-10-14T11:00:00.000Z', '{\"step\":\"live\",\"page\":null}')",
+   "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 25)\n       INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       SELECT 'me@mine.example', printf('s%02d', i), 't', printf('2026-09-%02dT10:00:00Z', i), 'sent', 'me@mine.example', NULL, '[]', NULL FROM n"
+  ],
+  "rules": [
+   {
+    "action": "GMAIL_GET_PROFILE",
+    "data": {
+     "emailAddress": "me@mine.example"
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "queryHas": "after:17",
+    "data": {
+     "messages": []
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+    "data": {
+     "labelIds": [
+      "SENT"
+     ]
+    }
+   }
+  ],
+  "steps": [
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:01:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:02:00.000Z"
+   }
+  ],
+  "dumps": [
+   "SELECT mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject FROM email_messages ORDER BY mailbox, id",
+   "SELECT mailbox, message_id, contact_id, sent_at FROM email_message_contacts ORDER BY mailbox, message_id, contact_id",
+   "SELECT mailbox, contact_id, email FROM email_contact_imports ORDER BY mailbox, contact_id",
+   "SELECT id, first_name, last_name, email, company_id, last_contacted_at FROM contacts ORDER BY id",
+   "SELECT id, name, domain FROM companies ORDER BY name",
+   "SELECT mailbox, enabled, labels, history, visibility, auto_create, exclude_group, exclude_personal, blocklist, phase, import_cursor, synced_until, contacts_created, last_run_at, last_error, running_until, job_id, next_run_at FROM email_accounts ORDER BY mailbox"
+  ],
+  "expect": {
+   "results": [
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":0,\"stored\":0,\"forgotten\":0,\"more\":true}",
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":0,\"stored\":0,\"forgotten\":0,\"more\":false}",
+    "{\"status\":\"ran\",\"phase\":\"live\",\"step\":\"live\",\"created\":0,\"stored\":0,\"forgotten\":0,\"more\":false}"
+   ],
+   "calls": [
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "-in:chats after:1791972000",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s25",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s24",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s23",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s22",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s21",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s20",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s19",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s18",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s17",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s16",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s15",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s14",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s13",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s12",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s11",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s10",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s09",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s08",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s07",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s06",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "-in:chats after:1791972000",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s05",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s04",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s03",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s02",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID",
+     "args": {
+      "message_id": "s01",
+      "format": "minimal",
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "-in:chats after:1791972000",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    }
+   ],
+   "statements": [
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:01:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:00:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id FROM email_messages WHERE mailbox = ? AND sent_at > ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-14T12:05:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, sent_at FROM email_messages\n      WHERE mailbox = ? AND direction = 'sent' AND (sent_at < ? OR (sent_at = ? AND id < ?))\n      ORDER BY sent_at DESC, id DESC LIMIT ?",
+     "params": [
+      "me@mine.example",
+      "9999-12-31T23:59:59Z",
+      "9999-12-31T23:59:59Z",
+      "",
+      20
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"2026-09-06T10:00:00Z|s06\"}",
+      "2026-10-14T11:00:00.000Z",
+      0,
+      "2026-10-14T12:00:00.000Z",
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:02:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:01:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id FROM email_messages WHERE mailbox = ? AND sent_at > ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-14T12:06:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, sent_at FROM email_messages\n      WHERE mailbox = ? AND direction = 'sent' AND (sent_at < ? OR (sent_at = ? AND id < ?))\n      ORDER BY sent_at DESC, id DESC LIMIT ?",
+     "params": [
+      "me@mine.example",
+      "2026-09-06T10:00:00Z",
+      "2026-09-06T10:00:00Z",
+      "s06",
+      20
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"done\"}",
+      "2026-10-14T11:00:00.000Z",
+      0,
+      "2026-10-14T12:01:00.000Z",
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:03:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:02:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT id, email FROM contacts WHERE email IS NOT NULL AND email != ''",
+     "params": []
+    },
+    {
+     "sql": "SELECT id FROM email_messages WHERE mailbox = ? AND sent_at > ?",
+     "params": [
+      "me@mine.example",
+      "2026-10-14T12:07:00.000Z"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET phase = ?, import_cursor = ?, synced_until = ?, contacts_created = contacts_created + ?,\n              last_run_at = ?, last_error = NULL, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "live",
+      "{\"step\":\"live\",\"check\":\"done\"}",
+      "2026-10-14T11:00:00.000Z",
+      0,
+      "2026-10-14T12:02:00.000Z",
+      "me@mine.example"
+     ]
+    }
+   ],
+   "dumps": [
+    [
+     {
+      "mailbox": "me@mine.example",
+      "id": "s01",
+      "thread_id": "t",
+      "sent_at": "2026-09-01T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s02",
+      "thread_id": "t",
+      "sent_at": "2026-09-02T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s03",
+      "thread_id": "t",
+      "sent_at": "2026-09-03T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s04",
+      "thread_id": "t",
+      "sent_at": "2026-09-04T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s05",
+      "thread_id": "t",
+      "sent_at": "2026-09-05T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s06",
+      "thread_id": "t",
+      "sent_at": "2026-09-06T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s07",
+      "thread_id": "t",
+      "sent_at": "2026-09-07T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s08",
+      "thread_id": "t",
+      "sent_at": "2026-09-08T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s09",
+      "thread_id": "t",
+      "sent_at": "2026-09-09T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s10",
+      "thread_id": "t",
+      "sent_at": "2026-09-10T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s11",
+      "thread_id": "t",
+      "sent_at": "2026-09-11T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s12",
+      "thread_id": "t",
+      "sent_at": "2026-09-12T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s13",
+      "thread_id": "t",
+      "sent_at": "2026-09-13T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s14",
+      "thread_id": "t",
+      "sent_at": "2026-09-14T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s15",
+      "thread_id": "t",
+      "sent_at": "2026-09-15T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s16",
+      "thread_id": "t",
+      "sent_at": "2026-09-16T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s17",
+      "thread_id": "t",
+      "sent_at": "2026-09-17T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s18",
+      "thread_id": "t",
+      "sent_at": "2026-09-18T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s19",
+      "thread_id": "t",
+      "sent_at": "2026-09-19T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s20",
+      "thread_id": "t",
+      "sent_at": "2026-09-20T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s21",
+      "thread_id": "t",
+      "sent_at": "2026-09-21T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s22",
+      "thread_id": "t",
+      "sent_at": "2026-09-22T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s23",
+      "thread_id": "t",
+      "sent_at": "2026-09-23T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s24",
+      "thread_id": "t",
+      "sent_at": "2026-09-24T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "s25",
+      "thread_id": "t",
+      "sent_at": "2026-09-25T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[]",
+      "subject": null
+     }
+    ],
+    [],
+    [],
+    [],
+    [],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "enabled": 1,
+      "labels": "[]",
+      "history": "12m",
+      "visibility": "metadata",
+      "auto_create": "sent",
+      "exclude_group": 1,
+      "exclude_personal": 1,
+      "blocklist": "[]",
+      "phase": "live",
+      "import_cursor": "{\"step\":\"live\",\"check\":\"done\"}",
+      "synced_until": "2026-10-14T11:00:00.000Z",
+      "contacts_created": 0,
+      "last_run_at": "2026-10-14T12:02:00.000Z",
+      "last_error": null,
+      "running_until": null,
+      "job_id": null,
+      "next_run_at": null
+     }
+    ]
+   ]
+  }
+ },
+ {
+  "name": "off, busy, and a connection that is not the mailbox",
+  "connected": [
+   "gmail"
+  ],
+  "seed": [
+   "INSERT INTO email_accounts (mailbox, enabled, auto_create) VALUES ('me@mine.example', 1, 'sent')",
+   "INSERT INTO email_accounts (mailbox, enabled) VALUES ('old@mine.example', 0)",
+   "INSERT INTO email_accounts (mailbox, enabled, running_until) VALUES ('busy@mine.example', 1, '2026-10-14T12:01:00.000Z')"
+  ],
+  "rules": [
+   {
+    "action": "GMAIL_GET_PROFILE",
+    "data": {
+     "emailAddress": null
+    },
+    "once": true
+   },
+   {
+    "action": "GMAIL_GET_PROFILE",
+    "data": {
+     "emailAddress": "Other@Mine.example"
+    }
+   }
+  ],
+  "steps": [
+   {
+    "op": "runSync",
+    "mailbox": "nobody@else.example",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "old@mine.example",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "busy@mine.example",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:00:30.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "busy@mine.example",
+    "now": "2026-10-14T12:02:00.000Z"
+   },
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:10:00.000Z",
+    "connected": []
+   },
+   {
+    "op": "runSync",
+    "mailbox": "me@mine.example",
+    "now": "2026-10-14T12:20:00.000Z",
+    "connected": [
+     "slack"
+    ]
+   }
+  ],
+  "dumps": [
+   "SELECT mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject FROM email_messages ORDER BY mailbox, id",
+   "SELECT mailbox, message_id, contact_id, sent_at FROM email_message_contacts ORDER BY mailbox, message_id, contact_id",
+   "SELECT mailbox, contact_id, email FROM email_contact_imports ORDER BY mailbox, contact_id",
+   "SELECT id, first_name, last_name, email, company_id, last_contacted_at FROM contacts ORDER BY id",
+   "SELECT id, name, domain FROM companies ORDER BY name",
+   "SELECT mailbox, enabled, labels, history, visibility, auto_create, exclude_group, exclude_personal, blocklist, phase, import_cursor, synced_until, contacts_created, last_run_at, last_error, running_until, job_id, next_run_at FROM email_accounts ORDER BY mailbox"
+  ],
+  "expect": {
+   "results": [
+    "{\"status\":\"off\"}",
+    "{\"status\":\"off\"}",
+    "{\"status\":\"busy\"}",
+    "{\"status\":\"error\",\"phase\":\"importing\",\"step\":\"sent\",\"created\":0,\"stored\":0,\"error\":\"The connected Google account did not report its address\"}",
+    "{\"status\":\"error\",\"phase\":\"importing\",\"step\":\"sent\",\"created\":0,\"stored\":0,\"error\":\"The connected Google account is now other@mine.example, not me@mine.example. Open Email settings to switch.\"}",
+    "{\"status\":\"error\",\"phase\":\"importing\",\"step\":\"sent\",\"created\":0,\"stored\":0,\"error\":\"The connected Google account is now other@mine.example, not busy@mine.example. Open Email settings to switch.\"}",
+    "{\"status\":\"error\",\"phase\":\"importing\",\"step\":\"sent\",\"created\":0,\"stored\":0,\"error\":\"Gmail is not connected. Connect it in Clawnify to keep syncing.\"}",
+    "{\"status\":\"error\",\"phase\":\"importing\",\"step\":\"sent\",\"created\":0,\"stored\":0,\"error\":\"Gmail is not connected. Connect it in Clawnify to keep syncing.\"}"
+   ],
+   "calls": [
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    }
+   ],
+   "statements": [
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "nobody@else.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "old@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "busy@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:01:30.000Z",
+      "busy@mine.example",
+      "2026-10-14T12:00:00.000Z"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:01:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:00:00.000Z"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET import_cursor = ?, contacts_created = contacts_created + ?, last_run_at = ?, last_error = ?, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "{\"step\":\"sent\",\"started_at\":\"2026-10-14T12:00:00.000Z\",\"check\":\"done\"}",
+      0,
+      "2026-10-14T12:00:00.000Z",
+      "The connected Google account did not report its address",
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:02:00.000Z",
+      "me@mine.example",
+      "2026-10-14T12:00:30.000Z"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET import_cursor = ?, contacts_created = contacts_created + ?, last_run_at = ?, last_error = ?, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "{\"step\":\"sent\",\"started_at\":\"2026-10-14T12:00:00.000Z\",\"check\":\"done\"}",
+      0,
+      "2026-10-14T12:00:30.000Z",
+      "The connected Google account is now other@mine.example, not me@mine.example. Open Email settings to switch.",
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "busy@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:03:30.000Z",
+      "busy@mine.example",
+      "2026-10-14T12:02:00.000Z"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET import_cursor = ?, contacts_created = contacts_created + ?, last_run_at = ?, last_error = ?, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "{\"step\":\"sent\",\"started_at\":\"2026-10-14T12:02:00.000Z\",\"check\":\"done\"}",
+      0,
+      "2026-10-14T12:02:00.000Z",
+      "The connected Google account is now other@mine.example, not busy@mine.example. Open Email settings to switch.",
+      "busy@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:11:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:10:00.000Z"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET import_cursor = ?, contacts_created = contacts_created + ?, last_run_at = ?, last_error = ?, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "{\"step\":\"sent\",\"started_at\":\"2026-10-14T12:00:00.000Z\",\"check\":\"done\"}",
+      0,
+      "2026-10-14T12:10:00.000Z",
+      "Gmail is not connected. Connect it in Clawnify to keep syncing.",
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts WHERE mailbox = ?",
+     "params": [
+      "me@mine.example"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET running_until = ?\n      WHERE mailbox = ? AND enabled = 1 AND (running_until IS NULL OR running_until < ?)\n      RETURNING mailbox",
+     "params": [
+      "2026-10-14T12:21:30.000Z",
+      "me@mine.example",
+      "2026-10-14T12:20:00.000Z"
+     ]
+    },
+    {
+     "sql": "UPDATE email_accounts SET import_cursor = ?, contacts_created = contacts_created + ?, last_run_at = ?, last_error = ?, running_until = NULL WHERE mailbox = ?",
+     "params": [
+      "{\"step\":\"sent\",\"started_at\":\"2026-10-14T12:00:00.000Z\",\"check\":\"done\"}",
+      0,
+      "2026-10-14T12:20:00.000Z",
+      "Gmail is not connected. Connect it in Clawnify to keep syncing.",
+      "me@mine.example"
+     ]
+    }
+   ],
+   "dumps": [
+    [],
+    [],
+    [],
+    [],
+    [],
+    [
+     {
+      "mailbox": "busy@mine.example",
+      "enabled": 1,
+      "labels": "[]",
+      "history": "12m",
+      "visibility": "metadata",
+      "auto_create": "sent",
+      "exclude_group": 1,
+      "exclude_personal": 1,
+      "blocklist": "[]",
+      "phase": "idle",
+      "import_cursor": "{\"step\":\"sent\",\"started_at\":\"2026-10-14T12:02:00.000Z\",\"check\":\"done\"}",
+      "synced_until": null,
+      "contacts_created": 0,
+      "last_run_at": "2026-10-14T12:02:00.000Z",
+      "last_error": "The connected Google account is now other@mine.example, not busy@mine.example. Open Email settings to switch.",
+      "running_until": null,
+      "job_id": null,
+      "next_run_at": null
+     },
+     {
+      "mailbox": "me@mine.example",
+      "enabled": 1,
+      "labels": "[]",
+      "history": "12m",
+      "visibility": "metadata",
+      "auto_create": "sent",
+      "exclude_group": 1,
+      "exclude_personal": 1,
+      "blocklist": "[]",
+      "phase": "idle",
+      "import_cursor": "{\"step\":\"sent\",\"started_at\":\"2026-10-14T12:00:00.000Z\",\"check\":\"done\"}",
+      "synced_until": null,
+      "contacts_created": 0,
+      "last_run_at": "2026-10-14T12:20:00.000Z",
+      "last_error": "Gmail is not connected. Connect it in Clawnify to keep syncing.",
+      "running_until": null,
+      "job_id": null,
+      "next_run_at": null
+     },
+     {
+      "mailbox": "old@mine.example",
+      "enabled": 0,
+      "labels": "[]",
+      "history": "12m",
+      "visibility": "metadata",
+      "auto_create": "sent",
+      "exclude_group": 1,
+      "exclude_personal": 1,
+      "blocklist": "[]",
+      "phase": "idle",
+      "import_cursor": null,
+      "synced_until": null,
+      "contacts_created": 0,
+      "last_run_at": null,
+      "last_error": null,
+      "running_until": null,
+      "job_id": null,
+      "next_run_at": null
+     }
+    ]
+   ]
+  }
+ },
+ {
+  "name": "a contact added after the import",
+  "connected": [
+   "gmail"
+  ],
+  "seed": [
+   "INSERT INTO email_accounts (mailbox, enabled, phase, visibility, history, blocklist) VALUES ('me@mine.example', 1, 'live', 'subject', 'all', '[\"@blocked.example\"]')",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-new', 'New', '', ' New@Else.example ', NULL)",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-blocked', 'Blocked', '', 'x@blocked.example', NULL)",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-done', 'Done', '', 'done@else.example', NULL)",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-changed', 'Changed', '', 'changed@else.example', NULL)",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-noemail', 'No', '', NULL, NULL)",
+   "INSERT INTO contacts (id, first_name, last_name, email, company_id) VALUES ('c-other', 'Other', '', 'other@else.example', NULL)",
+   "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES ('me@mine.example', 'c-done', 'done@else.example'), ('me@mine.example', 'c-changed', 'old@else.example')"
+  ],
+  "rules": [
+   {
+    "action": "GMAIL_GET_PROFILE",
+    "data": {
+     "emailAddress": "me@mine.example"
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "queryHas": "from:new@else.example",
+    "data": {
+     "messages": [
+      {
+       "messageId": "n1",
+       "threadId": "t-n1",
+       "messageTimestamp": "2026-10-10T10:00:00Z",
+       "sender": "New <new@else.example>",
+       "to": "me@mine.example",
+       "subject": "Hello",
+       "labelIds": [
+        "INBOX"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      },
+      {
+       "messageId": "n2",
+       "threadId": "t-n2",
+       "messageTimestamp": "2026-10-11T10:00:00Z",
+       "sender": "me@mine.example",
+       "to": "new@else.example, x@blocked.example",
+       "subject": "Reply",
+       "labelIds": [
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      }
+     ],
+     "nextPageToken": "never-read"
+    }
+   },
+   {
+    "action": "GMAIL_FETCH_EMAILS",
+    "queryHas": "from:changed@else.example",
+    "data": {
+     "messages": [
+      {
+       "messageId": "c1",
+       "threadId": "t-c1",
+       "messageTimestamp": "2026-10-12T10:00:00Z",
+       "sender": "me@mine.example",
+       "to": "changed@else.example",
+       "subject": "Moved",
+       "labelIds": [
+        "SENT"
+       ],
+       "preview": {
+        "body": "never stored"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "steps": [
+   {
+    "op": "importContactIfNeeded",
+    "contact": "c-new",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "importContactIfNeeded",
+    "contact": "c-new",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "importContactIfNeeded",
+    "contact": "c-blocked",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "importContactIfNeeded",
+    "contact": "c-done",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "importContactIfNeeded",
+    "contact": "c-changed",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "importContactIfNeeded",
+    "contact": "c-noemail",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "importContactIfNeeded",
+    "contact": "c-unknown",
+    "now": "2026-10-14T12:00:00.000Z"
+   },
+   {
+    "op": "importContactIfNeeded",
+    "contact": "c-other",
+    "now": "2026-10-14T12:00:00.000Z",
+    "connected": []
+   }
+  ],
+  "dumps": [
+   "SELECT mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject FROM email_messages ORDER BY mailbox, id",
+   "SELECT mailbox, message_id, contact_id, sent_at FROM email_message_contacts ORDER BY mailbox, message_id, contact_id",
+   "SELECT mailbox, contact_id, email FROM email_contact_imports ORDER BY mailbox, contact_id",
+   "SELECT id, first_name, last_name, email, company_id, last_contacted_at FROM contacts ORDER BY id",
+   "SELECT id, name, domain FROM companies ORDER BY name",
+   "SELECT mailbox, enabled, labels, history, visibility, auto_create, exclude_group, exclude_personal, blocklist, phase, import_cursor, synced_until, contacts_created, last_run_at, last_error, running_until, job_id, next_run_at FROM email_accounts ORDER BY mailbox"
+  ],
+  "expect": {
+   "results": [
+    "{\"ok\":true}",
+    "{\"ok\":true}",
+    "{\"ok\":true}",
+    "{\"ok\":true}",
+    "{\"ok\":true}",
+    "{\"ok\":true}",
+    "{\"ok\":true}",
+    "{\"error\":\"Gmail is not connected. Connect it in Clawnify to keep syncing.\"}"
+   ],
+   "calls": [
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "{from:new@else.example to:new@else.example} -in:chats",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_GET_PROFILE",
+     "args": {
+      "user_id": "me"
+     }
+    },
+    {
+     "service": "gmail",
+     "action": "GMAIL_FETCH_EMAILS",
+     "args": {
+      "query": "{from:changed@else.example to:changed@else.example} -in:chats",
+      "max_results": 100,
+      "verbose": false,
+      "include_payload": false
+     }
+    }
+   ],
+   "statements": [
+    {
+     "sql": "SELECT * FROM email_accounts ORDER BY enabled DESC, updated_at DESC LIMIT 1",
+     "params": []
+    },
+    {
+     "sql": "SELECT lower(trim(email)) AS email FROM contacts WHERE id = ?",
+     "params": [
+      "c-new"
+     ]
+    },
+    {
+     "sql": "SELECT email FROM email_contact_imports WHERE mailbox = ? AND contact_id = ?",
+     "params": [
+      "me@mine.example",
+      "c-new"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "n1",
+      "t-n1",
+      "2026-10-10T10:00:00Z",
+      "received",
+      "new@else.example",
+      "New",
+      "[\"me@mine.example\"]",
+      "Hello"
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "n1",
+      "c-new",
+      "2026-10-10T10:00:00Z"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "n2",
+      "t-n2",
+      "2026-10-11T10:00:00Z",
+      "sent",
+      "me@mine.example",
+      null,
+      "[\"new@else.example\",\"x@blocked.example\"]",
+      "Reply"
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "n2",
+      "c-new",
+      "2026-10-11T10:00:00Z"
+     ]
+    },
+    {
+     "sql": "UPDATE contacts SET last_contacted_at =\n         (SELECT MAX(l.sent_at) FROM email_message_contacts l WHERE l.contact_id = contacts.id)\n       WHERE id IN (?)",
+     "params": [
+      "c-new"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n     ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "c-new",
+      "new@else.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts ORDER BY enabled DESC, updated_at DESC LIMIT 1",
+     "params": []
+    },
+    {
+     "sql": "SELECT lower(trim(email)) AS email FROM contacts WHERE id = ?",
+     "params": [
+      "c-new"
+     ]
+    },
+    {
+     "sql": "SELECT email FROM email_contact_imports WHERE mailbox = ? AND contact_id = ?",
+     "params": [
+      "me@mine.example",
+      "c-new"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts ORDER BY enabled DESC, updated_at DESC LIMIT 1",
+     "params": []
+    },
+    {
+     "sql": "SELECT lower(trim(email)) AS email FROM contacts WHERE id = ?",
+     "params": [
+      "c-blocked"
+     ]
+    },
+    {
+     "sql": "SELECT email FROM email_contact_imports WHERE mailbox = ? AND contact_id = ?",
+     "params": [
+      "me@mine.example",
+      "c-blocked"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts ORDER BY enabled DESC, updated_at DESC LIMIT 1",
+     "params": []
+    },
+    {
+     "sql": "SELECT lower(trim(email)) AS email FROM contacts WHERE id = ?",
+     "params": [
+      "c-done"
+     ]
+    },
+    {
+     "sql": "SELECT email FROM email_contact_imports WHERE mailbox = ? AND contact_id = ?",
+     "params": [
+      "me@mine.example",
+      "c-done"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts ORDER BY enabled DESC, updated_at DESC LIMIT 1",
+     "params": []
+    },
+    {
+     "sql": "SELECT lower(trim(email)) AS email FROM contacts WHERE id = ?",
+     "params": [
+      "c-changed"
+     ]
+    },
+    {
+     "sql": "SELECT email FROM email_contact_imports WHERE mailbox = ? AND contact_id = ?",
+     "params": [
+      "me@mine.example",
+      "c-changed"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_messages (mailbox, id, thread_id, sent_at, direction, from_email, from_name, to_emails, subject)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT (mailbox, id) DO UPDATE SET subject = excluded.subject",
+     "params": [
+      "me@mine.example",
+      "c1",
+      "t-c1",
+      "2026-10-12T10:00:00Z",
+      "sent",
+      "me@mine.example",
+      null,
+      "[\"changed@else.example\"]",
+      "Moved"
+     ]
+    },
+    {
+     "sql": "INSERT OR IGNORE INTO email_message_contacts (mailbox, message_id, contact_id, sent_at) VALUES (?, ?, ?, ?)",
+     "params": [
+      "me@mine.example",
+      "c1",
+      "c-changed",
+      "2026-10-12T10:00:00Z"
+     ]
+    },
+    {
+     "sql": "UPDATE contacts SET last_contacted_at =\n         (SELECT MAX(l.sent_at) FROM email_message_contacts l WHERE l.contact_id = contacts.id)\n       WHERE id IN (?)",
+     "params": [
+      "c-changed"
+     ]
+    },
+    {
+     "sql": "INSERT INTO email_contact_imports (mailbox, contact_id, email) VALUES (?, ?, ?)\n     ON CONFLICT (mailbox, contact_id) DO UPDATE SET email = excluded.email, imported_at = datetime('now')",
+     "params": [
+      "me@mine.example",
+      "c-changed",
+      "changed@else.example"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts ORDER BY enabled DESC, updated_at DESC LIMIT 1",
+     "params": []
+    },
+    {
+     "sql": "SELECT lower(trim(email)) AS email FROM contacts WHERE id = ?",
+     "params": [
+      "c-noemail"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts ORDER BY enabled DESC, updated_at DESC LIMIT 1",
+     "params": []
+    },
+    {
+     "sql": "SELECT lower(trim(email)) AS email FROM contacts WHERE id = ?",
+     "params": [
+      "c-unknown"
+     ]
+    },
+    {
+     "sql": "SELECT * FROM email_accounts ORDER BY enabled DESC, updated_at DESC LIMIT 1",
+     "params": []
+    },
+    {
+     "sql": "SELECT lower(trim(email)) AS email FROM contacts WHERE id = ?",
+     "params": [
+      "c-other"
+     ]
+    },
+    {
+     "sql": "SELECT email FROM email_contact_imports WHERE mailbox = ? AND contact_id = ?",
+     "params": [
+      "me@mine.example",
+      "c-other"
+     ]
+    }
+   ],
+   "dumps": [
+    [
+     {
+      "mailbox": "me@mine.example",
+      "id": "c1",
+      "thread_id": "t-c1",
+      "sent_at": "2026-10-12T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[\"changed@else.example\"]",
+      "subject": "Moved"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "n1",
+      "thread_id": "t-n1",
+      "sent_at": "2026-10-10T10:00:00Z",
+      "direction": "received",
+      "from_email": "new@else.example",
+      "from_name": "New",
+      "to_emails": "[\"me@mine.example\"]",
+      "subject": "Hello"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "id": "n2",
+      "thread_id": "t-n2",
+      "sent_at": "2026-10-11T10:00:00Z",
+      "direction": "sent",
+      "from_email": "me@mine.example",
+      "from_name": null,
+      "to_emails": "[\"new@else.example\",\"x@blocked.example\"]",
+      "subject": "Reply"
+     }
+    ],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "c1",
+      "contact_id": "c-changed",
+      "sent_at": "2026-10-12T10:00:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "n1",
+      "contact_id": "c-new",
+      "sent_at": "2026-10-10T10:00:00Z"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "message_id": "n2",
+      "contact_id": "c-new",
+      "sent_at": "2026-10-11T10:00:00Z"
+     }
+    ],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "c-changed",
+      "email": "changed@else.example"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "c-done",
+      "email": "done@else.example"
+     },
+     {
+      "mailbox": "me@mine.example",
+      "contact_id": "c-new",
+      "email": "new@else.example"
+     }
+    ],
+    [
+     {
+      "id": "c-blocked",
+      "first_name": "Blocked",
+      "last_name": "",
+      "email": "x@blocked.example",
+      "company_id": null,
+      "last_contacted_at": null
+     },
+     {
+      "id": "c-changed",
+      "first_name": "Changed",
+      "last_name": "",
+      "email": "changed@else.example",
+      "company_id": null,
+      "last_contacted_at": "2026-10-12T10:00:00Z"
+     },
+     {
+      "id": "c-done",
+      "first_name": "Done",
+      "last_name": "",
+      "email": "done@else.example",
+      "company_id": null,
+      "last_contacted_at": null
+     },
+     {
+      "id": "c-new",
+      "first_name": "New",
+      "last_name": "",
+      "email": " New@Else.example ",
+      "company_id": null,
+      "last_contacted_at": "2026-10-11T10:00:00Z"
+     },
+     {
+      "id": "c-noemail",
+      "first_name": "No",
+      "last_name": "",
+      "email": null,
+      "company_id": null,
+      "last_contacted_at": null
+     },
+     {
+      "id": "c-other",
+      "first_name": "Other",
+      "last_name": "",
+      "email": "other@else.example",
+      "company_id": null,
+      "last_contacted_at": null
+     }
+    ],
+    [],
+    [
+     {
+      "mailbox": "me@mine.example",
+      "enabled": 1,
+      "labels": "[]",
+      "history": "all",
+      "visibility": "subject",
+      "auto_create": "sent",
+      "exclude_group": 1,
+      "exclude_personal": 1,
+      "blocklist": "[\"@blocked.example\"]",
+      "phase": "live",
+      "import_cursor": null,
+      "synced_until": null,
+      "contacts_created": 0,
+      "last_run_at": null,
+      "last_error": null,
+      "running_until": null,
+      "job_id": null,
+      "next_run_at": null
+     }
+    ]
+   ]
+  }
+ }
+]
