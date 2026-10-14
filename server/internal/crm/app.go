@@ -5,17 +5,16 @@ package crm
 import (
 	"net/http"
 
+	"opencrm/internal/clawnify"
 	"opencrm/internal/web"
 	"opencrm/internal/web/discovery"
 )
 
-// Env is a placeholder for clawnify.Env, which Task 3 brings.
-type Env struct{}
-
 // App is what every route can reach beyond the request: the deployment's
 // configuration and clients.
 type App struct {
-	Env Env
+	Env  clawnify.Env
+	Conn *clawnify.Connections
 }
 
 var routes []func(rt *web.Router, app *App)

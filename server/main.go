@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"opencrm/internal/clawnify"
 	"opencrm/internal/crm"
 	"opencrm/internal/db"
 	"opencrm/internal/web"
@@ -32,7 +33,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           crm.New(&crm.App{}),
+		Handler:           crm.New(newApp()),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
@@ -55,4 +56,12 @@ func main() {
 	if !web.Drain(20 * time.Second) {
 		log.Print("shutdown: background work still running, exiting anyway")
 	}
+}
+
+// newApp reads the platform configuration the Worker passes on. The
+// connections client has no timeout of its own: each call carries its
+// request's context.
+func newApp() *crm.App {
+	env := clawnify.EnvFromOS()
+	return &crm.App{Env: env, Conn: clawnify.NewConnections(env, nil)}
 }

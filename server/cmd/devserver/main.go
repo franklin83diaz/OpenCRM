@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 
+	"opencrm/internal/clawnify"
 	"opencrm/internal/crm"
 	"opencrm/internal/db"
 	"opencrm/internal/db/sqlite"
@@ -31,6 +32,7 @@ func main() {
 		log.Fatal(err)
 	}
 	db.Use(d)
+	env := clawnify.EnvFromOS()
 	log.Printf("listening on %s, database %s", *addr, *path)
-	log.Fatal(http.ListenAndServe(*addr, crm.New(&crm.App{})))
+	log.Fatal(http.ListenAndServe(*addr, crm.New(&crm.App{Env: env, Conn: clawnify.NewConnections(env, nil)})))
 }
