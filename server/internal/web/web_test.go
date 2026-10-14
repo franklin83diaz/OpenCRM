@@ -2,10 +2,14 @@ package web_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -25,6 +29,52 @@ func TestJSONDoesNotEscapeHTML(t *testing.T) {
 	}
 	if got := rec.Body.String(); got != `{"name":"Cedar & Co <x>"}` {
 		t.Errorf("body = %q", got)
+	}
+}
+
+// JSON.stringify writes NaN and ±Infinity as null; encoding/json refuses them.
+func TestJSONWritesNonFiniteNumbersAsNull(t *testing.T) {
+	type inner struct {
+		F32 float32 `json:"f32"`
+		Any any     `json:"any,omitempty"`
+	}
+	type outer struct {
+		X      float64            `json:"x"`
+		Ptr    *float64           `json:"ptr"`
+		List   []float64          `json:"list"`
+		Inner  inner              `json:"inner"`
+		Nested map[string]any     `json:"nested"`
+		Raw    json.RawMessage    `json:"raw"`
+		Text   string             `json:"text"`
+		ByKey  map[string]float64 `json:"byKey"`
+	}
+	nan, inf := math.NaN(), math.Inf(1)
+	cases := []struct {
+		v    any
+		want string
+	}{
+		{map[string]any{"a": nan, "b": []any{inf, 1.0}}, `{"a":null,"b":[null,1]}`},
+		{nan, `null`},
+		{[]float64{math.Inf(-1), -1.5e-300, 2}, `[null,-1.5e-300,2]`},
+		{outer{
+			X: nan, Ptr: &inf, List: []float64{1, nan},
+			Inner:  inner{F32: float32(math.Inf(-1)), Any: []any{map[string]any{"deep": nan}}},
+			Nested: map[string]any{"n": map[string]any{"m": []any{inf, "NaN & <x>"}}},
+			Raw:    json.RawMessage(`{"kept":1}`),
+			Text:   "-1e+308 null",
+			ByKey:  map[string]float64{"k": nan},
+		}, `{"x":null,"ptr":null,"list":[1,null],"inner":{"f32":null,"any":[{"deep":null}]},` +
+			`"nested":{"n":{"m":[null,"NaN & <x>"]}},"raw":{"kept":1},"text":"-1e+308 null","byKey":{"k":null}}`},
+	}
+	for _, c := range cases {
+		rec := httptest.NewRecorder()
+		if err := web.JSON(rec, 200, c.v); err != nil {
+			t.Errorf("JSON(%#v) error: %v", c.v, err)
+			continue
+		}
+		if got := rec.Body.String(); got != c.want {
+			t.Errorf("JSON(%#v)\n got %s\nwant %s", c.v, got, c.want)
+		}
 	}
 }
 
@@ -253,5 +303,35 @@ func TestBackgroundOutlivesTheRequest(t *testing.T) {
 	}
 	if err := <-done; err != nil {
 		t.Errorf("background ctx was canceled with the request: %v", err)
+	}
+}
+
+// Drain must tolerate Background starting work while it waits — including
+// from an idle state, which is a misuse of a bare sync.WaitGroup. Run with -race.
+func TestBackgroundDuringDrain(t *testing.T) {
+	r := httptest.NewRequest("GET", "/api/stats", nil)
+	var ran atomic.Int32
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(2)
+		go func() { defer wg.Done(); web.Drain(time.Second) }()
+		go func() { defer wg.Done(); web.Background(r, func(context.Context) { ran.Add(1) }) }()
+	}
+	wg.Wait()
+	if !web.Drain(time.Second) || ran.Load() != 100 {
+		t.Fatalf("after drain, %d of 100 background jobs ran", ran.Load())
+	}
+
+	// Work started while Drain waits is waited for too.
+	release := make(chan struct{})
+	web.Background(r, func(context.Context) { <-release; ran.Add(1) })
+	drained := make(chan bool)
+	go func() { drained <- web.Drain(5 * time.Second) }()
+	for i := 0; i < 10; i++ {
+		web.Background(r, func(context.Context) { ran.Add(1) })
+	}
+	close(release)
+	if !<-drained || ran.Load() != 111 {
+		t.Fatalf("Drain returned before all work finished: %d of 111 ran", ran.Load())
 	}
 }

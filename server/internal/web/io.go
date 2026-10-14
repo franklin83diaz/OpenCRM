@@ -8,19 +8,32 @@ import (
 )
 
 // JSON writes v as c.json(v, status) did: no HTML escaping ("Cedar & Co" stays
-// as is) and no trailing newline. Map keys come out sorted, where JS kept
-// insertion order; use a struct when the order of a body's fields matters.
+// as is), NaN and ±Infinity as null, and no trailing newline. Map keys come
+// out sorted, where JS kept insertion order; use a struct when the order of a
+// body's fields matters.
 func JSON(w http.ResponseWriter, status int, v any) error {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
+	b, err := marshal(v)
+	if isNonFinite(err) {
+		b, err = marshalNonFinite(v)
+	}
+	if err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	w.Write(bytes.TrimSuffix(buf.Bytes(), []byte("\n")))
+	w.Write(b)
 	return nil // a failed write means the client left; nothing to report to it
+}
+
+// marshal is json.Marshal without HTML escaping.
+func marshal(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
 }
 
 // Text writes body with the given content type.

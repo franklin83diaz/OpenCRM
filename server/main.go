@@ -50,7 +50,8 @@ func main() {
 	if err := srv.Shutdown(shutdown); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
-	// Requests are done; give the work they left behind (waitUntil) its chance.
+	// Give the work requests left behind (waitUntil) its chance. If Shutdown
+	// timed out, a request still running may start more; Drain waits for that too.
 	if !web.Drain(20 * time.Second) {
 		log.Print("shutdown: background work still running, exiting anyway")
 	}

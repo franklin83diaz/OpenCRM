@@ -91,6 +91,13 @@ func TestParamsMustBeScalars(t *testing.T) {
 	if err == nil || !strings.HasPrefix(err.Error(), "@clawnify/db: param [1] is object") || !strings.HasSuffix(err.Error(), `xxx...`) {
 		t.Errorf("Run(map) error = %v", err)
 	}
+	// The bridge speaks JSON: a []byte would cross as base64 and be bound as
+	// TEXT in production while SQLite stored a real BLOB in tests.
+	_, err = db.Run(context.Background(), "x", nil, []byte("blob"))
+	want = "@clawnify/db: param [1] is []byte — blobs aren't supported over the D1 bridge (they would be stored as base64 text)"
+	if err == nil || err.Error() != want {
+		t.Errorf("Run([]byte) error = %v; want %q", err, want)
+	}
 	if got != nil {
 		t.Errorf("a refused query reached the bridge: %#v", got)
 	}

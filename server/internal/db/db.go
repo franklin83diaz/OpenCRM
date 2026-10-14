@@ -12,7 +12,7 @@ import (
 	"reflect"
 )
 
-// Row is one result row, column name → value (string, float64, []byte or nil).
+// Row is one result row, column name → value (string, float64 or nil).
 type Row = map[string]any
 
 // Result is what a write reports back, as D1's meta.changes / meta.last_row_id.
@@ -80,11 +80,15 @@ func nonNil(params []any) []any {
 
 // assertBindable is @clawnify/db's guard, with its message: an object handed
 // to D1 binds as "[object Object]" without complaint, so refuse it up front.
+// Blobs are refused too: the bridge to D1 is JSON, so a []byte would arrive as
+// base64 and be stored as TEXT — while SQLite in tests stored a real BLOB.
 func assertBindable(params []any) error {
 	for i, v := range params {
 		switch v.(type) {
-		case nil, string, bool, int, int64, float64, []byte:
+		case nil, string, bool, int, int64, float64:
 			continue
+		case []byte:
+			return fmt.Errorf("@clawnify/db: param [%d] is []byte — blobs aren't supported over the D1 bridge (they would be stored as base64 text)", i)
 		}
 		preview := fmt.Sprint(v)
 		if b, err := json.Marshal(v); err == nil {
