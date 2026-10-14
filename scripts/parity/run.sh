@@ -9,25 +9,37 @@ P="$ROOT/.parity"
 REF="$P/ts-ref"
 TS_PORT=8788
 GO_PORT=8790
+INSPECTOR_PORT=9230
 export GOTOOLCHAIN=local
 
 mkdir -p "$P"
 
+TS_PID=""
+GO_PID=""
 cleanup() {
-  # Kill by recorded PID / process group only, never by pattern.
-  if [ -f "$P/ts.pgid" ]; then kill -- "-$(cat "$P/ts.pgid")" 2>/dev/null || true; rm -f "$P/ts.pgid"; fi
-  if [ -f "$P/go.pid" ]; then kill "$(cat "$P/go.pid")" 2>/dev/null || true; rm -f "$P/go.pid"; fi
+  # Kill by recorded PID / process group only, never by pattern. TS_PID is a
+  # session leader (setsid), so -TS_PID reaches wrangler and its workerd child.
+  if [ -n "$TS_PID" ]; then kill -- "-$TS_PID" 2>/dev/null || kill "$TS_PID" 2>/dev/null || true; fi
+  if [ -n "$GO_PID" ]; then kill "$GO_PID" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
 
-if [ -n "$(ss -ltn "sport = :$TS_PORT or sport = :$GO_PORT" | tail -n +2)" ]; then
-  echo "parity: port $TS_PORT or $GO_PORT is already in use" >&2
-  exit 2
-fi
+for port in $TS_PORT $GO_PORT $INSPECTOR_PORT; do
+  if [ -n "$(ss -ltn "sport = :$port" | tail -n +2)" ]; then
+    echo "parity: port $port is already in use" >&2
+    exit 2
+  fi
+done
+rm -f "$P/ts.pgid" "$P/go.pid"
 
 # 1. The TS reference checkout.
 if [ ! -e "$REF" ]; then
   git -C "$ROOT" worktree add --detach "$REF" "${PARITY_BASE:-0068887}" >&2
+fi
+BASE="$(git -C "$ROOT" rev-parse "${PARITY_BASE:-0068887}^{commit}")"
+if [ "$(git -C "$REF" rev-parse HEAD)" != "$BASE" ]; then
+  git -C "$REF" checkout -q --detach "$BASE" \
+    || { echo "parity: $REF is not at $BASE and could not be moved there" >&2; exit 2; }
 fi
 [ -e "$REF/node_modules" ] || ln -s "$ROOT/node_modules" "$REF/node_modules"
 
@@ -40,11 +52,8 @@ for x in ts go; do
   done
 done
 
-# 3. Start both servers.
-# The inner shell records its own PID, which setsid makes the process group
-# leader, so cleanup can kill wrangler and its workerd child together.
-(cd "$REF" && exec setsid bash -c 'echo $$ >"$0"; exec npx wrangler dev --port '$TS_PORT' --inspector-port 9230 --persist-to "$1"' "$P/ts.pgid" "$P/state-ts" >"$P/ts.log" 2>&1) &
-
+# 3. Start both servers. Build and check first, so nothing can fail between
+# launching TS and the trap knowing its PID.
 (cd "$ROOT/server" && go build -o "$P/devserver" ./cmd/devserver)
 shopt -s nullglob
 sqlites=("$P"/state-go/v3/d1/miniflare-D1DatabaseObject/[0-9a-f]*.sqlite)
@@ -52,8 +61,13 @@ if [ "${#sqlites[@]}" -ne 1 ]; then
   echo "parity: expected one sqlite file under state-go, found ${#sqlites[@]}" >&2
   exit 2
 fi
+
+cd "$REF"
+setsid npx wrangler dev --port $TS_PORT --inspector-port $INSPECTOR_PORT --persist-to "$P/state-ts" >"$P/ts.log" 2>&1 &
+TS_PID=$!
+cd "$ROOT"
 "$P/devserver" -sqlite "${sqlites[0]}" -addr ":$GO_PORT" >"$P/go.log" 2>&1 &
-echo $! >"$P/go.pid"
+GO_PID=$!
 
 # wait_for <port> <label> <logname> <path>
 wait_for() {

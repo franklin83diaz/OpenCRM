@@ -149,5 +149,9 @@ for (const file of selected) {
   }
 }
 
+if (scenarios === 0) {
+  console.error("parity: no scenarios ran");
+  process.exit(2);
+}
 console.log(`parity: ${scenarios} scenarios, ${calls} calls, ${mismatches} mismatches`);
 process.exit(mismatches ? 1 : 0);
