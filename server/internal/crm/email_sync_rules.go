@@ -289,7 +289,7 @@ func SplitName(address Address) PersonName {
 				return PersonName{First: first, Last: last}
 			}
 		}
-		fields := strings.Fields(name)
+		fields := runOfSpace.Split(name, -1) // name.split(/\s+/)
 		return PersonName{First: fields[0], Last: strings.Join(fields[1:], " ")}
 	}
 	return PersonName{First: localPart(address.Email)}

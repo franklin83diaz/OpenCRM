@@ -385,6 +385,16 @@ func TestRulesHealth(t *testing.T) {
 			`{"status":"green","reasons":[],"last_touch_at":"2026-10-13T12:00:00.000Z","days_quiet":1,"silence":null}`},
 		{"renewal passed", func(a *AccountFacts) { a.LastMeetingAt = ago(1); a.RenewalDate = str("2026-09-30") },
 			`{"status":"yellow","reasons":["The renewal date (30 Sept) has passed: set the next one"],"last_touch_at":"2026-10-13T12:00:00.000Z","days_quiet":1,"silence":null}`},
+		{"email still importing", func(a *AccountFacts) { a.LastEmailAt = ago(30); a.Sight.Emails = "importing" },
+			`{"status":"yellow","reasons":["No contact in 30 days (email is still importing)"],"last_touch_at":"2026-09-14T12:00:00.000Z","days_quiet":30,"silence":"No contact in 30 days (email is still importing)"}`},
+		{"no addressed contact", func(a *AccountFacts) { a.Sight.Addressed = 0 },
+			`{"status":"yellow","reasons":["No calls yet (no contact has an email address)"],"last_touch_at":null,"days_quiet":null,"silence":"No calls yet (no contact has an email address)"}`},
+		{"every addressed contact unread", func(a *AccountFacts) { a.Sight.Addressed = 2; a.Sight.Unread = []string{"Ann", "Bob"} },
+			`{"status":"yellow","reasons":["No calls yet (emails with Ann and Bob aren't read yet)"],"last_touch_at":null,"days_quiet":null,"silence":"No calls yet (emails with Ann and Bob aren't read yet)"}`},
+		{"some addressed contacts unread", func(a *AccountFacts) { a.Sight.Addressed = 3; a.Sight.Unread = []string{"Ann", "Bob"} },
+			`{"status":"yellow","reasons":["No calls or emails yet (emails with Ann and Bob aren't read yet)"],"last_touch_at":null,"days_quiet":null,"silence":"No calls or emails yet (emails with Ann and Bob aren't read yet)"}`},
+		{"calls off, no touch", func(a *AccountFacts) { a.Sight.Calls = "off" },
+			`{"status":"yellow","reasons":["No emails yet (calls aren't synced)"],"last_touch_at":null,"days_quiet":null,"silence":"No emails yet (calls aren't synced)"}`},
 		{"renewal not a date", func(a *AccountFacts) { a.LastMeetingAt = ago(1); a.RenewalDate = str("garbage") },
 			`{"status":"green","reasons":[],"last_touch_at":"2026-10-13T12:00:00.000Z","days_quiet":1,"silence":null}`},
 	}
@@ -452,6 +462,12 @@ func TestRulesDealHealth(t *testing.T) {
 			d.Tasks = []DealTask{{Title: "Same day", DueDate: str("2026-10-20"), OwedBy: "us"}}
 			d.Sentiments = []Sentiment{{Value: 0}, {Value: 1}}
 		}, `{"status":"yellow","reasons":["The mood dropped since the call before"],"next_step":` + demoStep + `,"last_touch_at":"2026-10-12T12:00:00.000Z","days_quiet":2}`},
+		{"meeting booked and recent contact is green", func(d *DealFacts) { d.LastEmailAt = ago(2); d.NextMeeting = demo },
+			`{"status":"green","reasons":[],"next_step":` + demoStep + `,"last_touch_at":"2026-10-12T12:00:00.000Z","days_quiet":2}`},
+		{"meeting booked, both syncs off", func(d *DealFacts) { d.NextMeeting = demo; d.Sight.Calls, d.Sight.Emails = "off", "off" },
+			`{"status":"unknown","reasons":["Calls aren't synced, email isn't synced"],"next_step":` + demoStep + `,"last_touch_at":null,"days_quiet":null}`},
+		{"email off, no touch", func(d *DealFacts) { d.Sight.Emails = "off" },
+			`{"status":"yellow","reasons":["No next step","No calls yet (email isn't synced)"],"next_step":null,"last_touch_at":null,"days_quiet":null}`},
 		{"two promises overdue", func(d *DealFacts) {
 			d.LastEmailAt = ago(2)
 			d.Tasks = []DealTask{{Title: "Two", DueDate: str("2026-10-01"), OwedBy: "us"}, {Title: "Three", DueDate: str("2026-10-02"), OwedBy: "us"}}
@@ -499,6 +515,12 @@ func TestRulesFocus(t *testing.T) {
 	checkJSON(t, "limit", Focus(accs, 3, testToday),
 		`[{"kind":"overdue","company_id":"b","company_name":"B","text":"Earlier (was due 1 Oct)","task_id":"t1"},{"kind":"overdue","company_id":"a","company_name":"A","text":"Later (was due 5 Oct)","task_id":"t2"},{"kind":"reach_out","company_id":"a","company_name":"A","text":"Book a call: no contact in 50 days"}]`)
 	checkJSON(t, "empty", Focus(nil, 3, testToday), `[]`)
+	if got := Focus(accs, -2, testToday); len(got) != 8 {
+		t.Errorf("negative limit drops from the end: %d items", len(got))
+	}
+	if got := Focus(accs, -100, testToday); got == nil || len(got) != 0 {
+		t.Errorf("negative limit past the start: %v", got)
+	}
 }
 
 func TestRulesConstants(t *testing.T) {

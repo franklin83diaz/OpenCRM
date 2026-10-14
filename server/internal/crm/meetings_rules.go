@@ -1165,6 +1165,13 @@ func Focus(accounts []FocusAccount, limit int, today string) []FocusItem {
 			out = append(out, FocusItem{Kind: "risk", CompanyID: a.ID, CompanyName: a.Name, Text: r})
 		}
 	}
+	// out.slice(0, limit): a negative limit drops that many from the end.
+	if limit < 0 {
+		limit += len(out)
+		if limit < 0 {
+			limit = 0
+		}
+	}
 	if limit < len(out) {
 		out = out[:limit]
 	}

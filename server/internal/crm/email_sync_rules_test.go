@@ -121,10 +121,11 @@ func TestRulesCreationCandidates(t *testing.T) {
 }
 
 func TestRulesSplitName(t *testing.T) {
-	names := []string{"Ada Lovelace", "Lovelace, Ada", "Lovelace,", "a,b,c", "  ", "x@y.com", "Mary Jane Watson"}
+	names := []string{"Ada Lovelace", "Lovelace, Ada", "Lovelace,", "a,b,c", "  ", "x@y.com", "Mary Jane Watson", "\u0085", "Ada\ufeffLovelace", "Ada\u0085Lovelace"}
 	want := []string{
 		`{"first":"Ada","last":"Lovelace"}`, `{"first":"Ada","last":"Lovelace"}`, `{"first":"Lovelace,","last":""}`,
 		`{"first":"b","last":"a"}`, `{"first":"ada","last":""}`, `{"first":"ada","last":""}`, `{"first":"Mary","last":"Jane Watson"}`,
+		"{\"first\":\"\u0085\",\"last\":\"\"}", `{"first":"Ada","last":"Lovelace"}`, "{\"first\":\"Ada\u0085Lovelace\",\"last\":\"\"}",
 	}
 	for i, n := range names {
 		n := n

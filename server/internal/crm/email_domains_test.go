@@ -44,8 +44,9 @@ func TestDomainFindOrCreateCompany(t *testing.T) {
 		t.Errorf("row = %v", row)
 	}
 	// A stored domain with protocol, www and trailing slash resolves to the same company.
-	other, _ := db.Run(ctx, "INSERT INTO companies (id, name, domain) VALUES ('x1', 'Other', 'https://www.other.io/')")
-	_ = other
+	if _, err := db.Run(ctx, "INSERT INTO companies (id, name, domain) VALUES ('x1', 'Other', 'https://www.other.io/')"); err != nil {
+		t.Fatal(err)
+	}
 	got, err := FindOrCreateCompanyByDomain(ctx, "other.io")
 	if err != nil || got != "x1" {
 		t.Errorf("tolerant match: %q %v", got, err)
