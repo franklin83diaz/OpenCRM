@@ -241,7 +241,7 @@ Each of these tasks follows the same steps; only the sources, files and scenario
 | 6 | `email` | `integrations.ts`, `email-sync.ts`, `index.ts` 2074–2490 (integrations status/email/meeting, email-sync settings/labels/run/sync-now, contact emails, open email) | `integrations.go`, `email_sync.go`, `routes_email.go` | 3, 4, 5 |
 | 7 | `meetings` | `meetings.ts`, `index.ts` 2491–2738 (meetings sync settings/run/sync-now, list/get/link/digest) | `meetings.go`, `routes_meetings.go` | 3, 4, 6 (`integrations.go`) |
 | 8 | `customers` | `customers.ts`, `deal-progress.ts`, `lookup.ts`, `index.ts` 3148–3278 | `customers.go`, `deal_progress.go`, `lookup.go`, `routes_customers.go` | 6, 7 |
-| 9 | `companies-contacts` | `index.ts` 560–1330 (stats, widgets, companies + contacts list/aggregates/create/update/delete/bulk-delete) | `routes_stats.go`, `routes_companies.go`, `routes_contacts.go` | 5, 8 (`progressOf` for widgets if used) |
+| 9 | `companies-contacts` | `index.ts` 560–1330 (stats, widgets, companies + contacts list/aggregates/create/update/delete/bulk-delete) | `routes_stats.go`, `routes_companies.go`, `routes_contacts.go` | 5 |
 | 10 | `deals` | `index.ts` 1331–2036 (stages, deals board/progress/list/create/update/delete, customer marking), 2739–3147 (tasks, deal updates, insights), 3656–3740 (GET contact/deal/company by id, records, values) | `routes_stages.go`, `routes_deals.go`, `routes_tasks.go`, `routes_records.go` | 5, 8 |
 | 11 | `settings` | `index.ts` 2037–2073 (activities), 3400–3655 (CSV import), 3741–3981 (custom fields, views) | `routes_activities.go`, `routes_import.go`, `routes_custom_fields.go`, `routes_views.go` | 5 |
 | 12 | `ai-columns` | `ai-columns.ts`, `index.ts` 3279–3399 | `ai_columns.go`, `routes_ai_columns.go` | 3, 5 |
