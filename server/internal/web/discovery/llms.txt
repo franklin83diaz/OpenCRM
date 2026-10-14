@@ -1,0 +1,85 @@
+# OpenCRM
+
+> A CRM with companies, contacts, and deal pipeline management.
+
+## API
+- `GET /api/stats` — Get dashboard statistics
+- `GET /api/widgets` — Dashboard widgets: a bounded summary of this app for the current caller
+- `GET /api/companies` — List companies with pagination, search, and filtering
+- `POST /api/companies` — Create a new company
+- `PUT /api/companies/{id}` — Update a company
+- `DELETE /api/companies/{id}` — Delete a company
+- `POST /api/companies/bulk-delete` — Delete several companies
+- `GET /api/contacts` — List contacts with pagination, search, and filtering
+- `POST /api/contacts` — Create a new contact
+- `PUT /api/contacts/{id}` — Update a contact
+- `DELETE /api/contacts/{id}` — Delete a contact
+- `POST /api/contacts/bulk-delete` — Delete several contacts
+- `GET /api/stages` — List pipeline stages in order
+- `POST /api/stages` — Create a pipeline stage
+- `PUT /api/stages/{key}` — Update a stage's label, color, position, or semantic flags (key is immutable)
+- `DELETE /api/stages/{key}` — Delete a stage; deals in it must be reassigned via ?reassign_to=<stage key>
+- `GET /api/deals/board` — Get all deals for the pipeline board view, optionally filtered
+- `GET /api/deals/progress` — Open deals, worst first: each one's next step and the reasons to look at it
+- `GET /api/deals` — List deals with pagination, search, and filtering
+- `POST /api/deals` — Create a new deal
+- `PUT /api/deals/{id}` — Update a deal
+- `DELETE /api/deals/{id}` — Delete a deal
+- `GET /api/meetings` — List meetings with people from outside (calendar + Granola), newest first
+- `GET /api/meetings/{id}` — Get a meeting
+- `PATCH /api/meetings/{id}` — Link a meeting to a company, unlink it, or mark it as not an account meeting
+- `POST /api/meetings/{id}/digest` — Read a call again after its digest failed
+- `GET /api/tasks` — List tasks: open ones by due date (undated last), done ones newest first
+- `POST /api/tasks` — Create a task
+- `PUT /api/tasks/{id}` — Update a task, or mark it done (done: true) or open again (done: false)
+- `DELETE /api/tasks/{id}` — Delete a task
+- `POST /api/deals/{id}/updates` — Log what happened on a deal, what it finished, and its next step
+- `GET /api/insights` — List what calls said about accounts: ideas to propose, room to expand, risks. Newest first
+- `PUT /api/insights/{id}` — Mark an insight done or dismissed, or open it again
+- `POST /api/insights/{id}/deal` — Turn an expansion into a deal at the first stage of the pipeline
+- `GET /api/customers` — How each customer is doing (worst first), what to do first, and calls with customers in the next 7 days
+- `GET /api/lookup` — What the CRM knows about an email address before someone writes to it
+- `POST /api/lookup` — What the CRM knows about up to 100 addresses at once
+- `GET /api/companies/aggregates`
+- `GET /api/contacts/aggregates`
+- `GET /api/activities`
+- `POST /api/activities`
+- `GET /api/integrations/status`
+- `POST /api/integrations/email`
+- `POST /api/integrations/meeting`
+- `GET /api/email-sync`
+- `PUT /api/email-sync`
+- `GET /api/email-sync/labels`
+- `POST /api/email-sync/run`
+- `POST /api/email-sync/sync-now`
+- `GET /api/contacts/:id/emails`
+- `GET /api/emails/:mailbox/:id`
+- `GET /api/meetings/sync`
+- `PUT /api/meetings/sync`
+- `POST /api/meetings/run`
+- `POST /api/meetings/sync-now`
+- `GET /api/ai-columns`
+- `PUT /api/ai-columns/:entity/:key`
+- `DELETE /api/ai-columns/:entity/:key`
+- `POST /api/ai-columns/:entity/:key/fill`
+- `POST /api/ai-columns/:entity/:key/cells/:id`
+- `POST /api/ai-columns/run`
+- `POST /api/contacts/import`
+- `POST /api/companies/import`
+- `GET /api/contacts/:id`
+- `GET /api/deals/:id`
+- `GET /api/companies/:id`
+- `GET /api/records`
+- `GET /api/values`
+- `GET /api/custom-fields`
+- `POST /api/custom-fields`
+- `PUT /api/custom-fields/:id`
+- `DELETE /api/custom-fields/:id`
+- `GET /api/views`
+- `GET /api/views/:id/fields`
+- `PUT /api/views/:id/fields/:key`
+- `POST /api/views`
+- `PATCH /api/views/:id`
+- `DELETE /api/views/:id`
+
+Full machine-readable spec: [/api/openapi.json](/api/openapi.json)

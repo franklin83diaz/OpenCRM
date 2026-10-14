@@ -1,0 +1,351 @@
+[
+ {
+  "method": "GET",
+  "path": "/api/stats",
+  "summary": "Get dashboard statistics"
+ },
+ {
+  "method": "GET",
+  "path": "/api/widgets",
+  "summary": "Dashboard widgets: a bounded summary of this app for the current caller"
+ },
+ {
+  "method": "GET",
+  "path": "/api/companies",
+  "summary": "List companies with pagination, search, and filtering"
+ },
+ {
+  "method": "POST",
+  "path": "/api/companies",
+  "summary": "Create a new company"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/companies/{id}",
+  "summary": "Update a company"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/companies/{id}",
+  "summary": "Delete a company"
+ },
+ {
+  "method": "POST",
+  "path": "/api/companies/bulk-delete",
+  "summary": "Delete several companies"
+ },
+ {
+  "method": "GET",
+  "path": "/api/contacts",
+  "summary": "List contacts with pagination, search, and filtering"
+ },
+ {
+  "method": "POST",
+  "path": "/api/contacts",
+  "summary": "Create a new contact"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/contacts/{id}",
+  "summary": "Update a contact"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/contacts/{id}",
+  "summary": "Delete a contact"
+ },
+ {
+  "method": "POST",
+  "path": "/api/contacts/bulk-delete",
+  "summary": "Delete several contacts"
+ },
+ {
+  "method": "GET",
+  "path": "/api/stages",
+  "summary": "List pipeline stages in order"
+ },
+ {
+  "method": "POST",
+  "path": "/api/stages",
+  "summary": "Create a pipeline stage"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/stages/{key}",
+  "summary": "Update a stage's label, color, position, or semantic flags (key is immutable)"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/stages/{key}",
+  "summary": "Delete a stage; deals in it must be reassigned via ?reassign_to=<stage key>"
+ },
+ {
+  "method": "GET",
+  "path": "/api/deals/board",
+  "summary": "Get all deals for the pipeline board view, optionally filtered"
+ },
+ {
+  "method": "GET",
+  "path": "/api/deals/progress",
+  "summary": "Open deals, worst first: each one's next step and the reasons to look at it"
+ },
+ {
+  "method": "GET",
+  "path": "/api/deals",
+  "summary": "List deals with pagination, search, and filtering"
+ },
+ {
+  "method": "POST",
+  "path": "/api/deals",
+  "summary": "Create a new deal"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/deals/{id}",
+  "summary": "Update a deal"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/deals/{id}",
+  "summary": "Delete a deal"
+ },
+ {
+  "method": "GET",
+  "path": "/api/meetings",
+  "summary": "List meetings with people from outside (calendar + Granola), newest first"
+ },
+ {
+  "method": "GET",
+  "path": "/api/meetings/{id}",
+  "summary": "Get a meeting"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/meetings/{id}",
+  "summary": "Link a meeting to a company, unlink it, or mark it as not an account meeting"
+ },
+ {
+  "method": "POST",
+  "path": "/api/meetings/{id}/digest",
+  "summary": "Read a call again after its digest failed"
+ },
+ {
+  "method": "GET",
+  "path": "/api/tasks",
+  "summary": "List tasks: open ones by due date (undated last), done ones newest first"
+ },
+ {
+  "method": "POST",
+  "path": "/api/tasks",
+  "summary": "Create a task"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/tasks/{id}",
+  "summary": "Update a task, or mark it done (done: true) or open again (done: false)"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/tasks/{id}",
+  "summary": "Delete a task"
+ },
+ {
+  "method": "POST",
+  "path": "/api/deals/{id}/updates",
+  "summary": "Log what happened on a deal, what it finished, and its next step"
+ },
+ {
+  "method": "GET",
+  "path": "/api/insights",
+  "summary": "List what calls said about accounts: ideas to propose, room to expand, risks. Newest first"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/insights/{id}",
+  "summary": "Mark an insight done or dismissed, or open it again"
+ },
+ {
+  "method": "POST",
+  "path": "/api/insights/{id}/deal",
+  "summary": "Turn an expansion into a deal at the first stage of the pipeline"
+ },
+ {
+  "method": "GET",
+  "path": "/api/customers",
+  "summary": "How each customer is doing (worst first), what to do first, and calls with customers in the next 7 days"
+ },
+ {
+  "method": "GET",
+  "path": "/api/lookup",
+  "summary": "What the CRM knows about an email address before someone writes to it"
+ },
+ {
+  "method": "POST",
+  "path": "/api/lookup",
+  "summary": "What the CRM knows about up to 100 addresses at once"
+ },
+ {
+  "method": "GET",
+  "path": "/api/companies/aggregates"
+ },
+ {
+  "method": "GET",
+  "path": "/api/contacts/aggregates"
+ },
+ {
+  "method": "GET",
+  "path": "/api/activities"
+ },
+ {
+  "method": "POST",
+  "path": "/api/activities"
+ },
+ {
+  "method": "GET",
+  "path": "/api/integrations/status"
+ },
+ {
+  "method": "POST",
+  "path": "/api/integrations/email"
+ },
+ {
+  "method": "POST",
+  "path": "/api/integrations/meeting"
+ },
+ {
+  "method": "GET",
+  "path": "/api/email-sync"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/email-sync"
+ },
+ {
+  "method": "GET",
+  "path": "/api/email-sync/labels"
+ },
+ {
+  "method": "POST",
+  "path": "/api/email-sync/run"
+ },
+ {
+  "method": "POST",
+  "path": "/api/email-sync/sync-now"
+ },
+ {
+  "method": "GET",
+  "path": "/api/contacts/:id/emails"
+ },
+ {
+  "method": "GET",
+  "path": "/api/emails/:mailbox/:id"
+ },
+ {
+  "method": "GET",
+  "path": "/api/meetings/sync"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/meetings/sync"
+ },
+ {
+  "method": "POST",
+  "path": "/api/meetings/run"
+ },
+ {
+  "method": "POST",
+  "path": "/api/meetings/sync-now"
+ },
+ {
+  "method": "GET",
+  "path": "/api/ai-columns"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/ai-columns/:entity/:key"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/ai-columns/:entity/:key"
+ },
+ {
+  "method": "POST",
+  "path": "/api/ai-columns/:entity/:key/fill"
+ },
+ {
+  "method": "POST",
+  "path": "/api/ai-columns/:entity/:key/cells/:id"
+ },
+ {
+  "method": "POST",
+  "path": "/api/ai-columns/run"
+ },
+ {
+  "method": "POST",
+  "path": "/api/contacts/import"
+ },
+ {
+  "method": "POST",
+  "path": "/api/companies/import"
+ },
+ {
+  "method": "GET",
+  "path": "/api/contacts/:id"
+ },
+ {
+  "method": "GET",
+  "path": "/api/deals/:id"
+ },
+ {
+  "method": "GET",
+  "path": "/api/companies/:id"
+ },
+ {
+  "method": "GET",
+  "path": "/api/records"
+ },
+ {
+  "method": "GET",
+  "path": "/api/values"
+ },
+ {
+  "method": "GET",
+  "path": "/api/custom-fields"
+ },
+ {
+  "method": "POST",
+  "path": "/api/custom-fields"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/custom-fields/:id"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/custom-fields/:id"
+ },
+ {
+  "method": "GET",
+  "path": "/api/views"
+ },
+ {
+  "method": "GET",
+  "path": "/api/views/:id/fields"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/views/:id/fields/:key"
+ },
+ {
+  "method": "POST",
+  "path": "/api/views"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/views/:id"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/views/:id"
+ }
+]
