@@ -1,0 +1,5 @@
+# Not part of the production binary.
+**/*_test.go
+cmd/
+Dockerfile
+.dockerignore

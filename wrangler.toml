@@ -1,7 +1,25 @@
 name = "open-crm"
-main = "src/server/index.ts"
-compatibility_date = "2025-04-01"
-compatibility_flags = ["nodejs_compat"]
+main = "src/worker/index.ts"
+compatibility_date = "2026-06-01"
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/llms.txt"]
+
+[[containers]]
+class_name = "Api"
+image = "./server/Dockerfile"
+instance_type = "basic"
+max_instances = 1
+
+[[durable_objects.bindings]]
+name = "API"
+class_name = "Api"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Api"]
 
 [[d1_databases]]
 binding = "DB"
