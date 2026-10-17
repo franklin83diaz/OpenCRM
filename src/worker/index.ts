@@ -14,12 +14,26 @@ export { ContainerProxy };
 interface Env {
   API: DurableObjectNamespace<Api>;
   DB: D1Database;
+  // The first admin of a CRM with no accounts yet: `wrangler secret put` in
+  // production, .dev.vars under `wrangler dev`. The Go server creates the
+  // account on its first sign-in and ignores them once accounts exist.
+  ADMIN_EMAIL?: string;
+  ADMIN_PASSWORD?: string;
 }
 
 export class Api extends Container<Env> {
   defaultPort = 8080;
   sleepAfter = "10m";
-  envVars = { D1_URL: "http://d1.internal" };
+  envVars = containerEnv(this.env);
+}
+
+// The container's environment, fixed when it starts: a changed secret reaches
+// it at its next start.
+function containerEnv(env: Env): Record<string, string> {
+  const vars: Record<string, string> = { D1_URL: "http://d1.internal" };
+  if (env.ADMIN_EMAIL) vars.ADMIN_EMAIL = env.ADMIN_EMAIL;
+  if (env.ADMIN_PASSWORD) vars.ADMIN_PASSWORD = env.ADMIN_PASSWORD;
+  return vars;
 }
 
 // The D1 bridge. Wire protocol (fixed; the Go side is server/internal/db/d1.go):
@@ -69,11 +83,19 @@ Api.outboundByHost = {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     // The container sees the request arrive over plain HTTP from the Worker;
-    // tell it the scheme and host the browser used, for links it builds.
+    // tell it the scheme and host the browser used, for links it builds and
+    // to tell its own pages' requests from other sites'. Set here, so what a
+    // client sends in these headers never gets through.
     const url = new URL(request.url);
     const headers = new Headers(request.headers);
     headers.set("X-Forwarded-Host", url.host);
     headers.set("X-Forwarded-Proto", url.protocol.slice(0, -1));
+    // The visitor's address, for the login limiter: Cloudflare's edge sets
+    // CF-Connecting-IP (overwriting any a client sends); the container only
+    // sees the Worker's connection.
+    const ip = request.headers.get("CF-Connecting-IP");
+    if (ip) headers.set("CF-Connecting-IP", ip);
+    else headers.delete("CF-Connecting-IP");
     return getContainer(env.API, "api").fetch(new Request(request, { headers }));
   },
 } satisfies ExportedHandler<Env>;
