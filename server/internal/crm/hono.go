@@ -7,6 +7,7 @@ package crm
 // app.get/app.post routes never did.
 
 import (
+	"math"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -247,4 +248,207 @@ func optionalJSONBody(r *http.Request) (v any, checked, ok bool) {
 	}
 	v, ok = openapiJSON(r)
 	return v, true, ok
+}
+
+// ── zod schemas as checks ──────────────────────────────────────────
+// A zodCheck is one zod 3 schema applied to one value: the issues it raised,
+// none when the value passes. present is false for a key the input lacks
+// (zod read undefined). They compose as the schemas did, so a route's body or
+// query schema reads like its createRoute: zObject(zKey("label", zString(1,
+// 0)), zKey("position", zOptional(zInt())), …).
+
+type zodCheck func(path []any, v any, present bool) []web.Issue
+
+// zodKey is one key of a z.object shape.
+type zodKey struct {
+	key   string
+	check zodCheck
+}
+
+func zKey(key string, check zodCheck) zodKey { return zodKey{key, check} }
+
+// pathAt is path extended by key, without sharing path's backing array.
+func pathAt(path []any, key any) []any {
+	return append(append(make([]any, 0, len(path)+1), path...), key)
+}
+
+// zObject is z.object(shape) (stripping or passthrough alike: unknown keys
+// raise nothing): a non-object is invalid_type, else each key in the shape's
+// order.
+func zObject(keys ...zodKey) zodCheck {
+	return func(path []any, v any, present bool) []web.Issue {
+		if !present {
+			return []web.Issue{requiredIssue(path, "object")}
+		}
+		obj, ok := v.(map[string]any)
+		if !ok {
+			return []web.Issue{invalidType(path, "object", v)}
+		}
+		var issues []web.Issue
+		for _, k := range keys {
+			val, has := obj[k.key]
+			issues = append(issues, k.check(pathAt(path, k.key), val, has)...)
+		}
+		return issues
+	}
+}
+
+// zOptional is .optional(): an absent key passes.
+func zOptional(c zodCheck) zodCheck {
+	return func(path []any, v any, present bool) []web.Issue {
+		if !present {
+			return nil
+		}
+		return c(path, v, present)
+	}
+}
+
+// zNullable is .nullable(): null passes.
+func zNullable(c zodCheck) zodCheck {
+	return func(path []any, v any, present bool) []web.Issue {
+		if present && v == nil {
+			return nil
+		}
+		return c(path, v, present)
+	}
+}
+
+// zString is z.string(), with .min(min) and .max(max) when they are above 0
+// (lengths in UTF-16 units, as JS counts them).
+func zString(min, max int) zodCheck {
+	return func(path []any, v any, present bool) []web.Issue {
+		if !present {
+			return []web.Issue{requiredIssue(path, "string")}
+		}
+		s, ok := v.(string)
+		if !ok {
+			return []web.Issue{invalidType(path, "string", v)}
+		}
+		var issues []web.Issue
+		if n := u16Len(s); min > 0 && n < min {
+			issues = append(issues, stringTooSmall(path, min))
+		} else if max > 0 && n > max {
+			issues = append(issues, stringTooBig(path, max))
+		}
+		return issues
+	}
+}
+
+// zBool is z.boolean().
+func zBool() zodCheck {
+	return func(path []any, v any, present bool) []web.Issue {
+		if !present {
+			return []web.Issue{requiredIssue(path, "boolean")}
+		}
+		if issue := checkType(path, v, "boolean"); issue != nil {
+			return []web.Issue{*issue}
+		}
+		return nil
+	}
+}
+
+// zInt is z.number().int(). Its int check is an invalid_type of its own,
+// built with an undefined message, so makeIssue kept message before path.
+func zInt() zodCheck {
+	return func(path []any, v any, present bool) []web.Issue {
+		if !present {
+			return []web.Issue{requiredIssue(path, "number")}
+		}
+		f, ok := v.(float64)
+		if !ok {
+			return []web.Issue{invalidType(path, "number", v)}
+		}
+		if math.IsInf(f, 0) || f != math.Trunc(f) {
+			return []web.Issue{{Code: "invalid_type", Expected: "integer", Received: "float", Path: path,
+				Message: "Expected integer, received float", Keys: []string{"code", "expected", "received", "message", "path"}}}
+		}
+		return nil
+	}
+}
+
+// zEnum is z.enum(options). ZodEnum reads a missing key as any other
+// non-string, in its own key order; zod's error map says "Required" for it.
+func zEnum(options ...string) zodCheck {
+	return func(path []any, v any, present bool) []web.Issue {
+		if !present {
+			return []web.Issue{{Code: "invalid_type", Expected: zodJoin(options), Received: "undefined", Path: path,
+				Message: "Required", Keys: []string{"expected", "received", "code", "path", "message"}}}
+		}
+		if issue := checkEnum(path, v, options); issue != nil {
+			return []web.Issue{*issue}
+		}
+		return nil
+	}
+}
+
+// zArray is z.array(item) with .max(max) when above 0: the length first,
+// then each item.
+func zArray(item zodCheck, max int) zodCheck {
+	return func(path []any, v any, present bool) []web.Issue {
+		if !present {
+			return []web.Issue{requiredIssue(path, "array")}
+		}
+		list, ok := v.([]any)
+		if !ok {
+			return []web.Issue{invalidType(path, "array", v)}
+		}
+		var issues []web.Issue
+		if max > 0 && len(list) > max {
+			issues = append(issues, arrayTooBig(path, max))
+		}
+		for i, x := range list {
+			issues = append(issues, item(pathAt(path, i), x, true)...)
+		}
+		return issues
+	}
+}
+
+// zNumberOrString is z.union([z.number(), z.string()]): when neither takes
+// the value, one invalid_union carrying each option's ZodError.
+func zNumberOrString() zodCheck {
+	return func(path []any, v any, present bool) []web.Issue {
+		switch v.(type) {
+		case float64, string:
+			if present {
+				return nil
+			}
+		}
+		option := func(expected string) web.UnionError {
+			issue := invalidType(path, expected, v)
+			if !present {
+				issue = requiredIssue(path, expected)
+			}
+			return web.UnionError{Issues: []web.Issue{issue}, Name: "ZodError"}
+		}
+		return []web.Issue{{Code: "invalid_union", UnionErrors: []web.UnionError{option("number"), option("string")}, Path: path,
+			Message: "Invalid input", Keys: []string{"code", "unionErrors", "path", "message"}}}
+	}
+}
+
+// zCustomValues is CustomValues, z.record(z.string(), z.any()).optional():
+// absent or an object passes (see CustomValuesIssue).
+func zCustomValues() zodCheck {
+	return func(path []any, v any, present bool) []web.Issue {
+		if _, isObject := v.(map[string]any); !present || isObject {
+			return nil
+		}
+		return []web.Issue{invalidType(path, "object", v)}
+	}
+}
+
+// zodIssues runs a route's root schema on a request's body or query.
+// @hono/zod-validator parsed with safeParseAsync, where a z.union settles its
+// options as promises: its invalid_union lands after every issue the
+// synchronous schemas raised, whatever its place in the shape. Unions are the
+// only asynchronous schemas here, so they go last, in their own order.
+func zodIssues(schema zodCheck, v any) []web.Issue {
+	var issues, unions []web.Issue
+	for _, issue := range schema(zodPath(), v, true) {
+		if issue.Code == "invalid_union" {
+			unions = append(unions, issue)
+		} else {
+			issues = append(issues, issue)
+		}
+	}
+	return append(issues, unions...)
 }

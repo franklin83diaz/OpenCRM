@@ -4,6 +4,7 @@ package crm
 
 import (
 	"net/http"
+	"time"
 
 	"opencrm/internal/clawnify"
 	"opencrm/internal/web"
@@ -15,9 +16,20 @@ import (
 type App struct {
 	Env  clawnify.Env
 	Conn *clawnify.Connections
+	// Now is the clock for what TS read with new Date() or Date.now(); nil is
+	// time.Now. Tests set it to replay TS at a fixed time.
+	Now func() time.Time
 	// done holds index.ts's per-isolate fast paths (backfills.go): which
 	// one-time checks have passed in this process.
 	done doneOnce
+}
+
+// now is the time by App.Now.
+func (app *App) now() time.Time {
+	if app.Now != nil {
+		return app.Now()
+	}
+	return time.Now()
 }
 
 var routes []func(rt *web.Router, app *App)

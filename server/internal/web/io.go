@@ -107,6 +107,8 @@ type Issue struct {
 	Exact      *bool    `json:"exact,omitempty"`
 	Options    []string `json:"options,omitempty"`
 	Validation any      `json:"validation,omitempty"` // invalid_string: "email", "url", "regex", …
+	// UnionErrors: invalid_union's ZodErrors, one per option of the union.
+	UnionErrors []UnionError `json:"unionErrors,omitempty"`
 	// Keys: e.g. ZodEnum's invalid_enum_value is {received, code, options,
 	// path, message}, and JSON.stringify kept that order.
 	Keys []string `json:"-"`
@@ -143,6 +145,13 @@ func (is Issue) MarshalJSON() ([]byte, error) {
 	}
 	out.WriteByte('}')
 	return out.Bytes(), nil
+}
+
+// UnionError is one option's ZodError inside an invalid_union issue, as
+// JSON.stringify wrote it: its issues, then its name.
+type UnionError struct {
+	Issues []Issue `json:"issues"`
+	Name   string  `json:"name"`
 }
 
 type zodBody struct {
