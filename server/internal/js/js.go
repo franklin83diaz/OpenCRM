@@ -88,6 +88,28 @@ func isJSSpace(r rune) bool {
 	return unicode.Is(unicode.Zs, r)
 }
 
+// ParseInt is parseInt(s, 10): leading JS whitespace skipped, an optional
+// sign, then as many decimal digits as there are; NaN when there are none.
+func ParseInt(s string) float64 {
+	s = strings.TrimLeftFunc(s, isJSSpace)
+	neg := strings.HasPrefix(s, "-")
+	if neg || strings.HasPrefix(s, "+") {
+		s = s[1:]
+	}
+	end := 0
+	for end < len(s) && s[end] >= '0' && s[end] <= '9' {
+		end++
+	}
+	if end == 0 {
+		return math.NaN()
+	}
+	n, _ := strconv.ParseFloat(s[:end], 64) // digits only: never fails, huge values round as JS's do
+	if neg {
+		return -n
+	}
+	return n
+}
+
 var decimalPattern = regexp.MustCompile(`^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$`)
 
 // Number is JS Number(v) for values that come out of JSON and the database.

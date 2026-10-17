@@ -142,3 +142,28 @@ func TestUUID(t *testing.T) {
 		t.Errorf("UUID() = %q, %q", a, b)
 	}
 }
+
+func TestParseInt(t *testing.T) {
+	// Expectations from node: parseInt(s, 10).
+	cases := []struct {
+		in   string
+		want float64
+	}{
+		{"25", 25}, {"0", 0}, {"-3", -3}, {" 7", 7}, {" \n12px", 12}, {"+4", 4}, {"1e3", 1}, {"2.9", 2},
+		{"0x10", 0}, {"99999999999999999999", 1e20}, {"12345678901234567890123", 1.2345678901234568e+22},
+		{" 7", 7}, {"00012", 12}, {"1_000", 1},
+	}
+	for _, c := range cases {
+		if got := ParseInt(c.in); got != c.want {
+			t.Errorf("ParseInt(%q) = %v, want %v", c.in, got, c.want)
+		}
+	}
+	for _, in := range []string{"abc", "", "-", "+", "--1", "٣"} {
+		if got := ParseInt(in); !math.IsNaN(got) {
+			t.Errorf("ParseInt(%q) = %v, want NaN", in, got)
+		}
+	}
+	if got := ParseInt("-0"); got != 0 || !math.Signbit(got) {
+		t.Errorf("ParseInt(-0) = %v, want -0", got)
+	}
+}

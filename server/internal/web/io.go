@@ -92,6 +92,8 @@ func Object(v any) map[string]any {
 
 // Issue is one zod 3 issue, with zod's field names. Fields are in zod's order
 // for invalid_type, the most common one; the rest are only sent when set.
+// Keys, when set, are the fields written and their order, for an issue zod
+// built in an order of its own.
 type Issue struct {
 	Code       string   `json:"code"`
 	Expected   any      `json:"expected,omitempty"`
@@ -105,6 +107,42 @@ type Issue struct {
 	Exact      *bool    `json:"exact,omitempty"`
 	Options    []string `json:"options,omitempty"`
 	Validation any      `json:"validation,omitempty"` // invalid_string: "email", "url", "regex", …
+	// Keys: e.g. ZodEnum's invalid_enum_value is {received, code, options,
+	// path, message}, and JSON.stringify kept that order.
+	Keys []string `json:"-"`
+}
+
+// MarshalJSON writes the issue's fields, in Keys' order when it has Keys.
+func (is Issue) MarshalJSON() ([]byte, error) {
+	type plain Issue // the same fields, without this method
+	b, err := marshal(plain(is))
+	if isNonFinite(err) {
+		b, err = marshalNonFinite(plain(is))
+	}
+	if err != nil || is.Keys == nil {
+		return b, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(b, &fields); err != nil {
+		return nil, err
+	}
+	var out bytes.Buffer
+	out.WriteByte('{')
+	for _, k := range is.Keys {
+		raw, ok := fields[k]
+		if !ok {
+			continue
+		}
+		if out.Len() > 1 {
+			out.WriteByte(',')
+		}
+		name, _ := marshal(k)
+		out.Write(name)
+		out.WriteByte(':')
+		out.Write(raw)
+	}
+	out.WriteByte('}')
+	return out.Bytes(), nil
 }
 
 type zodBody struct {

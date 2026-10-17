@@ -128,6 +128,26 @@ func TestZodError(t *testing.T) {
 	}
 }
 
+func TestZodErrorKeyOrder(t *testing.T) {
+	// zod built some issues in their own key order (ZodEnum's), which
+	// JSON.stringify kept; Keys says it, and leaves the rest out.
+	rec := httptest.NewRecorder()
+	_ = web.ZodError(rec, []web.Issue{
+		{Code: "invalid_enum_value", Received: "<b>", Options: []string{"a", "b"}, Path: []any{"link"}, Message: "Invalid enum value. Expected 'a' | 'b', received '<b>'",
+			Keys: []string{"received", "code", "options", "path", "message"}},
+		{Code: "invalid_type", Expected: "'a' | 'b'", Received: "array", Path: []any{"when"}, Message: "Expected 'a' | 'b', received array",
+			Keys: []string{"expected", "received", "code", "path", "message"}},
+		{Code: "invalid_enum_value", Received: "", Options: []string{"a"}, Message: "m", Keys: []string{"received", "code", "options", "path", "message"}},
+	})
+	want := `{"success":false,"error":{"issues":[` +
+		`{"received":"<b>","code":"invalid_enum_value","options":["a","b"],"path":["link"],"message":"Invalid enum value. Expected 'a' | 'b', received '<b>'"},` +
+		`{"expected":"'a' | 'b'","received":"array","code":"invalid_type","path":["when"],"message":"Expected 'a' | 'b', received array"},` +
+		`{"received":"","code":"invalid_enum_value","options":["a"],"path":[],"message":"m"}],"name":"ZodError"}}`
+	if rec.Body.String() != want {
+		t.Errorf("ZodError key order\n got  %s\n want %s", rec.Body.String(), want)
+	}
+}
+
 func newApp(routes func(rt *web.Router)) http.Handler {
 	rt := web.NewRouter()
 	discovery.Mount(rt)
@@ -333,5 +353,13 @@ func TestBackgroundDuringDrain(t *testing.T) {
 	close(release)
 	if !<-drained || ran.Load() != 111 {
 		t.Fatalf("Drain returned before all work finished: %d of 111 ran", ran.Load())
+	}
+}
+
+func TestZodErrorNonFiniteStillNull(t *testing.T) {
+	rec := httptest.NewRecorder()
+	_ = web.ZodError(rec, []web.Issue{{Code: "too_big", Maximum: math.Inf(1), Message: "m", Keys: []string{"code", "maximum", "path", "message"}}})
+	if want := `{"success":false,"error":{"issues":[{"code":"too_big","maximum":null,"path":[],"message":"m"}],"name":"ZodError"}}`; rec.Body.String() != want {
+		t.Errorf("got %s", rec.Body.String())
 	}
 }

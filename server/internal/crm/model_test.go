@@ -120,8 +120,16 @@ func TestCompleteTimeout(t *testing.T) {
 	defer srv.Close()
 	defer close(release)
 	_, err := Complete(context.Background(), clawnify.Env{Token: "t", APIURL: srv.URL}, "s", "u", CompleteOptions{Timeout: 20 * time.Millisecond})
-	if err == nil {
-		t.Fatal("no timeout")
+	// AbortSignal.timeout's reason, which TS stored as the digest's error.
+	var me *ModelError
+	if err == nil || err.Error() != "The operation was aborted due to timeout" || errors.As(err, &me) {
+		t.Fatalf("err=%v", err)
+	}
+	// A caller that gives up is not the model's timeout.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := Complete(ctx, clawnify.Env{Token: "t", APIURL: srv.URL}, "s", "u", CompleteOptions{Timeout: time.Second}); err == nil || errMessage(err) != "context canceled" {
+		t.Fatalf("canceled: err=%v", err)
 	}
 }
 

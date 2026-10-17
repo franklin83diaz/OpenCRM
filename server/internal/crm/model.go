@@ -3,6 +3,7 @@ package crm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -40,6 +41,10 @@ type CompleteOptions struct {
 
 var dataRegion = regexp.MustCompile(`(?i)data region`)
 
+// errModelTimeout is what fetch rejected with when AbortSignal.timeout fired
+// (a DOMException, not a ModelError); TS stored its message as the error.
+var errModelTimeout = errors.New("The operation was aborted due to timeout")
+
 type completion struct {
 	ok      bool
 	status  int
@@ -66,6 +71,7 @@ func Complete(ctx context.Context, env clawnify.Env, system, user string, opts C
 		maxTokens = 600
 	}
 	ask := func(extra map[string]any) (completion, error) {
+		parent := ctx
 		ctx := ctx // each request has its own time limit
 		if opts.Timeout > 0 {
 			var cancel context.CancelFunc
@@ -96,6 +102,9 @@ func Complete(ctx context.Context, env clawnify.Env, system, user string, opts C
 		req.Header.Set("Content-Type", "application/json")
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
+			if ctx.Err() == context.DeadlineExceeded && parent.Err() == nil {
+				return completion{}, errModelTimeout
+			}
 			return completion{}, err
 		}
 		defer res.Body.Close()
