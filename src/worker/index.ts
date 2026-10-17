@@ -92,8 +92,9 @@ export default {
     headers.set("X-Forwarded-Proto", url.protocol.slice(0, -1));
     // The visitor's address, for the login limiter: Cloudflare's edge sets
     // CF-Connecting-IP (overwriting any a client sends), and with Pseudo IPv4
-    // on, the real IPv6 address in CF-Connecting-IPv6; the container only
-    // sees the Worker's connection.
+    // on, the real IPv6 address in CF-Connecting-IPv6 (which the Go server
+    // believes only beside a Class E CF-Connecting-IP: a client can send one
+    // too); the container only sees the Worker's connection.
     for (const name of ["CF-Connecting-IP", "CF-Connecting-IPv6"]) {
       const ip = request.headers.get(name);
       if (ip) headers.set(name, ip);

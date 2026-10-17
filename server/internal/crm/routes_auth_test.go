@@ -756,7 +756,10 @@ func TestAuthLoginWhenBcryptIsBusy(t *testing.T) {
 	releases = nil
 	ada := a.login("ada@example.com", testPassword)
 	for i := 0; i < 2; i++ {
-		release, _ := auth.AcquireBcryptSlot(context.Background())
+		release, err := auth.AcquireBcryptSlot(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
 		releases = append(releases, release)
 	}
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 200*time.Millisecond)
@@ -834,6 +837,60 @@ func TestAuthLoginRacingAPasswordChange(t *testing.T) {
 			}
 			if n := a.count("sessions"); n != 0 {
 				t.Errorf("%d sessions", n)
+			}
+		})
+	}
+}
+
+// A stolen session can't mint a token that outlives the admin's answer to
+// it: a POST /api/tokens signed in before a password reset or a disabling,
+// whose INSERT lands after it, must not leave a token behind. The INSERT
+// itself checks the session is still live and its account enabled.
+func TestTokenRacingAResetOrADisable(t *testing.T) {
+	for name, admin := range map[string][]string{
+		"password reset": {
+			"UPDATE users SET password_hash = 'reset' WHERE id = 'u-bo'",
+			"DELETE FROM sessions WHERE user_id = 'u-bo'",
+			"DELETE FROM api_tokens WHERE user_id = 'u-bo'",
+		},
+		"disable": {
+			"UPDATE users SET disabled = 1 WHERE id = 'u-bo'",
+			"DELETE FROM sessions WHERE user_id = 'u-bo'",
+			"DELETE FROM api_tokens WHERE user_id = 'u-bo'",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rec := recordedDB(t, nil)
+			a := &authAPI{t: t, ctx: context.Background(), app: &App{}}
+			a.h = New(a.app)
+			a.user("u-ada", "ada@example.com", "admin", false)
+			a.user("u-bo", "bo@example.com", "user", false)
+			bo := a.login("bo@example.com", testPassword)
+			g := &guardDriver{Driver: rec.inner}
+			db.Use(g)
+			g.before = func(sql string) {
+				if strings.Contains(sql, "INSERT INTO api_tokens") {
+					g.before = nil
+					for _, st := range admin { // the admin's request, landing first
+						if _, err := rec.inner.Run(a.ctx, st, nil); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
+			res := a.do("POST", "/api/tokens", map[string]any{"name": "keep-me"}, asSession(bo))
+			if res.code != 401 || res.body != unauthorizedBody || strings.Contains(res.body, "crm_") {
+				t.Errorf("token minted across the %s = %s", name, res)
+			}
+			if n := a.count("api_tokens"); n != 0 {
+				t.Errorf("%d tokens left", n)
+			}
+			// Enabled again, nothing comes back.
+			if _, err := db.Run(a.ctx, "UPDATE users SET disabled = 0 WHERE id = 'u-bo'"); err != nil {
+				t.Fatal(err)
+			}
+			if n := a.count("api_tokens"); n != 0 {
+				t.Errorf("%d tokens after re-enabling", n)
 			}
 		})
 	}

@@ -107,14 +107,23 @@ func (l *Limiter) sweep(now time.Time) {
 }
 
 // client is the key an address counts under. An IPv6 client is usually given
-// a whole /64, and can pick any address in it: it counts as one.
+// a whole /64, and can pick any address in it: it counts as one. Anything
+// that isn't an address counts under one shared key, so a made-up header
+// can't open a fresh count for each request.
 func client(ip string) string {
-	if a, err := netip.ParseAddr(ip); err == nil && a.Is6() && !a.Is4In6() {
-		if p, err := a.Prefix(64); err == nil {
-			return p.String()
-		}
+	a, err := netip.ParseAddr(ip)
+	if err != nil {
+		return "unknown"
 	}
-	return cut(ip)
+	a = a.Unmap()
+	if a.Is4() {
+		return a.String()
+	}
+	p, err := a.WithZone("").Prefix(64)
+	if err != nil {
+		return "unknown"
+	}
+	return p.String()
 }
 
 func cut(key string) string {

@@ -654,9 +654,19 @@ func (app *App) createToken(w http.ResponseWriter, r *http.Request) error {
 	}
 	secret, hash := auth.NewSecret(auth.TokenPrefix)
 	id := js.UUID()
-	if _, err := db.Run(ctx, "INSERT INTO api_tokens (id, user_id, name, token_hash, prefix) VALUES (?, ?, ?, ?, ?)",
-		id, web.CurrentUser(r).ID, name, hash, secret[:12]); err != nil {
+	// Made only while the session that asks is still live and its account
+	// enabled, in the same statement: a request signed in before an admin's
+	// password reset or disabling (which delete the account's sessions and
+	// tokens) can't leave a token behind it. As StartSession does for logins.
+	res, err := db.Run(ctx, `INSERT INTO api_tokens (id, user_id, name, token_hash, prefix)
+     SELECT ?, u.id, ?, ?, ? FROM sessions s JOIN users u ON u.id = s.user_id
+      WHERE s.token_hash = ? AND u.id = ? AND s.expires_at > datetime('now') AND u.disabled = 0`,
+		id, name, hash, secret[:12], auth.HashSecret(auth.SessionToken(r)), web.CurrentUser(r).ID)
+	if err != nil {
 		return err
+	}
+	if res.Changes == 0 { // signed out in the meantime
+		return auth.Unauthorized(w)
 	}
 	row, err := db.Get(ctx, "SELECT "+tokenColumns+" FROM api_tokens WHERE id = ?", id)
 	if err != nil {

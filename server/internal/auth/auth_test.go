@@ -407,11 +407,73 @@ func TestClientIP(t *testing.T) {
 	if got := auth.ClientIP(r); got != "2001:db8::1" {
 		t.Errorf("ClientIP(CF-Connecting-IP) = %q", got)
 	}
-	// With Cloudflare's Pseudo IPv4, CF-Connecting-IP is a made-up IPv4
-	// address and the visitor's own is in CF-Connecting-IPv6.
+	// With Cloudflare's Pseudo IPv4, CF-Connecting-IP is a made-up Class E
+	// address (240.0.0.0/4) and the visitor's own is in CF-Connecting-IPv6.
 	r.Header.Set("CF-Connecting-IP", "240.1.2.3")
 	r.Header.Set("CF-Connecting-IPv6", "2001:db8:5::7")
 	if got := auth.ClientIP(r); got != "2001:db8:5::7" {
-		t.Errorf("ClientIP(CF-Connecting-IPv6) = %q", got)
+		t.Errorf("ClientIP(Class E + CF-Connecting-IPv6) = %q", got)
+	}
+	r.Header.Set("CF-Connecting-IP", "255.255.255.254")
+	if got := auth.ClientIP(r); got != "2001:db8:5::7" {
+		t.Errorf("ClientIP(top of Class E + CF-Connecting-IPv6) = %q", got)
+	}
+	// Cloudflare always overwrites CF-Connecting-IP, but sets
+	// CF-Connecting-IPv6 only with Pseudo IPv4: next to a real address, one
+	// is the client's own invention and doesn't count.
+	for _, v4 := range []string{"203.0.113.7", "239.255.255.255", "2001:db8::9"} {
+		r.Header.Set("CF-Connecting-IP", v4)
+		r.Header.Set("CF-Connecting-IPv6", "2001:db8:6::1")
+		if got := auth.ClientIP(r); got != v4 {
+			t.Errorf("ClientIP(%s + a sent CF-Connecting-IPv6) = %q", v4, got)
+		}
+	}
+	// A Class E address with no usable IPv6 beside it stays as it is.
+	r.Header.Set("CF-Connecting-IP", "240.1.2.3")
+	r.Header.Set("CF-Connecting-IPv6", "not-an-address")
+	if got := auth.ClientIP(r); got != "240.1.2.3" {
+		t.Errorf("ClientIP(Class E + garbage v6) = %q", got)
+	}
+}
+
+// What the limiter counts an address under: Pseudo IPv4 visitors by their
+// IPv6 /64, and anything that isn't an address under one shared key, so a
+// made-up header can't open a fresh count per request.
+func TestLimiterKeysFromRequests(t *testing.T) {
+	l := auth.NewLimiter(nil)
+	try := func(ip, ipv6 string, i int) bool {
+		r := httptest.NewRequest("POST", "/api/auth/login", nil)
+		r.Header.Set("CF-Connecting-IP", ip)
+		if ipv6 != "" {
+			r.Header.Set("CF-Connecting-IPv6", ipv6)
+		}
+		return l.Allow(auth.ClientIP(r), fmt.Sprintf("k%d-%s@x", i, ip))
+	}
+	// Class E + IPv6: each request a different pseudo address, one /64.
+	for i := 0; i < 10; i++ {
+		if !try(fmt.Sprintf("240.0.0.%d", i+1), fmt.Sprintf("2001:db8:7:7::%x", i+1), i) {
+			t.Fatalf("pseudo IPv4 attempt %d refused", i+1)
+		}
+	}
+	if try("240.0.0.99", "2001:db8:7:7:ffff::1", 99) {
+		t.Error("a Pseudo IPv4 visitor escaped its /64")
+	}
+	// A real IPv4 address with a made-up IPv6 beside it counts as the IPv4.
+	for i := 0; i < 10; i++ {
+		if !try("203.0.113.50", fmt.Sprintf("2001:db8:%x::1", i+100), i) {
+			t.Fatalf("v4 attempt %d refused", i+1)
+		}
+	}
+	if try("203.0.113.50", "2001:db8:ffff::1", 99) {
+		t.Error("a sent CF-Connecting-IPv6 opened a fresh count")
+	}
+	// Garbage in the header: one shared count.
+	for i := 0; i < 10; i++ {
+		if !try(fmt.Sprintf("garbage-%d", i), "", i) {
+			t.Fatalf("garbage attempt %d refused", i+1)
+		}
+	}
+	if try("garbage-new", "", 99) {
+		t.Error("a header that isn't an address opened a fresh count")
 	}
 }

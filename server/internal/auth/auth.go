@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 
@@ -78,8 +79,7 @@ func Middleware(next http.Handler) http.Handler {
 			return
 		}
 		if user == nil {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="OpenCRM"`)
-			web.JSON(w, http.StatusUnauthorized, unauthorizedBody{"unauthorized", "Sign in to use the CRM."})
+			Unauthorized(w)
 			return
 		}
 		// The browser attaches the cookie to whatever sends a request to this
@@ -90,6 +90,13 @@ func Middleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, web.WithIdentity(r, caller, user))
 	})
+}
+
+// Unauthorized answers 401: the request is signed in as nobody (or no
+// longer is).
+func Unauthorized(w http.ResponseWriter) error {
+	w.Header().Set("WWW-Authenticate", `Bearer realm="OpenCRM"`)
+	return web.JSON(w, http.StatusUnauthorized, unauthorizedBody{"unauthorized", "Sign in to use the CRM."})
 }
 
 // isAPI is whether the path is the API's, decoded as the router decodes it
@@ -284,18 +291,27 @@ func setCookie(w http.ResponseWriter, value string, maxAge int) {
 	})
 }
 
+// pseudoIPv4 is the Class E range Cloudflare's Pseudo IPv4 makes addresses in.
+var pseudoIPv4 = netip.MustParsePrefix("240.0.0.0/4")
+
 // ClientIP is the address a request came from, for the login limiter.
 // Cloudflare puts the visitor's address in CF-Connecting-IP (a client can't
-// set it: the edge overwrites it) and the Worker passes it on; the container
-// itself only sees the Worker's connection. With Cloudflare's Pseudo IPv4 on,
-// that is a made-up IPv4 address and the real one, which the limiter groups
-// by /64, is in CF-Connecting-IPv6. Without either header (the dev server),
+// set it: the edge always overwrites it) and the Worker passes it on; the
+// container itself only sees the Worker's connection. With Cloudflare's
+// Pseudo IPv4 on, that address is a made-up Class E one and the real one,
+// which the limiter groups by /64, is in CF-Connecting-IPv6. That header is
+// believed only then: Cloudflare sets it only for Pseudo IPv4 and doesn't
+// say it drops one a client sent. Without CF-Connecting-IP (the dev server),
 // it is the connection's address.
 func ClientIP(r *http.Request) string {
-	for _, h := range []string{"CF-Connecting-IPv6", "CF-Connecting-IP"} {
-		if ip := strings.TrimSpace(r.Header.Get(h)); ip != "" {
-			return ip
+	if ip := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); ip != "" {
+		if a, err := netip.ParseAddr(ip); err == nil && a.Is4() && pseudoIPv4.Contains(a) {
+			v6 := strings.TrimSpace(r.Header.Get("CF-Connecting-IPv6"))
+			if b, err := netip.ParseAddr(v6); err == nil && b.Is6() && !b.Is4In6() {
+				return v6
+			}
 		}
+		return ip
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
