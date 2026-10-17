@@ -1,0 +1,8 @@
+# Headers for the UI's static files (Vite copies this into dist/, and
+# Cloudflare's asset server applies it). /api/* and /llms.txt come from the
+# Worker and the Go API, which set their own.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  Referrer-Policy: strict-origin-when-cross-origin

@@ -25,6 +25,9 @@ export class Api extends Container<Env> {
   defaultPort = 8080;
   sleepAfter = "10m";
   envVars = containerEnv(this.env);
+  // The Go server calls nothing on the internet: its only outbound requests
+  // go to d1.internal, which outboundByHost below still answers.
+  enableInternet = false;
 }
 
 // The container's environment, fixed when it starts: a changed secret reaches

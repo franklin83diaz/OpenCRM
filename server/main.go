@@ -28,8 +28,13 @@ func main() {
 	if d1 == "" {
 		log.Fatal("D1_URL is not set: the Worker passes it to the container (http://d1.internal)")
 	}
-	// D1 gives up on a query after 30 s, so a bridge call far past that is stuck.
-	db.Use(db.NewD1(d1, &http.Client{Timeout: time.Minute}))
+	// The bridge's own transport: every query is a request to the Worker, and
+	// the default keeps only 2 idle connections per host, so parallel queries
+	// would keep dialing new ones. D1 gives up on a query after 30 s, so a
+	// bridge call far past that is stuck.
+	bridge := http.DefaultTransport.(*http.Transport).Clone()
+	bridge.MaxIdleConnsPerHost = 32
+	db.Use(db.NewD1(d1, &http.Client{Timeout: time.Minute, Transport: bridge}))
 
 	srv := &http.Server{
 		Addr:              ":" + port,

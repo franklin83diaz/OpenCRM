@@ -14,8 +14,10 @@ import (
 )
 
 // freemail.txt is a copy of the maintained `free-email-domains` npm list, which
-// is no longer one of the repo's dependencies. To refresh it, install that
-// package somewhere else and run, from the repo root, with D its domains.json:
+// is no longer one of the repo's dependencies: Copyright © 2017 Kiko Beats,
+// under the MIT licence, whose notice is in freemail.LICENSE beside it. To
+// refresh it, install that package somewhere else and run, from the repo
+// root, with D its domains.json:
 //
 //	D=<dir>/node_modules/free-email-domains/domains.json node -e 'const d=require(process.env.D);const s=[...new Set(d.map(x=>x.toLowerCase()))].sort();require("fs").writeFileSync("server/internal/crm/freemail.txt",s.join("\n")+"\n")'
 //
