@@ -13,6 +13,12 @@ export function Avatar({ firstName, lastName, className }: { firstName?: string 
   );
 }
 
+/** An account's avatar: initials from the name, or the email's first letter when it has none. */
+export function UserAvatar({ name, email, className }: { name: string; email: string; className?: string }) {
+  const words = (name.trim() || email).split(/\s+/);
+  return <Avatar firstName={words[0]} lastName={words.length > 1 ? words[words.length - 1] : ""} className={className} />;
+}
+
 /** Company icon: favicon from the domain, letter fallback tinted by name. */
 export function EntityIcon({ name, domain, className }: { name: string; domain?: string | null; className?: string }) {
   const [err, setErr] = useState(false);

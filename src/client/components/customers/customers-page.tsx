@@ -5,9 +5,9 @@ import { api } from "@/api";
 import { EntityIcon, EmptyState, PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eyebrow, HEALTH, HealthPill, StatusPill, daysAgo, meetingWhen, sightNotice, tzOffset } from "@/components/meetings/shared";
+import { Eyebrow, HEALTH, HealthPill, StatusPill, daysAgo, sightNotice, tzOffset } from "@/components/health";
 import { cn, formatDate } from "@/lib/utils";
-import type { CustomersOverview, FocusItem, MeetingSyncStatus } from "@/types";
+import type { CustomersOverview, FocusItem } from "@/types";
 
 const FOCUS_ICON: Record<FocusItem["kind"], typeof AlarmClock> = {
   overdue: AlarmClock,
@@ -19,23 +19,17 @@ const FOCUS_ICON: Record<FocusItem["kind"], typeof AlarmClock> = {
 
 /**
  * Customers: how each account is doing, worst first, with the reasons in plain
- * words; the few things worth doing first; and the calls coming up this week.
- * A company is a customer from its "Customer since" day (set on its page, or
- * from the close date of its first won deal).
+ * words, and the few things worth doing first. A company is a customer from
+ * its "Customer since" day (set on its page, or from the close date of its
+ * first won deal).
  */
 export function CustomersPage({ navigate }: { navigate: (to: string) => void }) {
   const { setError, changes } = useCrm();
   const [data, setData] = useState<CustomersOverview | null>(null);
-  const [sync, setSync] = useState<MeetingSyncStatus | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [overview, status] = await Promise.all([
-        api<CustomersOverview>("GET", `/api/customers?tz=${tzOffset()}`),
-        api<MeetingSyncStatus>("GET", "/api/meetings/sync"),
-      ]);
-      setData(overview);
-      setSync(status);
+      setData(await api<CustomersOverview>("GET", `/api/customers?tz=${tzOffset()}`));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load customers");
     }
@@ -90,14 +84,7 @@ export function CustomersPage({ navigate }: { navigate: (to: string) => void }) 
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-8 p-6">
-            {notice && (
-              <p className="rounded-md bg-info-tint px-3 py-2 text-[0.8125rem] text-info">
-                {notice.text}
-                {sync?.can_configure && notice.links.map((l, i) => (
-                  <span key={l.href}>{i > 0 ? " · " : " "}<button type="button" className="font-medium underline" onClick={() => navigate(l.href)}>{l.label}</button></span>
-                ))}
-              </p>
-            )}
+            {notice && <p className="rounded-md bg-info-tint px-3 py-2 text-[0.8125rem] text-info">{notice}</p>}
 
             {data.focus.length > 0 && (
               <section className="flex flex-col gap-3">
@@ -135,13 +122,9 @@ export function CustomersPage({ navigate }: { navigate: (to: string) => void }) 
                       <TableHead pinned width={220}>Company</TableHead>
                       <TableHead width={340}>Status</TableHead>
                       <TableHead width={120}>Last contact</TableHead>
-                      <TableHead width={150}>Next call</TableHead>
                       <TableHead width={120}>Renews</TableHead>
                       <TableHead width={130} className="text-right">Our promises</TableHead>
                       <TableHead width={120} className="text-right">Waiting on them</TableHead>
-                      <TableHead width={80} className="text-right">Ideas</TableHead>
-                      <TableHead width={96} className="text-right">Expansion</TableHead>
-                      <TableHead width={72} className="text-right">Risks</TableHead>
                       <TableHead aria-hidden="true" />
                     </TableRow>
                   </TableHeader>
@@ -157,50 +140,22 @@ export function CustomersPage({ navigate }: { navigate: (to: string) => void }) 
                         <TableCell>
                           <div className="flex min-w-0 items-center gap-2" title={c.reasons.join("\n") || undefined}>
                             <HealthPill status={c.status} />
-                            <span className="truncate text-muted-foreground">{c.reasons[0] ?? (c.last_summary ? c.last_summary : "")}</span>
+                            <span className="truncate text-muted-foreground">{c.reasons[0] ?? ""}</span>
                           </div>
                         </TableCell>
                         <TableCell className="tabular">{daysAgo(c.days_quiet)}</TableCell>
-                        <TableCell className="tabular">{c.next_meeting_at ? meetingWhen(c.next_meeting_at) : <span className="text-faint">None booked</span>}</TableCell>
                         <TableCell className="tabular">{c.renewal_date ? formatDate(c.renewal_date) : <span className="text-faint">Not set</span>}</TableCell>
                         <TableCell className="text-right tabular">
                           {c.ours_open}
                           {c.ours_overdue > 0 && <span className="text-destructive"> · {c.ours_overdue} late</span>}
                         </TableCell>
                         <TableCell className="text-right tabular">{c.theirs_open || <span className="text-faint">0</span>}</TableCell>
-                        <TableCell className="text-right tabular">{c.ideas || <span className="text-faint">0</span>}</TableCell>
-                        <TableCell className="text-right tabular">{c.expansion || <span className="text-faint">0</span>}</TableCell>
-                        <TableCell className={cn("text-right tabular", c.risks > 0 && "text-destructive")}>{c.risks || <span className="text-faint">0</span>}</TableCell>
                         <TableCell aria-hidden="true" />
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
-            </section>
-
-            <section className="flex flex-col gap-3">
-              <Eyebrow>Calls in the next 7 days</Eyebrow>
-              {data.upcoming.length === 0 ? (
-                <p className="text-sm text-faint">No calls with customers booked this week.</p>
-              ) : (
-                <ul className="flex flex-col rounded-md bg-card shadow-edge">
-                  {data.upcoming.map((m) => (
-                    <li key={m.id} className="flex items-start gap-3 px-3.5 py-2.5 [&+li]:border-t [&+li]:border-border">
-                      <EntityIcon name={m.company_name} domain={m.company_domain} className="mt-0.5 size-5" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <button type="button" className="truncate text-sm font-medium hover:underline" onClick={() => open(m.company_id)}>{m.company_name}</button>
-                          <span className="truncate text-[0.8125rem] text-muted-foreground">{m.title}</span>
-                        </div>
-                        {m.last_summary && <p className="mt-0.5 line-clamp-2 text-[0.8125rem] text-muted-foreground">Last call: {m.last_summary}</p>}
-                        {m.ours_open > 0 && <p className="mt-0.5 text-[0.8125rem] text-muted-foreground">{m.ours_open} open {m.ours_open === 1 ? "promise" : "promises"} from us</p>}
-                      </div>
-                      <span className="shrink-0 tabular text-[0.8125rem]">{meetingWhen(m.starts_at)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </section>
           </div>
         </div>

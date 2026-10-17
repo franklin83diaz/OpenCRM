@@ -2,6 +2,9 @@ import type { ReactNode } from "react";
 import { cn, toIsoDate } from "@/lib/utils";
 import type { HealthStatus, SyncState } from "@/types";
 
+// What the Customers page, Deals → Next steps, a deal's page and the task
+// list share: the health pill, the day and time words, and the zone eyebrow.
+
 type Tone = "success" | "warning" | "danger" | "neutral";
 
 const TONES: Record<Tone, string> = {
@@ -29,20 +32,6 @@ export const HEALTH: Record<HealthStatus, { label: string; tone: Tone }> = {
 
 export function HealthPill({ status }: { status: HealthStatus }) {
   return <StatusPill tone={HEALTH[status].tone}>{HEALTH[status].label}</StatusPill>;
-}
-
-const MOODS: Record<number, { label: string; tone: Tone }> = {
-  2: { label: "Went very well", tone: "success" },
-  1: { label: "Went well", tone: "success" },
-  0: { label: "Neutral", tone: "neutral" },
-  [-1]: { label: "Uneasy", tone: "warning" },
-  [-2]: { label: "Went badly", tone: "danger" },
-};
-
-/** How a call went, from its digest. The reason shows on hover. */
-export function MoodPill({ value, reason }: { value: number | null; reason?: string | null }) {
-  if (value === null || !(value in MOODS)) return null;
-  return <StatusPill tone={MOODS[value].tone} title={reason ?? undefined}>{MOODS[value].label}</StatusPill>;
 }
 
 /** The viewer's offset from UTC in minutes, as the API's `tz` takes it. */
@@ -91,17 +80,17 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
 }
 
 const CHANNELS = [
-  { key: "calls", off: "calls aren't synced", importing: "calls are still importing", failing: "the meeting sync is failing", href: "/settings/meetings", setup: "Set up meetings", open: "Meeting settings" },
-  { key: "emails", off: "email isn't synced", importing: "email is still importing", failing: "the email sync is failing", href: "/settings/email", setup: "Set up email", open: "Email settings" },
+  { key: "calls", off: "calls aren't synced", importing: "calls are still importing", failing: "the meeting sync is failing" },
+  { key: "emails", off: "email isn't synced", importing: "email is still importing", failing: "the email sync is failing" },
 ] as const;
 
-/** What the CRM can't see, as one sentence, and where to fix each part; null when it sees both. `of`: whose contact it is ("customers", "deals"). */
-export function sightNotice(sight: { calls: SyncState; emails: SyncState }, of: string) {
+/** What the CRM can't see, as one sentence; null when it sees both. `of`: whose contact it is ("customers", "these deals"). */
+export function sightNotice(sight: { calls: SyncState; emails: SyncState }, of: string): string | null {
   const gaps = CHANNELS.flatMap((ch) => {
     const state: SyncState = sight[ch.key];
-    return state === "seen" ? [] : [{ text: ch[state], href: ch.href, label: state === "off" ? ch.setup : ch.open }];
+    return state === "seen" ? [] : [ch[state]];
   });
   if (!gaps.length) return null;
-  const said = gaps.map((g) => g.text).join(" and ");
-  return { text: `${said.charAt(0).toUpperCase()}${said.slice(1)}, so the CRM can't see all your contact with ${of}.`, links: gaps };
+  const said = gaps.join(" and ");
+  return `${said.charAt(0).toUpperCase()}${said.slice(1)}, so the CRM can't see all your contact with ${of}.`;
 }

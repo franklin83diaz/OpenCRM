@@ -1,18 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mail, Star, LayoutGrid, Activity as ActivityIcon, Phone, Globe, Building2, Tag, AtSign, Users, StickyNote, Calendar, CalendarDays, Clock, CheckSquare, BadgeCheck, CalendarClock } from "lucide-react";
+import { ArrowLeft, Mail, Star, LayoutGrid, Activity as ActivityIcon, Phone, Globe, Building2, Tag, AtSign, Users, StickyNote, Calendar, Clock, CheckSquare, BadgeCheck, CalendarClock } from "lucide-react";
 import { useCrm } from "@/context";
 import { EntityIcon, CategoryBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
-import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection, AskAi, useRecordChat } from "@/components/record-page";
+import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection } from "@/components/record-page";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ValuesMenu } from "@/components/cell-editors";
-import { MeetingsSection } from "@/components/meetings/meetings-section";
 import { TasksSection } from "@/components/tasks/tasks-section";
-import { InsightsSection } from "@/components/insights/insights-section";
 import { cn, formatDate } from "@/lib/utils";
-import { useComposer } from "@/components/email/composer";
 import type { Company, Activity } from "@/types";
 
 function formatTimestamp(createdAt: string): string {
@@ -25,14 +22,11 @@ function formatTimestamp(createdAt: string): string {
 // control; there is no edit mode. `panel` renders it in the side panel beside
 // the companies list, as ContactDetail does.
 export function CompanyDetail({ id, navigate, panel = false }: { id: string; navigate: (to: string) => void; panel?: boolean }) {
-  const { fetchCompany, updateCompany, fetchActivities, setError, customFields, changes, connections } = useCrm();
-  const { compose } = useComposer();
+  const { fetchCompany, updateCompany, fetchActivities, setError, customFields, changes } = useCrm();
   const relationDefs = customFields.filter((d) => d.entity_type === "company" && d.field_type === "relation");
   const [company, setCompany] = useState<Company | null | undefined>(undefined);
-  useRecordChat("company", "Company", id, company ? company.name : undefined);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [taskCount, setTaskCount] = useState(0);
-  const [meetingCount, setMeetingCount] = useState(0);
 
   const saveField = async (patch: Partial<Company>) => {
     if (!company) return;
@@ -76,7 +70,6 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
 
   const recent = [...activities].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const noteCount = activities.filter((a) => a.type === "note").length;
-  const emailCount = activities.filter((a) => a.type === "email").length;
   const host = (company.domain || "").replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
 
   return (
@@ -94,19 +87,12 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
           </div>
 
           <div className="flex flex-wrap gap-2 px-4 pt-3 pb-4">
-            {connections.email ? (
-              <Button variant="outline" size="sm" onClick={() => compose({ to: company.email ? [{ email: company.email.toLowerCase(), name: company.name || null }] : [] })}>
-                <Mail className="size-4" /> Compose email
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" disabled={!company.email} asChild={!!company.email}>
-                {company.email ? <a href={`mailto:${company.email}`}><Mail className="size-4" /> Compose email</a> : <><Mail className="size-4" /> Compose email</>}
-              </Button>
-            )}
+            <Button variant="outline" size="sm" disabled={!company.email} asChild={!!company.email}>
+              {company.email ? <a href={`mailto:${company.email}`}><Mail className="size-4" /> Compose email</a> : <><Mail className="size-4" /> Compose email</>}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate(`/contacts?company=${encodeURIComponent(company.id)}`)}>
               <Users className="size-4" /> Contacts {company.contact_count ? <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{company.contact_count}</span> : null}
             </Button>
-            <AskAi about={company.name || "this company"} />
           </div>
 
           <DetailsSection title="Record details">
@@ -155,8 +141,6 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
           {!panel && <RecordTabs tabs={[
             { key: "overview", label: "Overview", icon: LayoutGrid },
             { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
-            { key: "emails", label: "Emails", icon: Mail, count: emailCount },
-            { key: "meetings", label: "Meetings", icon: CalendarDays, count: meetingCount },
             { key: "team", label: "Team", icon: Users, count: company.contact_count ?? 0 },
             { key: "notes", label: "Notes", icon: StickyNote, count: noteCount },
             { key: "tasks", label: "Tasks", icon: CheckSquare, count: taskCount },
@@ -177,9 +161,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
               </section>
             )}
 
-            <MeetingsSection companyId={company.id} onCount={setMeetingCount} />
             <TasksSection companyId={company.id} onCount={setTaskCount} />
-            <InsightsSection companyId={company.id} navigate={navigate} />
 
             <section className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
@@ -201,7 +183,6 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
               )}
             </section>
 
-            <FutureSection label="Emails" count={emailCount} />
             <FutureSection label="Notes" count={noteCount} />
           </div>
         </main>

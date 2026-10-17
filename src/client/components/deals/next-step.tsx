@@ -1,5 +1,5 @@
 import { CalendarClock, CircleDashed, ListChecks } from "lucide-react";
-import { dueWhen, localToday, meetingWhen } from "@/components/meetings/shared";
+import { dueWhen, localToday, meetingWhen } from "@/components/health";
 import { toIsoDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { DealProgress } from "@/types";

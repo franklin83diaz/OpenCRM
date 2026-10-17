@@ -15,8 +15,9 @@ export type Route =
   | { name: "deal"; id: string }
   | { name: "customers" }
   | { name: "properties" }
-  | { name: "email-sync" }
-  | { name: "meetings-sync" }
+  | { name: "account" }
+  | { name: "tokens" }
+  | { name: "users" }
   | { name: "not-found" };
 
 function parse(pathname: string, search: string): Route {
@@ -35,8 +36,9 @@ function parse(pathname: string, search: string): Route {
   if (dm) return { name: "deal", id: decodeURIComponent(dm[1]) };
   if (pathname === "/customers") return { name: "customers" };
   if (pathname === "/settings/properties") return { name: "properties" };
-  if (pathname === "/settings/email") return { name: "email-sync" };
-  if (pathname === "/settings/meetings") return { name: "meetings-sync" };
+  if (pathname === "/settings/account") return { name: "account" };
+  if (pathname === "/settings/tokens") return { name: "tokens" };
+  if (pathname === "/settings/users") return { name: "users" };
   return { name: "not-found" };
 }
 

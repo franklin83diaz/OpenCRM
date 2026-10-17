@@ -3,22 +3,18 @@ import { ArrowLeft, Mail, Calendar, StickyNote, MessageSquare, Trophy, Star, Lay
 import { useCrm } from "@/context";
 import { Avatar, CategoryBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { InlineField } from "@/components/ui/inline-field";
-import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection, AskAi, useRecordChat } from "@/components/record-page";
+import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection } from "@/components/record-page";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RelationInput } from "@/lib/relations";
-import { ContactEmails } from "@/components/contacts/contact-emails";
-import { useComposer } from "@/components/email/composer";
 import { Separator } from "@/components/ui/separator";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Contact, Activity, RelationRecord } from "@/types";
 
-type FormKind = "meeting" | "note";
-
+// Activities the CRM no longer makes (emails, meetings, Slack) keep their look
+// on records that have them.
 const ACTIVITY_STYLE: Record<string, { icon: typeof Mail; className: string }> = {
   email: { icon: Mail, className: "bg-primary/10 text-primary" },
   meeting: { icon: Calendar, className: "bg-cat-4-tint text-cat-4-text" },
@@ -50,20 +46,14 @@ function formatTimestamp(createdAt: string): string {
 // `panel` is the same record in the side panel beside the contacts list: one
 // column, no tab strip, and no highlight tiles repeating the details above them.
 export function ContactDetail({ id, navigate, panel = false }: { id: string; navigate: (to: string) => void; panel?: boolean }) {
-  const { fetchContact, fetchActivities, updateContact, scheduleMeeting, addNote, connections, setError, customFields, changes } = useCrm();
-  const { compose } = useComposer();
+  const { fetchContact, fetchActivities, updateContact, addNote, setError, customFields, changes } = useCrm();
   const relationDefs = customFields.filter((d) => d.entity_type === "contact" && d.field_type === "relation");
 
   const [contact, setContact] = useState<Contact | null | undefined>(undefined);
-  useRecordChat("contact", "Contact", id, contact ? `${contact.first_name} ${contact.last_name}`.trim() : undefined);
   const [activities, setActivities] = useState<Activity[]>([]);
 
-  const [openForm, setOpenForm] = useState<FormKind | null>(null);
+  const [noteOpen, setNoteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-
-  const [meetingTitle, setMeetingTitle] = useState("");
-  const [meetingStart, setMeetingStart] = useState("");
-  const [meetingDuration, setMeetingDuration] = useState("30");
   const [noteBody, setNoteBody] = useState("");
 
   // Click-to-edit saves one field, then re-reads the record so derived columns
@@ -127,45 +117,10 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
     ? { id: contact.company_id, label: contact.company_name, domain: contact.company_domain ?? null }
     : undefined;
   const fullName = `${contact.first_name} ${contact.last_name}`.trim() || "Contact";
-  const composeToContact = () =>
-    compose({ to: contact.email ? [{ email: contact.email.toLowerCase(), name: `${contact.first_name} ${contact.last_name}`.trim() || null }] : [] });
 
-  const openFormKind = (kind: FormKind) => {
-    if (openForm === kind) {
-      setOpenForm(null);
-      return;
-    }
-    setOpenForm(kind);
-    if (kind === "meeting") {
-      setMeetingTitle(`Meeting with ${fullName}`);
-      setMeetingStart("");
-      setMeetingDuration("30");
-    } else {
-      setNoteBody("");
-    }
-  };
-
-  const afterAction = async () => {
-    setOpenForm(null);
-    await reloadActivities();
-  };
-
-  const submitMeeting = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await scheduleMeeting(contact.id, {
-        summary: meetingTitle,
-        start_datetime: meetingStart.slice(0, 19),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        duration_minutes: Number(meetingDuration),
-      });
-      await afterAction();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to schedule meeting");
-    } finally {
-      setBusy(false);
-    }
+  const toggleNote = () => {
+    if (!noteOpen) setNoteBody("");
+    setNoteOpen(!noteOpen);
   };
 
   const submitNote = async (e: React.FormEvent) => {
@@ -173,7 +128,8 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
     setBusy(true);
     try {
       await addNote("contact", contact.id, noteBody);
-      await afterAction();
+      setNoteOpen(false);
+      await reloadActivities();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save note");
     } finally {
@@ -182,13 +138,11 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
   };
 
   const noteCount = activities.filter((a) => a.type === "note").length;
-  const emailCount = activities.filter((a) => a.type === "email").length;
   const recent = [...activities].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const tabs: Array<{ key: string; label: string; icon: typeof Mail; count?: number }> = [
     { key: "overview", label: "Overview", icon: LayoutGrid },
     { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
-    { key: "emails", label: "Emails", icon: Mail, count: emailCount },
     { key: "notes", label: "Notes", icon: StickyNote, count: noteCount },
     { key: "tasks", label: "Tasks", icon: CheckSquare, count: 0 },
   ];
@@ -211,34 +165,15 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
           </div>
 
           <div className="flex flex-wrap gap-2 px-4 pt-3 pb-4">
-            <Button variant="outline" size="sm" onClick={composeToContact} disabled={!connections.email} title={connections.email ? undefined : "Connect Gmail in Clawnify"}>
-              <Mail className="size-4" /> Compose email
+            <Button variant="outline" size="sm" disabled={!contact.email} asChild={!!contact.email}>
+              {contact.email ? <a href={`mailto:${contact.email}`}><Mail className="size-4" /> Compose email</a> : <><Mail className="size-4" /> Compose email</>}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => openFormKind("meeting")} disabled={!connections.meeting} title={connections.meeting ? undefined : "Connect Google Calendar in Clawnify"} aria-label="Schedule meeting">
-              <Calendar className="size-4" /> Meeting
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => openFormKind("note")} aria-label="Add note" title="Add note">
+            <Button variant="outline" size="icon" onClick={toggleNote} aria-label="Add note" title="Add note">
               <StickyNote className="size-4" />
             </Button>
-            <AskAi about={`${contact.first_name} ${contact.last_name}`.trim() || "this contact"} />
           </div>
 
-          {openForm === "meeting" && (
-            <form onSubmit={submitMeeting} className="mx-4 mb-4 flex flex-col gap-3 rounded-md p-4 shadow-edge">
-              <div className="flex flex-col gap-1.5"><Label htmlFor="meeting-title">Title</Label><Input id="meeting-title" required value={meetingTitle} onChange={(e) => setMeetingTitle(e.target.value)} /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5"><Label htmlFor="meeting-start">Start</Label><Input id="meeting-start" type="datetime-local" required value={meetingStart} onChange={(e) => setMeetingStart(e.target.value)} /></div>
-                <div className="flex flex-col gap-1.5"><Label htmlFor="meeting-duration">Duration</Label>
-                  <Select value={meetingDuration} onValueChange={setMeetingDuration}>
-                    <SelectTrigger id="meeting-duration"><SelectValue /></SelectTrigger>
-                    <SelectContent>{["15", "30", "45", "60"].map((m) => <SelectItem key={m} value={m}>{m} min</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex justify-end"><Button type="submit" size="sm" disabled={busy}>{busy ? "Scheduling…" : "Schedule meeting"}</Button></div>
-            </form>
-          )}
-          {openForm === "note" && (
+          {noteOpen && (
             <form onSubmit={submitNote} className="mx-4 mb-4 flex flex-col gap-3 rounded-md p-4 shadow-edge">
               <div className="flex flex-col gap-1.5"><Label htmlFor="note-body">Note</Label><Textarea id="note-body" required value={noteBody} onChange={(e) => setNoteBody(e.target.value)} /></div>
               <div className="flex justify-end"><Button type="submit" size="sm" disabled={busy}>{busy ? "Saving…" : "Add note"}</Button></div>
@@ -301,7 +236,7 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
                 <button type="button" className="text-[0.8125rem] text-muted-foreground hover:text-foreground">View all</button>
               </div>
               {recent.length === 0 ? (
-                <p className="text-sm text-faint">No activity yet. Send an email, schedule a meeting, or add a note.</p>
+                <p className="text-sm text-faint">No activity yet. Add a note to start the timeline.</p>
               ) : (
                 <ul className="flex flex-col rounded-md bg-card shadow-edge">
                   {recent.slice(0, 6).map((a) => {
@@ -323,8 +258,7 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
               )}
             </section>
 
-            <ContactEmails contactId={contact.id} contactName={fullName} canCompose={connections.email} onCompose={composeToContact} navigate={navigate} />
-            <FutureSection label="Notes" count={noteCount} onAdd={() => openFormKind("note")} />
+            <FutureSection label="Notes" count={noteCount} onAdd={toggleNote} />
             <FutureSection label="Tasks" count={0} />
           </div>
         </main>

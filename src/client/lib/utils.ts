@@ -93,11 +93,28 @@ export function formatPeriod(period: string): string {
   return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
+/** A timestamp as a Date: SQLite's "YYYY-MM-DD HH:MM:SS" (UTC) or ISO. */
+export function parseTimestamp(timestamp: string): Date {
+  return new Date(/[zZ]$|[+-]\d\d:?\d\d$/.test(timestamp) ? timestamp : `${timestamp.replace(" ", "T")}Z`);
+}
+
 /** Whole days since a timestamp: SQLite's "YYYY-MM-DD HH:MM:SS" (UTC) or ISO. */
 export function daysSince(timestamp: string, now = Date.now()): number {
-  const iso = /[zZ]$|[+-]\d\d:?\d\d$/.test(timestamp) ? timestamp : `${timestamp.replace(" ", "T")}Z`;
-  const t = new Date(iso).getTime();
+  const t = parseTimestamp(timestamp).getTime();
   return Number.isNaN(t) ? 0 : Math.max(0, Math.floor((now - t) / 86_400_000));
+}
+
+/** How long ago, as people say it: "Just now", "5 min ago", "3 h ago", "Yesterday", then the date. */
+export function timeAgo(timestamp: string, now = Date.now()): string {
+  const t = parseTimestamp(timestamp).getTime();
+  if (Number.isNaN(t)) return timestamp;
+  const min = Math.floor((now - t) / 60_000);
+  if (min < 1) return "Just now";
+  if (min < 60) return `${min} min ago`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} h ago`;
+  if (h < 48) return "Yesterday";
+  return new Date(t).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 /** Days between two ISO dates (positive = b after a). */

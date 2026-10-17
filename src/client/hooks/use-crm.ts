@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, type Dispatch, type SetStateAction } 
 import { api } from "../api";
 import type {
   Contact, Company, Deal, Stats, PaginatedState, StageDef,
-  Activity, ConnectionStatus, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult,
+  Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult,
 } from "../types";
 import { sanitize, type FilterNode } from "@/lib/filters";
 import type { CrmContextValue } from "../context";
@@ -40,7 +40,6 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
   const [boardDeals, setBoardDeals] = useState<Deal[]>([]);
   const [boardFilters, setBoardFilters] = useState<FilterNode[]>([]);
 
-  const [connections, setConnections] = useState<ConnectionStatus>({ email: false, meeting: false, slack: false, notes: false });
   const [customFields, setCustomFields] = useState<CustomFieldDef[]>([]);
   const [stages, setStages] = useState<StageDef[]>([]);
   // Bumped on every record write, so an open record page re-reads itself.
@@ -81,14 +80,6 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     setBoardDeals(data.deals);
   }, [boardFilters]);
 
-  const fetchConnections = useCallback(async () => {
-    try {
-      setConnections(await api<ConnectionStatus>("GET", "/api/integrations/status"));
-    } catch {
-      /* off-platform / no broker — leave everything disconnected */
-    }
-  }, []);
-
   const refetchCustomFields = useCallback(async () => {
     const data = await api<{ defs: CustomFieldDef[] }>("GET", "/api/custom-fields");
     setCustomFields(data.defs);
@@ -107,7 +98,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
       try {
         await Promise.all([
           fetchStats(), fetchContacts(contactsPag), fetchCompanies(companiesPag),
-          fetchDeals(dealsPag), fetchBoardDeals(), fetchConnections(),
+          fetchDeals(dealsPag), fetchBoardDeals(),
           refetchCustomFields(), refetchStages(),
         ]);
       } catch (err) {
@@ -243,14 +234,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     await Promise.all([fetchDeals(dealsPag), fetchBoardDeals(), fetchStats()]);
   }, [dealsPag, fetchDeals, fetchBoardDeals, fetchStats]);
 
-  // ── Integrations & timeline ──
-
-  const scheduleMeeting = useCallback(async (
-    contactId: string,
-    data: { summary: string; start_datetime: string; timezone: string; duration_minutes: number },
-  ) => {
-    await api("POST", "/api/integrations/meeting", { contact_id: contactId, ...data });
-  }, []);
+  // ── Timeline ──
 
   const fetchActivities = useCallback(async (entityType: EntityType, entityId: string) => {
     const data = await api<{ activities: Activity[] }>("GET", `/api/activities?entity_type=${entityType}&entity_id=${entityId}`);
@@ -288,7 +272,6 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     addCompany, updateCompany, deleteCompanies,
     deals, dealsPag, dealsTotalValue, setDealsPage: dSet.setPage, setDealsSort: dSet.setSort, setDealsSearch: dSet.setSearch,
     addDeal, fetchDeal, updateDeal, deleteDeal, boardDeals, boardFilters, setBoardFilters,
-    connections, scheduleMeeting,
     fetchActivities, addNote, importEntity,
     customFields, refetchCustomFields,
     changes, recordsChanged,

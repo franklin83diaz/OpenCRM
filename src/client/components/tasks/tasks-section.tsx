@@ -5,15 +5,16 @@ import { api } from "@/api";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { dueWhen, meetingWhen } from "@/components/meetings/shared";
+import { dueWhen, meetingWhen } from "@/components/health";
 import { cn } from "@/lib/utils";
 import type { Task, OwedBy } from "@/types";
 
 const OWED: Record<OwedBy, string> = { us: "We owe", them: "They owe" };
 
 /**
- * A company's tasks: what we promised and what we're waiting on, typed here or
- * taken from its calls. Open ones by due date; done ones on request. Each value
+ * A company's tasks: what we promised and what we're waiting on, typed here
+ * (older ones may carry the quote from the call they came from). Open ones by
+ * due date; done ones on request. Each value
  * is the control (title and due date edit in place, the chip flips who owes it).
  * With `dealId`, a deal's: its own tasks and its company's on no deal, and a
  * new one is the deal's (a task with a date is a next step).

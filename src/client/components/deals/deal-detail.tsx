@@ -4,12 +4,11 @@ import { useCrm } from "@/context";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection, AskAi, useRecordChat } from "@/components/record-page";
+import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection } from "@/components/record-page";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RelationInput } from "@/lib/relations";
 import { formatMoney, colorClasses, cn } from "@/lib/utils";
-import { HealthPill, daysAgo } from "@/components/meetings/shared";
-import { MeetingsSection } from "@/components/meetings/meetings-section";
+import { HealthPill, daysAgo } from "@/components/health";
 import { TasksSection } from "@/components/tasks/tasks-section";
 import { NextStepLine } from "@/components/deals/next-step";
 import type { Deal, Activity, RelationRecord, StageDef } from "@/types";
@@ -38,7 +37,6 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
   const { fetchDeal, updateDeal, fetchActivities, setError, customFields, changes, stages } = useCrm();
   const relationDefs = customFields.filter((d) => d.entity_type === "deal" && d.field_type === "relation");
   const [deal, setDeal] = useState<Deal | null | undefined>(undefined);
-  useRecordChat("deal", "Deal", id, deal ? deal.name : undefined);
   const [activities, setActivities] = useState<Activity[]>([]);
 
   const saveField = async (patch: Partial<Deal>) => {
@@ -104,7 +102,6 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
             <div className="min-w-0 flex-1">
               <InlineField value={deal.name} placeholder="Deal name" onSave={(v) => { if (v) return saveField({ name: v }); }} className="h-8 w-auto px-1.5 text-base font-semibold" />
             </div>
-            <AskAi about={deal.name || "this deal"} />
           </div>
 
           <DetailsSection title="Deal">
@@ -172,7 +169,7 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
                     </ul>
                   )}
                   {!deal.progress.next_step && (
-                    <p className="text-[0.8125rem] text-muted-foreground">Book a call with them, or add a task with a date below.</p>
+                    <p className="text-[0.8125rem] text-muted-foreground">Add a task with a date below: that's the deal's next step.</p>
                   )}
                 </div>
               </section>
@@ -193,15 +190,6 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
             )}
 
             <TasksSection companyId={deal.company_id} dealId={deal.id} />
-
-            {deal.company_id ? (
-              <MeetingsSection companyId={deal.company_id} />
-            ) : (
-              <section className="flex flex-col gap-2">
-                <h2 className="text-sm font-medium">Calls</h2>
-                <p className="text-sm text-faint">Set the deal's company to see the calls with it.</p>
-              </section>
-            )}
 
             <section className="flex flex-col gap-3">
               <h2 className="text-sm font-medium">Activity</h2>

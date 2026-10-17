@@ -20,6 +20,11 @@ export default defineConfig({
         target: "http://localhost:8787",
         changeOrigin: true,
       },
+      // The API's description for agents, linked from Settings → API tokens.
+      "/llms.txt": {
+        target: "http://localhost:8787",
+        changeOrigin: true,
+      },
     },
   },
 });

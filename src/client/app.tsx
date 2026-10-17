@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
-import { Building2, Handshake, PanelLeft, Users } from "lucide-react";
-import { AppNav, reportLocation, useHostChanges, useHostNavigate, type AppNavItem } from "@clawnify/app/client";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Building2, Handshake, Users } from "lucide-react";
+import { api, ApiError, onUnauthorized } from "./api";
+import { AuthContext, useAuth, type AuthValue } from "./auth";
 import { useCrmState } from "./hooks/use-crm";
 import { CrmContext } from "./context";
-import { useRouter, withQuery, type Route } from "./hooks/use-router";
+import { useRouter, withQuery } from "./hooks/use-router";
 import { ErrorBanner } from "./components/error-banner";
-import { ComposerProvider } from "./components/email/composer";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { Button } from "./components/ui/button";
+import { AppSidebar } from "./components/app-sidebar";
+import { LoginPage } from "./components/auth/login-page";
 import { ContactsPage } from "./components/contacts/contacts-page";
 import { ContactDetail } from "./components/contacts/contact-detail";
 import { CompaniesPage } from "./components/companies/companies-page";
@@ -15,92 +18,90 @@ import { DealsBoard } from "./components/deals/deals-board";
 import { DealsProgressPage } from "./components/deals/deals-progress-page";
 import { DealDetail } from "./components/deals/deal-detail";
 import { PropertiesPage } from "./components/properties/properties-page";
-import { EmailSyncPage } from "./components/email-sync/email-sync-page";
 import { CustomersPage } from "./components/customers/customers-page";
-import { MeetingsSettingsPage } from "./components/meetings/meetings-settings-page";
+import { AccountPage } from "./components/settings/account-page";
+import { TokensPage } from "./components/settings/tokens-page";
+import { UsersPage } from "./components/settings/users-page";
 import { RecordPanel, RecordPanelHeader } from "./components/record-page";
+import type { User } from "./types";
 
-// One definition of the navigation. <AppNav> paints it as this app's own
-// sidebar when opened directly, and hands it to the Clawnify dashboard's
-// sidebar when embedded there. Record types own a colour: the tile behind
-// the icon is the type's hue, and the same hue follows the type onto its
-// page header and its chips inside other records.
-const RECORDS: AppNavItem[] = [
-  // The CRM opens on contacts. This hidden item is what the app's name opens
-  // (the brand row standalone, the app's row in the dashboard).
-  { id: "home", label: "Contacts", href: "/", home: true },
-  { id: "contacts", label: "Contacts", href: "/contacts", icon: "users", color: "blue" },
-  { id: "companies", label: "Companies", href: "/companies", icon: "building-2", color: "violet" },
-  { id: "deals", label: "Deals", href: "/deals", icon: "dollar-sign", color: "green" },
-  { id: "customers", label: "Customers", href: "/customers", icon: "activity", color: "orange" },
-];
-const SETTINGS: AppNavItem[] = [
-  { id: "properties", label: "Attributes", href: "/settings/properties", icon: "layers" },
-  { id: "email-sync", label: "Email", href: "/settings/email", icon: "mail" },
-  { id: "meetings-sync", label: "Meetings", href: "/settings/meetings", icon: "calendar" },
-];
+type Auth =
+  | { status: "checking" }
+  | { status: "signed-out"; expired?: boolean }
+  | { status: "unreachable"; message: string }
+  | { status: "signed-in"; user: User };
 
-function activeFor(route: Route): string {
-  if (route.name === "contact") return "contacts";
-  if (route.name === "company") return "companies";
-  if (route.name === "deal") return "deals";
-  return route.name;
+/**
+ * Who is here decides what renders: the login page, or the CRM. On load the
+ * session cookie is checked with GET /api/auth/me. Afterwards a 401 from any
+ * call (the session expired or was ended, the account was disabled) comes
+ * back here through api.ts and shows the login page; nothing else retries.
+ */
+export function App() {
+  const [auth, setAuth] = useState<Auth>({ status: "checking" });
+
+  useEffect(() => onUnauthorized(() => {
+    setAuth((a) => (a.status === "signed-in" ? { status: "signed-out", expired: true } : a.status === "signed-out" ? a : { status: "signed-out" }));
+  }), []);
+
+  const check = useCallback(async () => {
+    setAuth({ status: "checking" });
+    try {
+      const { user } = await api<{ user: User }>("GET", "/api/auth/me");
+      setAuth({ status: "signed-in", user });
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) setAuth({ status: "signed-out" });
+      else setAuth({ status: "unreachable", message: e instanceof Error ? e.message : String(e) });
+    }
+  }, []);
+  useEffect(() => { void check(); }, [check]);
+
+  const signOut = useCallback(async () => {
+    await api("POST", "/api/auth/logout");
+    // The next person to sign in starts on the home screen, not on this one's page.
+    window.history.replaceState(null, "", "/");
+    setAuth({ status: "signed-out" });
+  }, []);
+  const setUser = useCallback((user: User) => setAuth({ status: "signed-in", user }), []);
+
+  const user = auth.status === "signed-in" ? auth.user : null;
+  const value = useMemo<AuthValue | null>(() => (user ? { user, setUser, signOut } : null), [user, setUser, signOut]);
+
+  if (auth.status === "checking") {
+    return <div className="flex h-dvh items-center justify-center bg-background text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (auth.status === "unreachable") {
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center gap-3 bg-background p-6 text-center">
+        <p className="text-sm text-muted-foreground">The CRM didn't answer: {auth.message}</p>
+        <Button size="sm" variant="outline" onClick={() => void check()}>Try again</Button>
+      </div>
+    );
+  }
+  if (auth.status === "signed-out" || !value) {
+    return <LoginPage expired={auth.status === "signed-out" && auth.expired} onSignedIn={setUser} />;
+  }
+  return (
+    <AuthContext.Provider value={value}>
+      {/* A new person gets a fresh CRM state: nothing of the last one's lists or panels. */}
+      <Crm key={value.user.id} />
+    </AuthContext.Provider>
+  );
 }
 
-export function App() {
+function Crm() {
   const isAgent = document.documentElement.hasAttribute("data-agent");
   const state = useCrmState(isAgent);
-  const { path, route, navigate } = useRouter();
+  const { route, navigate } = useRouter();
+  const { user } = useAuth();
   // A list opens its records in a side panel; the record's own path is the full page.
   const openRecord = route.name === "contacts" || route.name === "companies" || route.name === "deals" ? route.record : undefined;
-
-  // Lets the dashboard restore this exact screen on reload.
-  useEffect(() => {
-    reportLocation(path);
-  }, [path]);
-
-  // The Clawnify dashboard's chat drives this app too: it opens a page
-  // through our router (no reload), and after it writes records through the
-  // API, the lists and any open record re-read, the same as after our own edits.
-  useHostNavigate((to) => navigate(to));
-  useHostChanges(() => {
-    void state.recordsChanged();
-  });
-
-  // Collapse folds the SDK sidebar to icons. The toggle lives here, not in
-  // <AppNav>, because the SDK has no slot for it; the proper home is the SDK.
-  const [navCollapsed, setNavCollapsed] = useState(false);
-
-  const counts: Record<string, number> = { contacts: state.stats.contacts, companies: state.stats.companies, deals: state.stats.deals, customers: state.stats.customers };
-  const groups = [
-    { items: RECORDS.map((n) => (counts[n.id] ? { ...n, count: counts[n.id] } : n)) },
-    { label: "Settings", items: SETTINGS },
-  ];
 
   return (
     <CrmContext.Provider value={state}>
     <TooltipProvider delayDuration={200}>
-    <ComposerProvider>
-      <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-background text-foreground md:flex-row" data-nav-collapsed={navCollapsed || undefined}>
-        {/* flex, so the SDK aside stretches to the row height like a direct child */}
-        <div className="relative flex shrink-0">
-          <button
-            type="button"
-            onClick={() => setNavCollapsed((v) => !v)}
-            aria-label={navCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={navCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="absolute right-2 top-3.5 z-10 hidden size-7 items-center justify-center rounded-[0.5rem] text-muted-foreground hover:bg-border/60 hover:text-foreground md:inline-flex"
-          >
-            <PanelLeft className="size-4" />
-          </button>
-          <AppNav
-            title="OpenCRM"
-            icon="contact"
-            groups={groups}
-            active={activeFor(route)}
-            onNavigate={(item) => navigate(item.href ?? "/")}
-          />
-        </div>
+      <div className="flex h-dvh min-h-0 overflow-hidden bg-background text-foreground">
+        <AppSidebar route={route} navigate={navigate} />
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {state.loading ? (
             <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading…</div>
@@ -146,24 +147,30 @@ export function App() {
               {route.name === "deal" && <DealDetail id={route.id} navigate={navigate} />}
               {route.name === "customers" && <CustomersPage navigate={navigate} />}
               {route.name === "properties" && <PropertiesPage />}
-              {route.name === "email-sync" && <EmailSyncPage />}
-              {route.name === "meetings-sync" && <MeetingsSettingsPage />}
-              {route.name === "not-found" && (
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 p-12 text-center">
-                  <h1 className="text-xl font-bold tracking-tight">Not found</h1>
-                  <p className="text-sm text-muted-foreground">That page doesn't exist.</p>
-                  <button className="text-sm text-[var(--ring)] hover:underline" onClick={() => navigate("/contacts")}>
-                    Back to contacts
-                  </button>
-                </div>
-              )}
+              {route.name === "account" && <AccountPage navigate={navigate} />}
+              {route.name === "tokens" && <TokensPage />}
+              {route.name === "users" && (user.role === "admin"
+                ? <UsersPage navigate={navigate} />
+                : <Missing title="Admins only" text="Only an admin can manage accounts." navigate={navigate} />)}
+              {route.name === "not-found" && <Missing title="Not found" text="That page doesn't exist." navigate={navigate} />}
             </>
           )}
         </main>
         <ErrorBanner />
       </div>
-    </ComposerProvider>
     </TooltipProvider>
     </CrmContext.Provider>
+  );
+}
+
+function Missing({ title, text, navigate }: { title: string; text: string; navigate: (to: string) => void }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 p-12 text-center">
+      <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+      <p className="text-sm text-muted-foreground">{text}</p>
+      <button className="text-sm text-[var(--ring)] hover:underline" onClick={() => navigate("/contacts")}>
+        Back to contacts
+      </button>
+    </div>
   );
 }

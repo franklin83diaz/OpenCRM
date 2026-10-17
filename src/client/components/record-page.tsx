@@ -1,9 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
-import { Maximize2, Plus, Sparkles, X } from "lucide-react";
-import { openChat, useChatContext, useHasChat } from "@clawnify/app/client";
+import { Maximize2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useComposerAvoid } from "@/components/email/composer";
 
 type Icon = ComponentType<{ className?: string }>;
 
@@ -13,25 +11,6 @@ type Icon = ComponentType<{ className?: string }>;
  * main column with tabs, highlights, activity and the sections that exist
  * before their features do. Contacts and companies compose the same pieces.
  */
-
-/**
- * Tells the chat which record is on screen, so "this contact" means this one:
- * the Clawnify dashboard's chat when embedded, the app's own <AppChat> when
- * one is mounted. Cleared when the record page closes. Labels and ids only.
- */
-export function useRecordChat(type: string, label: string, id: string, name: string | undefined) {
-  useChatContext(name !== undefined ? { label, record: { type, id, label: name || `Untitled ${type}` } } : null);
-}
-
-/** Opens the chat with a draft about this record. Hidden when there is no chat. */
-export function AskAi({ about }: { about: string }) {
-  if (!useHasChat()) return null;
-  return (
-    <Button variant="outline" size="sm" onClick={() => openChat(`About ${about}: `)}>
-      <Sparkles className="size-4" /> Ask AI
-    </Button>
-  );
-}
 
 /** Top bar: h-14 + rule, continuous with the sidebar. */
 export function RecordTopBar({ onClose, crumb }: { onClose: () => void; crumb: string }) {
@@ -50,10 +29,8 @@ export function RecordTopBar({ onClose, crumb }: { onClose: () => void; crumb: s
  * in view. Full screen on a phone, where there is no room beside anything.
  */
 export function RecordPanel({ label, children }: { label: string; children: ReactNode }) {
-  // The docked email composer sits left of the panel, so it never covers the record.
-  const avoid = useComposerAvoid();
   return (
-    <aside ref={avoid} aria-label={label} className="fixed inset-0 z-40 flex flex-col bg-background md:static md:z-auto md:w-[26rem] md:shrink-0 md:border-l md:border-border">
+    <aside aria-label={label} className="fixed inset-0 z-40 flex flex-col bg-background md:static md:z-auto md:w-[26rem] md:shrink-0 md:border-l md:border-border">
       {children}
     </aside>
   );

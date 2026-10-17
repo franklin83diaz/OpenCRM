@@ -18,7 +18,7 @@ import type { StageDef } from "@/types";
 const COLORS = Object.keys(colorPalette) as ColorToken[];
 
 /** Create or edit a pipeline stage: label, color, and the semantic flags that
- *  drive behavior (won → Slack celebrate; lost → pass semantics). The key is
+ *  drive behavior (won → the company becomes a customer; lost → pass semantics). The key is
  *  immutable — it's what deals store. */
 export function StageDialog({
   open,
@@ -125,7 +125,7 @@ export function StageDialog({
               ))}
             </div>
             <span className="text-xs text-muted-foreground">
-              Won announces to Slack; Passed asks for a reason and leaves the pipeline value.
+              Won makes the deal's company a customer; Passed asks for a reason and leaves the pipeline value.
             </span>
           </div>
 

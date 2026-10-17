@@ -77,7 +77,7 @@ export interface Contact {
   company_id: string | null;
   title: string;
   status: string;
-  /** Newest synced email with this contact (Gmail sync); read-only. */
+  /** The newest email with this contact, from when the CRM synced email; read-only. */
   last_contacted_at?: string | null;
   company_name?: string | null;
   company_domain?: string | null;
@@ -85,60 +85,6 @@ export interface Contact {
   relations?: Record<string, RelationValue>; // reads only, keyed by relation field
   created_at: string;
   updated_at: string;
-}
-
-// ── Gmail sync ──
-
-export type EmailVisibility = "metadata" | "subject" | "everything";
-export type EmailAutoCreate = "none" | "sent" | "sent_and_received";
-export type EmailHistory = "3m" | "12m" | "all";
-
-/** A synced mailbox's settings and where its sync is. */
-export interface EmailAccountSettings {
-  mailbox: string;
-  enabled: boolean;
-  labels: string[];
-  history: EmailHistory;
-  visibility: EmailVisibility;
-  auto_create: EmailAutoCreate;
-  exclude_group: boolean;
-  exclude_personal: boolean;
-  blocklist: string[];
-  phase: "idle" | "importing" | "live";
-  synced_until: string | null;
-  contacts_created: number;
-  last_run_at: string | null;
-  last_error: string | null;
-  next_run_at: string | null;
-  updated_by: string | null;
-  updated_at: string;
-}
-
-export interface EmailSyncStatus {
-  /** Gmail, or Google Workspace, is connected in Clawnify. */
-  connected: boolean;
-  mailbox: string | null;
-  /** The connection now signs in as another account than the one synced. */
-  mailbox_changed: boolean;
-  account: EmailAccountSettings | null;
-  counts: { emails: number; contacts: number };
-  /** A signed-in person: agents and apps can read, not change settings. */
-  can_configure: boolean;
-}
-
-/** One synced email with a contact, as its mailbox's visibility allows. */
-export interface ContactEmail {
-  id: string;
-  mailbox: string;
-  thread_id: string;
-  sent_at: string;
-  direction: "sent" | "received";
-  from_email: string;
-  from_name: string | null;
-  to_emails: string[];
-  subject: string | null;
-  can_open: boolean;
-  gmail_url: string;
 }
 
 export interface Deal {
@@ -203,33 +149,6 @@ export interface Activity {
   created_at: string;
 }
 
-export interface ConnectionStatus {
-  email: boolean;
-  meeting: boolean;
-  slack: boolean;
-  /** Granola: call notes and transcripts. */
-  notes: boolean;
-  /** The address email goes out from, once email sync is set up. */
-  mailbox?: string | null;
-}
-
-export interface EmailAddress {
-  email: string;
-  name: string | null;
-}
-
-/** An email opened from the timeline: its text (read live from Gmail) and who it went between. */
-export interface OpenedEmail {
-  text: string;
-  subject: string;
-  sent_at: string;
-  direction: "sent" | "received";
-  thread_id: string;
-  from: EmailAddress | null;
-  to: EmailAddress[];
-  cc: EmailAddress[];
-}
-
 // Entities that support bulk spreadsheet import.
 export type ImportEntity = "contact" | "company";
 
@@ -245,96 +164,6 @@ export interface ImportResult {
   skipped: number;
   companiesCreated?: number;
   duplicates?: number;
-}
-
-/** A field the AI may fill (GET /api/ai-columns). */
-export interface AiField {
-  key: string;
-  label: string;
-  kind: string;
-  options: string[] | null;
-}
-
-/** A column the AI fills, and what it is told. */
-export interface AiColumnConfig {
-  entity_type: string;
-  field_key: string;
-  prompt: string;
-  research: number;
-  updated_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-/** A cell the AI is filling, or failed to fill. */
-export interface AiCellState {
-  record_id: string;
-  field_key: string;
-  status: "queued" | "running" | "error";
-  error: string | null;
-}
-
-// ── Meetings, tasks, insights, customers ──
-
-export interface MeetingPerson {
-  email: string;
-  name: string | null;
-}
-
-export type MeetingLink = "auto" | "manual" | "unmatched" | "ignored";
-export type DigestStatus = "none" | "queued" | "running" | "done" | "error";
-
-export interface Meeting {
-  id: string;
-  title: string;
-  starts_at: string;
-  ends_at: string | null;
-  attendees: MeetingPerson[];
-  company_id: string | null;
-  company_name: string | null;
-  company_domain: string | null;
-  link_status: MeetingLink;
-  calendar_url: string | null;
-  note_url: string | null;
-  has_note: boolean;
-  summary: string | null;
-  /** -2 (badly) to 2 (very well). */
-  sentiment: number | null;
-  sentiment_reason: string | null;
-  digest_status: DigestStatus;
-  digest_error: string | null;
-}
-
-export interface MeetingSyncSettings {
-  enabled: boolean;
-  history_days: number;
-  about: string;
-  calendar_owner: string | null;
-  phase: "idle" | "importing" | "live";
-  calendar_synced_at: string | null;
-  last_run_at: string | null;
-  last_error: string | null;
-  next_run_at: string | null;
-  updated_by: string | null;
-  updated_at: string;
-}
-
-export interface MeetingCounts {
-  meetings: number;
-  linked: number;
-  unmatched: number;
-  with_notes: number;
-  digested: number;
-  waiting: number;
-  failed: number;
-}
-
-export interface MeetingSyncStatus {
-  sources: { calendar: boolean; notes: boolean };
-  settings: MeetingSyncSettings | null;
-  counts: MeetingCounts;
-  history_choices: number[];
-  can_configure: boolean;
 }
 
 export type OwedBy = "us" | "them";
@@ -359,31 +188,14 @@ export interface Task {
   updated_at: string;
 }
 
-export type InsightKind = "idea" | "expansion" | "risk";
-
-export interface Insight {
-  id: string;
-  /** The call's company; null while the call is linked to none. */
-  company_id: string | null;
-  company_name: string | null;
-  meeting_id: string | null;
-  meeting_title: string | null;
-  meeting_starts_at: string | null;
-  kind: InsightKind;
-  text: string;
-  quote: string | null;
-  status: "open" | "done" | "dismissed";
-  deal_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 /** unknown: nothing against the account, but the CRM can't see whether anyone has been in touch. */
 export type HealthStatus = "red" | "yellow" | "green" | "unknown";
 
 /** Whether a sync lets the CRM see a channel: on and working, off, still on its first import, or its latest run failed. */
 export type SyncState = "seen" | "off" | "importing" | "failing";
 
+/** A customer as the Customers page shows it. The API also sends the call and
+ *  insight fields the CRM no longer fills (next call, ideas, risks…). */
 export interface CustomerRow {
   id: string;
   name: string;
@@ -394,16 +206,9 @@ export interface CustomerRow {
   reasons: string[];
   last_touch_at: string | null;
   days_quiet: number | null;
-  last_meeting_at: string | null;
-  next_meeting_at: string | null;
-  last_summary: string | null;
-  last_sentiment: number | null;
   ours_open: number;
   ours_overdue: number;
   theirs_open: number;
-  ideas: number;
-  expansion: number;
-  risks: number;
 }
 
 export interface FocusItem {
@@ -414,21 +219,9 @@ export interface FocusItem {
   task_id?: string;
 }
 
-export interface UpcomingCall {
-  id: string;
-  title: string;
-  starts_at: string;
-  company_id: string;
-  company_name: string;
-  company_domain: string;
-  ours_open: number;
-  last_summary: string | null;
-}
-
 export interface CustomersOverview {
   customers: CustomerRow[];
   focus: FocusItem[];
-  upcoming: UpcomingCall[];
   counts: Record<HealthStatus, number>;
   sight: { calls: SyncState; emails: SyncState };
 }
@@ -457,4 +250,33 @@ export interface DealsProgressOverview {
   total: number;
   counts: Record<HealthStatus, number>;
   sight: { calls: SyncState; emails: SyncState };
+}
+
+// ── Accounts ──
+
+export type Role = "admin" | "user";
+
+/** The signed-in person (GET /api/auth/me). */
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+}
+
+/** An account as an admin manages it (GET /api/users). Timestamps are SQLite UTC, "YYYY-MM-DD HH:MM:SS". */
+export interface Account extends User {
+  disabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** One of your API tokens. Its secret is shown once, when it is created. */
+export interface ApiToken {
+  id: string;
+  name: string;
+  /** The secret's first 12 characters, so you can tell tokens apart. */
+  prefix: string;
+  last_used_at: string | null;
+  created_at: string;
 }

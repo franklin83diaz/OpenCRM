@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Search, Upload, Plus, Trash2, X } from "lucide-react";
 import { useCrm } from "@/context";
 import { PageHeader, Avatar, EntityIcon, CategoryBadge, EmptyState } from "@/components/shared";
-import { ConnectionsIndicator } from "@/components/connections-indicator";
 import { ContactDialog, STATUSES } from "@/components/contacts/contact-dialog";
 import { FilterBar } from "@/components/filter-bar";
 import { fieldsFromDefs, sanitize } from "@/lib/filters";
@@ -21,11 +20,8 @@ import { customFieldCopy, customFieldEdit, optionEdit, recordEdit, textEdit } fr
 import { useTableView, useAggregates, listFilterQuery } from "@/hooks/use-table-view";
 import { downloadCsv, exportListCsv, exportViewCsv } from "@/lib/csv";
 import { ExportButton } from "@/components/export-button";
-import { EmailSyncBanner } from "@/components/email-sync/email-sync-banner";
 import { formatDate } from "@/lib/utils";
 import type { Contact } from "@/types";
-import { useAiColumns } from "@/hooks/use-ai-columns";
-import { aiTable } from "@/components/ai-column";
 
 const dash = <span className="text-muted-foreground">—</span>;
 const fullName = (c: Contact) => `${c.first_name} ${c.last_name}`.trim();
@@ -37,12 +33,6 @@ const fullName = (c: Contact) => `${c.first_name} ${c.last_name}`.trim();
 export function ContactsPage({ navigate, openId, viewParam, filtersParam }: { navigate: (to: string, opts?: { replace?: boolean }) => void; openId?: string; viewParam?: string; filtersParam?: string }) {
   const { contacts, contactsPag, stats, setContactsPage, setContactsSort, setContactsSearch, setContactsFilters, setContactsView, deleteContacts, updateContact, customFields, setError } = useCrm();
   const contactFields = customFields.filter((d) => d.entity_type === "contact");
-  const ai = useAiColumns("contact");
-  const aiChips = [
-    { key: "first_name", label: "First name" }, { key: "last_name", label: "Last name" }, { key: "email", label: "Email" }, { key: "title", label: "Title" },
-    { key: "company_name", label: "Company" }, { key: "company_domain", label: "Company domain" },
-    ...contactFields.filter((d) => d.field_type !== "relation").map((d) => ({ key: d.key, label: d.label })),
-  ];
   const filterFields = fieldsFromDefs(
     [
       { key: "first_name", label: "First name", type: "text", column: "name" },
@@ -102,7 +92,8 @@ export function ContactsPage({ navigate, openId, viewParam, filtersParam }: { na
       edit: optionEdit("status", STATUSES.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })), saveCell),
       render: (c) => <CategoryBadge value={c.status} />,
     },
-    // Kept by the Gmail sync (Settings → Email); not editable here.
+    // Filled by the email sync the CRM used to have; read-only, kept for the
+    // dates it already holds.
     {
       key: "last_contacted_at", label: "Last contacted", sort: "last_contacted_at", text: (c) => c.last_contacted_at ?? "",
       render: (c) => c.last_contacted_at ? <span className="tabular">{formatDate(c.last_contacted_at)}</span> : dash,
@@ -198,7 +189,6 @@ export function ContactsPage({ navigate, openId, viewParam, filtersParam }: { na
           </>
         ) : (
           <>
-            <ConnectionsIndicator />
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -217,7 +207,6 @@ export function ContactsPage({ navigate, openId, viewParam, filtersParam }: { na
           </>
         )}
       </PageHeader>
-      <EmailSyncBanner navigate={navigate} />
       <FilterBar
         leading={
           <ViewSwitcher
@@ -275,7 +264,6 @@ export function ContactsPage({ navigate, openId, viewParam, filtersParam }: { na
               onCustomize={() => navigate("/settings/properties")}
               totals={totals}
               onAdd={() => setDialogOpen(true)}
-              ai={aiTable<Contact>(ai, aiChips)}
             />
           </div>
 

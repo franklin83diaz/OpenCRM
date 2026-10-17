@@ -4,12 +4,12 @@ import { api } from "@/api";
 import { EntityIcon, EmptyState, PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { HEALTH, HealthPill, StatusPill, daysAgo, sightNotice, tzOffset } from "@/components/meetings/shared";
+import { HEALTH, HealthPill, StatusPill, daysAgo, sightNotice, tzOffset } from "@/components/health";
 import { NextStepLine } from "@/components/deals/next-step";
 import { DealsViewSwitch } from "@/components/deals/deals-view-switch";
 import { withQuery } from "@/hooks/use-router";
 import { cn, formatDate, formatMoney } from "@/lib/utils";
-import type { DealsProgressOverview, MeetingSyncStatus } from "@/types";
+import type { DealsProgressOverview } from "@/types";
 
 /**
  * Open deals by what needs attention: worst first, then the biggest, each
@@ -19,16 +19,10 @@ import type { DealsProgressOverview, MeetingSyncStatus } from "@/types";
 export function DealsProgressPage({ navigate, openId }: { navigate: (to: string) => void; openId?: string }) {
   const { setError, changes } = useCrm();
   const [data, setData] = useState<DealsProgressOverview | null>(null);
-  const [sync, setSync] = useState<MeetingSyncStatus | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [overview, status] = await Promise.all([
-        api<DealsProgressOverview>("GET", `/api/deals/progress?tz=${tzOffset()}`),
-        api<MeetingSyncStatus>("GET", "/api/meetings/sync"),
-      ]);
-      setData(overview);
-      setSync(status);
+      setData(await api<DealsProgressOverview>("GET", `/api/deals/progress?tz=${tzOffset()}`));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load deals");
     }
@@ -68,14 +62,7 @@ export function DealsProgressPage({ navigate, openId }: { navigate: (to: string)
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-4 p-6">
-            {notice && (
-              <p className="rounded-md bg-info-tint px-3 py-2 text-[0.8125rem] text-info">
-                {notice.text}
-                {sync?.can_configure && notice.links.map((l, i) => (
-                  <span key={l.href}>{i > 0 ? " · " : " "}<button type="button" className="font-medium underline" onClick={() => navigate(l.href)}>{l.label}</button></span>
-                ))}
-              </p>
-            )}
+            {notice && <p className="rounded-md bg-info-tint px-3 py-2 text-[0.8125rem] text-info">{notice}</p>}
             <div className="overflow-hidden rounded-md shadow-edge">
               <Table grid>
                 <TableHeader>
