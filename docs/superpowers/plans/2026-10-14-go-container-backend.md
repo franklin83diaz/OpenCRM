@@ -244,7 +244,7 @@ Each of these tasks follows the same steps; only the sources, files and scenario
 | 9 | `companies-contacts` | `index.ts` 560–1330 (stats, widgets, companies + contacts list/aggregates/create/update/delete/bulk-delete) | `routes_stats.go`, `routes_companies.go`, `routes_contacts.go` | 5 |
 | 10 | `deals` | `index.ts` 1331–2036 (stages, deals board/progress/list/create/update/delete, customer marking), 2739–3147 (tasks, deal updates, insights), 3656–3740 (GET contact/deal/company by id, records, values) | `routes_stages.go`, `routes_deals.go`, `routes_tasks.go`, `routes_records.go` | 5, 8 |
 | 11 | `settings` | `index.ts` 2037–2073 (activities), 3400–3655 (CSV import), 3741–3981 (custom fields, views) | `routes_activities.go`, `routes_import.go`, `routes_custom_fields.go`, `routes_views.go` | 5 |
-| 12 | `ai-columns` | `ai-columns.ts`, `index.ts` 3279–3399 | `ai_columns.go`, `routes_ai_columns.go` | 3, 5 |
+| ~~12~~ | ~~`ai-columns`~~ (superseded 2026-10-17, see Redesign) | `ai-columns.ts`, `index.ts` 3279–3399 | `ai_columns.go`, `routes_ai_columns.go` | 3, 5 |
 
 Task-specific test lines (add to that task's scenario or unit tests):
 - Task 9: `PUT /api/companies/{id}` with `{"domain": null}` then `{}` — both match TS (Review Focus 1); `POST /api/companies/bulk-delete` with 150 ids (Review Focus 3); a company named `Cedar & Co <b>` round-trips unescaped (Review Focus 2).
@@ -256,7 +256,7 @@ Task-specific test lines (add to that task's scenario or unit tests):
 
 ---
 
-### Task 13: Cutover
+### ~~Task 13: Cutover~~ (superseded 2026-10-17 by Tasks 12–15 in the Redesign section below)
 
 **Files:**
 - Delete: `src/server/` (all `.ts`), `docs`/README references to Hono as the backend
@@ -267,4 +267,126 @@ Task-specific test lines (add to that task's scenario or unit tests):
 - [ ] **Step 2: Apply** the deletions and edits above; `pnpm install`; `pnpm typecheck` — Expected: no errors (the pre-existing errors were all in `src/server/index.ts`).
 - [ ] **Step 3: End-to-end in the container**: `pnpm dev`; in the browser at `http://localhost:5175` create a company, a contact and a deal, move the deal across stages, add a custom field and a view; `curl -s localhost:8787/api/stats` reflects them. Then stop the container (`docker rm -f` the `workerd-open-crm-Api-*` container) and repeat `curl -s localhost:8787/api/stats` — Expected: 200 after the cold start, not 5xx.
 - [ ] **Step 4: Build check**: `docker build -f server/Dockerfile server -t opencrm-api` — Expected: success, image under 30 MB (`docker image ls opencrm-api`).
+- [ ] **Step 5: Commit** — `git commit -m "The CRM's backend is Go in a Cloudflare Container"`
+
+---
+
+## Redesign 2026-10-17: no Clawnify
+
+The user decided not to use Clawnify. Their answers: **own email + password login**, an **admin creates the accounts** (roles `admin` / `user`, first admin from secrets), **personal API tokens** for agents and scripts, **no integrations for now** (no Gmail, Calendar, Slack, Granola), **no AI**. Everything else in this plan stands; Tasks 1–11 are unchanged except that Task 10 no longer ports insights or the Slack deal-won alert. The old Tasks 12 (AI columns) and 13 (cutover) are replaced by Tasks 12–15 below.
+
+### What changes
+
+- Removed from the product: Gmail sync and everything built on it (Settings → Email, a contact's emails, open/reply/forward, send email), scheduling a meeting, the Slack alert, meetings sync and AI digests (Settings → Meetings, meeting list/link/retry), insights, AI columns, the Clawnify chat, and the Clawnify host integration (`@clawnify/app/client`'s `AppNav`, host navigation hooks).
+- Kept: companies, contacts, deals and stages, tasks (typed by hand), deal updates logged with `POST /api/deals/{id}/updates`, activities, custom fields, relations, views, import/export, lookup, the Customers page and Deals → Next steps. Their logic still reads the sync tables (`email_accounts`, `meeting_sync`, `meetings`, `emails`…), which stay in `server/schema.sql` untouched and empty, so the health rules keep saying what the CRM can't see. Their wording ("calls aren't synced") is a follow-up for the user, not part of this plan.
+- Stored widget ids such as `clawnify::score.score` are data in existing databases: keep them as they are.
+- No background jobs remain, so no queue and no Cron Trigger.
+
+### Global Constraints — amendments
+
+- Behavior parity with the TS reference applies to the routes that remain. The parity harness authenticates its Go calls (Task 13) and drops the scenarios of removed routes.
+- The production binary may also import `golang.org/x/crypto/bcrypt` (the only addition to "standard library only").
+- Identity no longer comes from `X-Clawnify-*` headers: `web.Caller(r)` is `"user"` for a signed-in session, `"api"` for an API token, `"public"` otherwise; `web.CurrentUser(r)` is the signed-in account. Incoming `X-Clawnify-*` headers are ignored.
+
+### Task 12: Remove Clawnify, integrations and AI
+
+**Files:**
+- Delete: `server/internal/clawnify/`, `server/internal/crm/{integrations,email_sync,routes_email,meetings,routes_meetings,model}.go` and their tests/fixtures, `scripts/parity/scenarios/{email,meetings}*.mjs`
+- Create: `server/internal/crm/sight.go` — the read helpers the Customers/Deals/lookup code still needs: `CurrentAccount(ctx) (*EmailAccount, error)`, `BlocklistOf(*EmailAccount) []string`, `SyncSettings(ctx) (*MeetingSync, error)` (moved, same SQL, read-only; `EmailAccount`/`MeetingSync` keep only the fields those callers read)
+- Modify: `server/internal/crm/app.go` (`App` drops `Env`/`Conn`; keep the backfill flags), `server/main.go`, `server/cmd/devserver/main.go`, `src/worker/index.ts` (drop the credentials bridge and every `CLAWNIFY_*`/`SLACK_CHANNEL` env var), the discovery snapshots `server/internal/web/discovery/{openapi.json,llms.txt,endpoints.json}` (remove every removed route; title/description unchanged), `wrangler.toml` (nothing Clawnify-related remains — verify)
+- Keep: `email_sync_rules.go`/`meetings_rules.go` functions still referenced; delete the ones nothing references after the removal (let `go vet`/`staticcheck`-style unused detection guide: `go build` + grep)
+
+**Removed routes** (must answer the not-found JSON afterwards): `GET /api/integrations/status`, `POST /api/integrations/email`, `POST /api/integrations/meeting`, `GET|PUT /api/email-sync`, `GET /api/email-sync/labels`, `POST /api/email-sync/run`, `POST /api/email-sync/sync-now`, `GET /api/contacts/{id}/emails`, `GET /api/emails/{mailbox}/{id}`, `GET|PUT /api/meetings/sync`, `POST /api/meetings/run`, `POST /api/meetings/sync-now`, `GET /api/meetings`, `GET|PATCH /api/meetings/{id}`, `POST /api/meetings/{id}/digest`, `GET /api/insights`, `PUT /api/insights/{id}`, `POST /api/insights/{id}/deal`, all `/api/ai-columns*`.
+
+- [ ] **Step 1: Write the failing check** — a Go test `TestRemovedRoutesAreGone` that requests each removed route above and expects 404 `not_found`; a test that `/llms.txt` and `/api/openapi.json` mention none of them.
+- [ ] **Step 2: Run** `cd server && GOTOOLCHAIN=local go test ./internal/crm -run TestRemovedRoutesAreGone` — Expected: FAIL.
+- [ ] **Step 3: Delete and move** as listed; `go build ./... && go vet ./...`.
+- [ ] **Step 4: Run** the full Go suite and `scripts/parity/run.sh` (remaining scenarios) — Expected: PASS, 0 mismatches; `npx tsc --noEmit` shows no errors in `src/worker/`.
+- [ ] **Step 5: Commit** — `git commit -m "Drop Clawnify, the integrations and AI from the Go backend"`
+
+### Task 13: Accounts, sessions and API tokens
+
+**Files:**
+- Modify: `server/schema.sql` (append the three tables below), `server/internal/web/identity.go` (identity from the request context, not headers), `server/internal/crm/app.go` (auth middleware wraps the router), `server/cmd/devserver/main.go` (flag `-bootstrap-token`), `scripts/parity/run.sh` + `runner.mjs` (Go calls carry `Authorization: Bearer <token>`), `go.mod` (`golang.org/x/crypto`), `src/worker/index.ts` (pass `ADMIN_EMAIL`/`ADMIN_PASSWORD` into `envVars` when set), discovery snapshots (add the new routes to `llms.txt`/`endpoints.json`)
+- Create: `server/internal/auth/{auth.go,passwords.go,limiter.go,auth_test.go}`, `server/internal/crm/routes_auth.go` (+ tests), `scripts/parity/scenarios/auth.mjs` is NOT needed (Go-only feature; Go tests cover it)
+
+**Schema:**
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  name TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  password_hash TEXT NOT NULL,
+  disabled INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  prefix TEXT NOT NULL,
+  last_used_at TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+```
+
+**Interfaces:**
+- `auth.HashPassword(pw string) (string, error)` (bcrypt cost 12); `auth.CheckPassword(hash, pw string) bool`; `auth.NewSecret(prefix string) (token, hash string)` — 32 random bytes, base64url, token `prefix + value`; hash = hex SHA-256 of the whole token. Session cookie values use prefix `""`, API tokens `"crm_"`.
+- `type auth.User struct{ ID, Email, Name, Role string }`; `auth.FromContext(ctx) (*User, string /*"user"|"api"|""*/)`; `auth.Middleware(next http.Handler) http.Handler`.
+- Middleware rules: `/api/*` requires a session cookie `crm_session` or `Authorization: Bearer crm_…`, except `POST /api/auth/login` and `GET /api/openapi.json`; `/llms.txt` and non-API paths pass. Unauthenticated → `401 {"error":"unauthorized","message":"Sign in to use the CRM."}`. A session is valid when not expired and its user not disabled; a token when its user isn't disabled (updates `last_used_at`). Cookie-authenticated `POST/PUT/PATCH/DELETE` with an `Origin` header whose host differs from `web.Origin(r)`'s host → `403 {"error":"Cross-site request refused"}`; token requests skip this check.
+- Bootstrap: the first request after start, while `users` is empty and env `ADMIN_EMAIL` + `ADMIN_PASSWORD` are set, creates that admin (idempotent, like the backfill flags). With no users and no secrets, `POST /api/auth/login` answers `503 {"error":"No accounts yet: set ADMIN_EMAIL and ADMIN_PASSWORD and restart the CRM"}`.
+- Routes (`routes_auth.go`):
+  - `POST /api/auth/login {email, password}` → `200 {user}` + `Set-Cookie: crm_session=<t>; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000` (sessions last 30 days); wrong email, wrong password or disabled → `401 {"error":"Wrong email or password"}` (bcrypt runs against a fixed dummy hash for unknown emails). Limiter (in memory — the container is one instance): 10 attempts per minute per `CF-Connecting-IP`, 10 failures per 15 minutes per email → `429 {"error":"Too many attempts. Try again in a few minutes."}`.
+  - `POST /api/auth/logout` → deletes the session, expires the cookie, `200 {"ok":true}`.
+  - `GET /api/auth/me` → `200 {user:{id,email,name,role}}`.
+  - `PUT /api/auth/password {current_password, new_password}` → checks the current one (`400 {"error":"Your current password is wrong"}`), stores the new, deletes the user's other sessions, `200 {"ok":true}`.
+  - Admin only (`403 {"error":"Only an admin can manage accounts"}` otherwise): `GET /api/users` (`{users:[…]}`, never `password_hash`), `POST /api/users {email, name?, password, role?}` (`409 {"error":"An account with this email already exists"}`), `PATCH /api/users/{id} {name?, role?, disabled?, password?}` (a new password or disabling deletes their sessions), `DELETE /api/users/{id}`. An admin can't delete, disable or demote themselves, and the last active admin can't be removed (`400 {"error":"The CRM needs at least one active admin"}`).
+  - `GET /api/tokens` (own: `{tokens:[{id,name,prefix,last_used_at,created_at}]}`), `POST /api/tokens {name}` → `201 {token:{…}, secret:"crm_…"}` (shown once), `DELETE /api/tokens/{id}` (own only, else 404).
+  - Validation: email must contain `@`, trimmed and lower-cased; password 8–72 bytes (`400 {"error":"A password needs 8 to 72 characters"}`); role `admin|user`; token name 1–60 characters.
+- `created_by` style fields that used `user(c)?.email ?? caller(c)` now get the signed-in user's email, or `"api"` is never reached for token calls because tokens act as their user (`CurrentUser` is set for both).
+
+- [ ] **Step 1: Write failing tests** (`dbtest.Setup` + `httptest`): login sets the cookie and `/api/auth/me` returns the user; wrong password and unknown email give the same 401 body; 11th attempt in a minute → 429; expired session → 401; disabled user's session and token → 401; token auth acts as its user and updates `last_used_at`; cross-site `Origin` on a cookie POST → 403, same with a token → allowed; bootstrap creates the admin once; non-admin `POST /api/users` → 403; last-admin guard; password change kills other sessions; `GET /api/users` never contains `password_hash`; every `/api/*` route registered by the CRM answers 401 without credentials (iterate the router's patterns).
+- [ ] **Step 2: Run** `go test ./internal/auth ./internal/crm -run 'Auth|Users|Tokens'` — Expected: FAIL.
+- [ ] **Step 3: Implement**; parity: the devserver's `-bootstrap-token` creates an admin plus an API token with that value at start, and the harness sends it on Go calls only.
+- [ ] **Step 4: Run** the full Go suite, vet, and `scripts/parity/run.sh` — Expected: PASS, 0 mismatches.
+- [ ] **Step 5: Commit** — `git commit -m "Accounts, sessions and API tokens"`
+
+### Task 14: Frontend without Clawnify
+
+**Files:**
+- Create: `src/client/components/auth/login-page.tsx`, `src/client/components/settings/users-page.tsx`, `src/client/components/settings/tokens-page.tsx`, `src/client/components/settings/account-page.tsx`, `src/client/components/app-sidebar.tsx`
+- Delete: `src/client/components/email/`, `email-sync/`, `meetings/`, `insights/`, `ai-column.tsx`, `contacts/contact-emails.tsx`, `connections-indicator.tsx`, `hooks/use-ai-columns.ts`
+- Modify: `src/client/app.tsx` (own sidebar instead of `AppNav`; drop host hooks, `ComposerProvider`, removed routes; add `/settings/users`, `/settings/tokens`, `/settings/account`), `src/client/api.ts` (a 401 signs the app out to the login page), `record-page.tsx` (no chat), every component that imported a deleted one (company/contact/deal detail, lists, customers page, deals progress, next step, tasks section, `use-crm.ts`, `use-router.ts`, `types.ts`, `styles.css` `.cn-nav` rules)
+
+**Behavior:**
+- Signed out: only the login page (email, password, error text from the API). Signed in: the sidebar shows Contacts, Companies, Deals, Customers, then Settings → Attributes, Account, API tokens and, for admins, Users; the footer shows the user's name/email and "Sign out".
+- The sidebar keeps the record colors and icons `AppNav` drew (contacts blue, companies violet, deals green, customers orange) and collapses on narrow screens.
+- Users page: list, add (email, name, password, role), change role, disable/enable, set a new password, delete, with the API's error text shown. Tokens page: list, create (the secret shown once with a copy button), revoke. Account page: change password.
+- Dark mode and the `?agent=true` mode keep working.
+
+- [ ] **Step 1: Run** `pnpm typecheck` — Expected: current errors only in `src/server/` (baseline).
+- [ ] **Step 2: Implement** the deletions and pages; `pnpm typecheck` with no errors under `src/client/` and `pnpm build` succeeds.
+- [ ] **Step 3: Check in the browser** against `wrangler dev` (container): sign in as the bootstrap admin, create a user, sign in as them in a private window, create and revoke a token (`curl -H "Authorization: Bearer …" localhost:8787/api/stats` works, then 401), create a company/contact/deal, open a record panel, Customers and Next steps pages render, sign out returns to the login page.
+- [ ] **Step 4: Commit** — `git commit -m "Frontend: own login, sidebar and settings; no Clawnify"`
+
+### Task 15: Cutover
+
+**Files:**
+- Delete: `src/server/`, `clawnify.json`, `manifest.json` (both describe the Clawnify app; verify nothing else reads them)
+- Modify: `package.json` (remove `hono`, `@hono/zod-openapi`, `zod`, every `@clawnify/*`, `free-email-domains`; scripts: `"dev": "pnpm db:migrate && mkdir -p dist && concurrently -n ui,api -c cyan,green \"vite\" \"wrangler dev --port 8787\""`, `"deploy": "vite build && wrangler deploy"`, `"db:migrate:remote": "wrangler d1 execute open-crm-db --remote --file=server/schema.sql"`, `"test": "cd server && go test ./..."`), `pnpm-workspace.yaml` (drop Clawnify entries), `tsconfig.json`, `.dev.vars.example` (new: `ADMIN_EMAIL=`, `ADMIN_PASSWORD=`), `README.md` (no Clawnify: stack table — Go on Cloudflare Containers + D1; prerequisites Node, pnpm, Go, Docker; first login from `.dev.vars`; deploy: `wrangler d1 create open-crm-db` → id in `wrangler.toml`, `pnpm db:migrate:remote`, `wrangler secret put ADMIN_EMAIL` / `ADMIN_PASSWORD`, `pnpm deploy`; remove the removed features from the feature list), `agent.md` (auth with `Authorization: Bearer crm_…`; remove removed endpoints)
+- Keep: `scripts/parity/*`
+
+- [ ] **Step 1: Run** the full Go suite, vet, and `scripts/parity/run.sh` — Expected: PASS, 0 mismatches.
+- [ ] **Step 2: Apply** the deletions and edits; `pnpm install`; `pnpm typecheck` — Expected: no errors.
+- [ ] **Step 3: End-to-end in the container**: `pnpm dev` with `.dev.vars`; sign in at `http://localhost:5175`; create a company, contact and deal, move the deal across stages, add a custom field and a view, import a small CSV; `curl` with a token to `/api/stats` reflects them; stop the container (`docker rm -f` the `workerd-open-crm-Api-*` container) and repeat the curl — Expected: 200 after the cold start.
+- [ ] **Step 4: Build check**: `docker build -f server/Dockerfile server -t opencrm-api` — Expected: success, image under 30 MB.
 - [ ] **Step 5: Commit** — `git commit -m "The CRM's backend is Go in a Cloudflare Container"`
