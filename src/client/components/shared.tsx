@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { cn, getInitials, categoryClasses } from "../lib/utils";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 
 /** Initials avatar tinted by a stable category color. */
 export function Avatar({ firstName, lastName, className }: { firstName?: string | null; lastName?: string | null; className?: string }) {
@@ -75,6 +76,16 @@ export function EmptyState({ title, action }: { title: string; action?: ReactNod
     <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
       <p className="text-muted-foreground">{title}</p>
       {action}
+    </div>
+  );
+}
+
+/** In place of a list that didn't load: what failed, the API's reason, and Try again. */
+export function LoadFailed({ what, error, onRetry }: { what: string; error: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
+      <p className="text-sm text-muted-foreground">Couldn't load {what}: {error}</p>
+      <Button size="sm" variant="outline" onClick={onRetry}>Try again</Button>
     </div>
   );
 }

@@ -57,7 +57,14 @@ export function App() {
   useEffect(() => { void check(); }, [check]);
 
   const signOut = useCallback(async () => {
-    await api("POST", "/api/auth/logout");
+    try {
+      await api("POST", "/api/auth/logout");
+    } catch (e) {
+      // A session that had already ended (expired, or ended elsewhere) is a
+      // sign-out done: the 401 already showed the login page. Anything else
+      // didn't sign out, and the sidebar says so.
+      if (!(e instanceof ApiError && e.status === 401)) throw e;
+    }
     // The next person to sign in starts on the home screen, not on this one's page.
     window.history.replaceState(null, "", "/");
     setAuth({ status: "signed-out" });

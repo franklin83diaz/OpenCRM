@@ -5,9 +5,10 @@ import { cn } from "@/lib/utils";
 import type { DealProgress } from "@/types";
 
 /**
- * A deal's next step in one line: the call booked with its company, or its
- * soonest dated task with who owes it, overdue in red. A deal with none says
- * so, because "nobody agreed on what happens next" is the thing to fix.
+ * A deal's next step in one line: its soonest dated task with who owes it,
+ * overdue in red (or a meeting with its company, from a calendar this CRM
+ * synced before it dropped its integrations). A deal with none says so,
+ * because "nobody agreed on what happens next" is the thing to fix.
  */
 export function NextStepLine({ progress, icon = true, compact = false, className }: {
   progress: DealProgress | null | undefined;

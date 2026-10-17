@@ -226,7 +226,7 @@ export interface CustomersOverview {
   sight: { calls: SyncState; emails: SyncState };
 }
 
-/** What happens next on a deal: the next call booked with its company, or its soonest dated task. */
+/** What happens next on a deal: its soonest dated task (or a meeting with its company, from a calendar synced before the CRM dropped its integrations). */
 export interface NextStep {
   kind: "meeting" | "task";
   title: string;

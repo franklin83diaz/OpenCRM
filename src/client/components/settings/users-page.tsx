@@ -3,7 +3,7 @@ import { Ban, CircleCheck, KeyRound, MoreHorizontal, Pencil, Plus, ShieldCheck, 
 import { api } from "@/api";
 import { useAuth } from "@/auth";
 import { useCrm } from "@/context";
-import { PageHeader, UserAvatar } from "@/components/shared";
+import { LoadFailed, PageHeader, UserAvatar } from "@/components/shared";
 import { Eyebrow, StatusPill } from "@/components/health";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,15 +35,17 @@ export function UsersPage({ navigate }: { navigate: (to: string) => void }) {
   const { user: me, setUser } = useAuth();
   const { setError } = useCrm();
   const [accounts, setAccounts] = useState<Account[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [open, setOpen] = useState<Open>(null);
 
   const load = useCallback(async () => {
+    setLoadError(null);
     try {
       setAccounts((await api<{ users: Account[] }>("GET", "/api/users")).users);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load the accounts");
+      setLoadError(e instanceof Error ? e.message : "Request failed");
     }
-  }, [setError]);
+  }, []);
   useEffect(() => { void load(); }, [load]);
 
   const replace = (a: Account) => setAccounts((list) => (list ?? []).map((x) => (x.id === a.id ? a : x)));
@@ -73,7 +75,11 @@ export function UsersPage({ navigate }: { navigate: (to: string) => void }) {
           </p>
 
           {accounts === null ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+            loadError !== null ? (
+              <LoadFailed what="the accounts" error={loadError} onRetry={() => void load()} />
+            ) : (
+              <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+            )
           ) : (
             <section className="flex flex-col gap-3">
               <Eyebrow>{accounts.length} {accounts.length === 1 ? "account" : "accounts"}</Eyebrow>
@@ -204,6 +210,8 @@ function DialogError({ error }: { error: string | null }) {
 function useSave(onClose: () => void) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Forgets the last save's error: for a dialog that stays mounted between openings. */
+  const clearError = useCallback(() => setError(null), []);
   const run = async (work: () => Promise<void>) => {
     setBusy(true);
     setError(null);
@@ -216,7 +224,7 @@ function useSave(onClose: () => void) {
       setBusy(false);
     }
   };
-  return { error, busy, run };
+  return { error, busy, run, clearError };
 }
 
 function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
@@ -234,7 +242,7 @@ function AddUserDialog({ open, onClose, onAdded }: { open: boolean; onClose: () 
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("user");
-  const { error, busy, run } = useSave(onClose);
+  const { error, busy, run, clearError } = useSave(onClose);
 
   useEffect(() => {
     if (open) {
@@ -242,8 +250,9 @@ function AddUserDialog({ open, onClose, onAdded }: { open: boolean; onClose: () 
       setName("");
       setPassword("");
       setRole("user");
+      clearError();
     }
-  }, [open]);
+  }, [open, clearError]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();

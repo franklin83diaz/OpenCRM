@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Check, Copy, Plus, Trash2 } from "lucide-react";
 import { api } from "@/api";
-import { useCrm } from "@/context";
-import { EmptyState, PageHeader } from "@/components/shared";
+import { EmptyState, LoadFailed, PageHeader } from "@/components/shared";
 import { Eyebrow } from "@/components/health";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,18 +18,19 @@ import type { ApiToken } from "@/types";
  * once, when it is created; the list only knows its first characters.
  */
 export function TokensPage() {
-  const { setError } = useCrm();
   const [tokens, setTokens] = useState<ApiToken[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [revoking, setRevoking] = useState<ApiToken | null>(null);
 
   const load = useCallback(async () => {
+    setLoadError(null);
     try {
       setTokens((await api<{ tokens: ApiToken[] }>("GET", "/api/tokens")).tokens);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load your tokens");
+      setLoadError(e instanceof Error ? e.message : "Request failed");
     }
-  }, [setError]);
+  }, []);
   useEffect(() => { void load(); }, [load]);
 
   const createButton = (
@@ -52,7 +52,11 @@ export function TokensPage() {
           </p>
 
           {tokens === null ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading…</div>
+            loadError !== null ? (
+              <LoadFailed what="your tokens" error={loadError} onRetry={() => void load()} />
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading…</div>
+            )
           ) : tokens.length === 0 ? (
             <EmptyState title="No API tokens yet. Create one for each script or agent, so you can revoke them one by one." action={createButton} />
           ) : (
@@ -99,14 +103,19 @@ export function TokensPage() {
   );
 }
 
-/** Name it, then copy the secret: the one time it is shown. */
+/**
+ * Name it, then copy the secret: the one time it is shown. The secret is kept
+ * only while the dialog shows it: closing the dialog forgets it.
+ */
 function CreateTokenDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: (token: ApiToken) => void }) {
   const [name, setName] = useState("");
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const isOpen = useRef(open);
 
   useEffect(() => {
+    isOpen.current = open;
     if (open) {
       setName("");
       setSecret(null);
@@ -120,7 +129,8 @@ function CreateTokenDialog({ open, onOpenChange, onCreated }: { open: boolean; o
     setError(null);
     try {
       const r = await api<{ token: ApiToken; secret: string }>("POST", "/api/tokens", { name });
-      setSecret(r.secret);
+      // Closed while it was being made: the secret has no one to show it to.
+      if (isOpen.current) setSecret(r.secret);
       onCreated(r.token);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the token");
@@ -131,8 +141,13 @@ function CreateTokenDialog({ open, onOpenChange, onCreated }: { open: boolean; o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* While the secret is on screen a stray click outside doesn't lose it; Done, the X and Escape still close. */}
-      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => { if (secret) e.preventDefault(); }}>
+      {/* While the secret is on screen a stray click outside doesn't lose it; Done, the X and Escape still close.
+          Once the dialog has closed (its fade-out over, so it doesn't flash the form), the secret is dropped. */}
+      <DialogContent
+        className="sm:max-w-md"
+        onInteractOutside={(e) => { if (secret) e.preventDefault(); }}
+        onCloseAutoFocus={() => setSecret(null)}
+      >
         {secret === null ? (
           <form onSubmit={create} className="flex flex-col gap-4">
             <DialogHeader>

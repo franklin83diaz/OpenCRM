@@ -114,6 +114,8 @@ export function AppSidebar({ route, navigate }: { route: Route; navigate: (to: s
     );
   };
 
+  // signOut resolves when the session had already ended (the login page is up
+  // by then); it fails only while the CRM is still on screen to say why.
   const doSignOut = () => {
     signOut().catch((e) => setError(e instanceof Error ? e.message : "Could not sign out"));
   };
