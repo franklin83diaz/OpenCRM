@@ -2,6 +2,7 @@ package crm
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -73,6 +74,53 @@ func TestCustomersInChunks(t *testing.T) {
 	}
 	if none, _ := InChunks(ctx, nil, func(string) string { return "SELECT nothing" }); len(none) != 0 || len(rec.log) != 3 {
 		t.Error("no ids should read nothing")
+	}
+}
+
+// A database from before the CRM dropped its integrations still has the
+// syncs' settings rows switched on, and open insights from digested calls.
+// Nothing syncs or digests any more, so applying schema.sql (pnpm db:migrate,
+// which an upgrade runs) switches them off: the customers read "off" rather
+// than "seen", and no old risk keeps an account red. Running it again changes
+// nothing. Historical calls and their moods stay.
+func TestSchemaRetiresTheOldSyncs(t *testing.T) {
+	ctx := dbtest.Setup(t)
+	mustExec(t, ctx, "INSERT INTO email_accounts (mailbox, enabled, phase) VALUES ('me@crm.example', 1, 'live')")
+	mustExec(t, ctx, "INSERT INTO meeting_sync (id, enabled, phase) VALUES (1, 1, 'live')")
+	mustExec(t, ctx, "INSERT INTO companies (id, name, customer_since) VALUES ('co-a', 'Acme', '2025-01-01')")
+	mustExec(t, ctx, `INSERT INTO insights (id, company_id, kind, text, status) VALUES
+    ('i-open', 'co-a', 'risk', 'They might churn', 'open'), ('i-done', 'co-a', 'idea', 'An idea', 'done')`)
+	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
+	before, err := CustomersOverview(ctx, now, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Sight.Calls != "seen" || before.Sight.Emails != "seen" || before.Customers[0].Status != "red" {
+		t.Fatalf("before the upgrade: sight %+v, status %s", before.Sight, before.Customers[0].Status)
+	}
+
+	schema, err := os.ReadFile("../../schema.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for run := 1; run <= 2; run++ {
+		mustRun(t, ctx, string(schema))
+		after, err := CustomersOverview(ctx, now, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := after.Customers[0]
+		if after.Sight.Calls != "off" || after.Sight.Emails != "off" || c.Status != "unknown" || c.Risks != 0 ||
+			strings.Join(c.Reasons, "|") != "Calls aren't synced, email isn't synced" {
+			t.Errorf("run %d: sight %+v, status %s, reasons %q, risks %d", run, after.Sight, c.Status, c.Reasons, c.Risks)
+		}
+		rows, err := db.Query(ctx, "SELECT id, status FROM insights ORDER BY id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := canonical(rows); got != `[{"id":"i-done","status":"done"},{"id":"i-open","status":"dismissed"}]` {
+			t.Errorf("run %d: insights %s", run, got)
+		}
 	}
 }
 

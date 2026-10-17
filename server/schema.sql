@@ -143,9 +143,10 @@ CREATE TABLE IF NOT EXISTS view_fields (
   PRIMARY KEY (view_id, field_key)
 );
 
--- One-time data fixes the server has applied, by name (see backfillOnce in
--- index.ts). This file is DDL only, so a fix that fills existing rows runs in
--- the app, once, and records itself here so it never runs again.
+-- One-time data fixes the server has applied, by name (see backfills.go).
+-- This file runs on every migration and is DDL, apart from the idempotent
+-- upgrade statements at its end; a fix that fills existing rows runs in the
+-- app, once, and records itself here so it never runs again.
 CREATE TABLE IF NOT EXISTS data_backfills (
   key TEXT PRIMARY KEY,
   applied_at TEXT DEFAULT (datetime('now'))
@@ -392,3 +393,14 @@ CREATE TABLE IF NOT EXISTS api_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+
+-- Upgrading a database from before the CRM dropped its integrations: nothing
+-- syncs email or calendars or digests calls any more, but their old rows
+-- would still read as on. An enabled email_accounts or meeting_sync row makes
+-- Customers and Next steps report what the CRM can see as "seen", and an open
+-- insight (a risk from a digested call) keeps its customer red for ever. So
+-- they are switched off here; on every later run these change nothing.
+-- Digested calls, their moods and past meetings stay, as history.
+UPDATE email_accounts SET enabled = 0 WHERE enabled != 0;
+UPDATE meeting_sync SET enabled = 0 WHERE enabled != 0;
+UPDATE insights SET status = 'dismissed' WHERE status = 'open';

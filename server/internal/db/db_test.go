@@ -142,9 +142,10 @@ func TestParamsMustBeScalars(t *testing.T) {
 func TestSQLite(t *testing.T) {
 	ctx := dbtest.Setup(t)
 
-	// The whole schema script ran, not just its first statement.
+	// The whole schema script ran, not just its first statement (its last
+	// ones, the upgrade UPDATEs, are crm's TestSchemaRetiresTheOldSyncs).
 	if row, err := db.Get(ctx, "SELECT name FROM sqlite_master WHERE name = 'idx_api_tokens_user'"); err != nil || row == nil {
-		t.Fatalf("schema.sql's last statement did not run: %v, %v", row, err)
+		t.Fatalf("schema.sql's last CREATE did not run: %v, %v", row, err)
 	}
 	if _, err := db.Run(ctx, "INSERT INTO companies (id, name) VALUES (?, ?)", "c1", "Cedar & Co"); err != nil {
 		t.Fatal(err)
