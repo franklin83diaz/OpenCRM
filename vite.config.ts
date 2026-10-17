@@ -15,6 +15,8 @@ export default defineConfig({
     },
   },
   server: {
+    // The address the README sends people to; the API is wrangler on 8787.
+    port: 5175,
     proxy: {
       "/api": {
         target: "http://localhost:8787",

@@ -1,13 +1,4 @@
 allowBuilds:
   esbuild: true
-  free-email-domains: false
   sharp: false
-  vue-demi: false
   workerd: true
-minimumReleaseAgeExclude:
-  # First-party Clawnify package — exempt from the new-release age gate so app
-  # builds pick up fresh versions promptly.
-  - '@clawnify/routes'
-  - '@clawnify/app'
-  - '@clawnify/connections'
-  - '@clawnify/services'

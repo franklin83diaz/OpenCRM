@@ -1,0 +1,4 @@
+# The first admin's email: the CRM creates this account at the first sign-in, while it has none.
+ADMIN_EMAIL=
+# That account's password, 8 to 72 characters; change it in Settings → Account once signed in.
+ADMIN_PASSWORD=

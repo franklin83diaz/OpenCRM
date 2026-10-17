@@ -13,9 +13,11 @@ import (
 	"opencrm/internal/js"
 )
 
-// freemail.txt is generated from the maintained `free-email-domains` list with:
+// freemail.txt is a copy of the maintained `free-email-domains` npm list, which
+// is no longer one of the repo's dependencies. To refresh it, install that
+// package somewhere else and run, from the repo root, with D its domains.json:
 //
-//	node -e 'const d=require("./node_modules/free-email-domains/domains.json");const s=[...new Set(d.map(x=>x.toLowerCase()))].sort();require("fs").writeFileSync("server/internal/crm/freemail.txt",s.join("\n")+"\n")'
+//	D=<dir>/node_modules/free-email-domains/domains.json node -e 'const d=require(process.env.D);const s=[...new Set(d.map(x=>x.toLowerCase()))].sort();require("fs").writeFileSync("server/internal/crm/freemail.txt",s.join("\n")+"\n")'
 //
 //go:embed freemail.txt
 var freemailTxt string
@@ -23,8 +25,7 @@ var freemailTxt string
 // FreemailDomains are the personal/free email providers (gmail, outlook, …): a
 // company is never inferred from these, else every import would spawn a
 // "Gmail" company. Sourced from the maintained `free-email-domains` list
-// (~12.8k domains) so it stays current via dependency bumps rather than
-// hand-curation.
+// (~12.8k domains) rather than hand-curated.
 var FreemailDomains = func() map[string]bool {
 	m := map[string]bool{}
 	for _, line := range strings.Split(freemailTxt, "\n") {

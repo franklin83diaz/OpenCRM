@@ -8,21 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@clawnify/app':
-        specifier: ^0.4.1
-        version: 0.4.1(@cloudflare/workers-types@4.20260702.1)(@hono/zod-openapi@0.18.4(hono@4.12.2)(zod@3.25.76))(@phosphor-icons/react@2.1.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(hono@4.12.2)(react@19.2.7)
-      '@clawnify/connections':
-        specifier: ^0.5.1
-        version: 0.5.1
-      '@clawnify/db':
-        specifier: ^0.4.2
-        version: 0.4.2(@cloudflare/workers-types@4.20260702.1)
-      '@clawnify/queue':
-        specifier: ^0.1.1
-        version: 0.1.1
-      '@clawnify/services':
-        specifier: ^0.1.0
-        version: 0.1.0
       '@cloudflare/containers':
         specifier: 0.3.7
         version: 0.3.7
@@ -35,12 +20,6 @@ importers:
       '@dnd-kit/sortable':
         specifier: ^10.0.0
         version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
-      '@hono/zod-openapi':
-        specifier: ^0.18.0
-        version: 0.18.4(hono@4.12.2)(zod@3.25.76)
-      '@phosphor-icons/react':
-        specifier: ^2.1.10
-        version: 2.1.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@radix-ui/react-dialog':
         specifier: ^1.1.23
         version: 1.1.23(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -80,12 +59,6 @@ importers:
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      free-email-domains:
-        specifier: ^1.9.62
-        version: 1.9.62
-      hono:
-        specifier: ^4.6.0
-        version: 4.12.2
       lucide-react:
         specifier: ^0.575.0
         version: 0.575.0(react@19.2.7)
@@ -101,9 +74,6 @@ importers:
       xlsx:
         specifier: ^0.18.5
         version: 0.18.5
-      zod:
-        specifier: ^3.24.0
-        version: 3.25.76
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20250101.0
@@ -140,11 +110,6 @@ importers:
         version: 4.151.0(@cloudflare/workers-types@4.20260702.1)(@types/node@25.3.0)
 
 packages:
-
-  '@asteasolutions/zod-to-openapi@7.3.4':
-    resolution: {integrity: sha512-/2rThQ5zPi9OzVwes6U7lK1+Yvug0iXu25olp7S0XsYmOqnyMfxH7gdSQjn/+DSOHRg7wnotwGJSyL+fBKdnEA==}
-    peerDependencies:
-      zod: ^3.20.2
 
   '@babel/code-frame@7.29.0':
     resolution: {integrity: sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==}
@@ -228,40 +193,6 @@ packages:
   '@babel/types@7.29.0':
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
-
-  '@clawnify/app@0.4.1':
-    resolution: {integrity: sha512-Qfe3ELtW9WeENc+cKWAyvxP+/w4JWbD5Oxb8W6jGe0Osg0FKvKRHfPn/z/PRyPPFua1Xs5CKoqkRHjLE1NETKg==}
-    peerDependencies:
-      '@hono/zod-openapi': '>=0.18 <1'
-      '@phosphor-icons/react': '>=2'
-      hono: '*'
-      react: '>=18'
-    peerDependenciesMeta:
-      '@phosphor-icons/react':
-        optional: true
-      react:
-        optional: true
-
-  '@clawnify/connections@0.5.1':
-    resolution: {integrity: sha512-qQwZIjpkMUmhzNpqMhQyHI8ttcpEHIYLoI4h66fNrxoyDIgINz8v9Cau53EHcBOuCr/huWp8XXBuuhnJsVXvRQ==}
-
-  '@clawnify/db@0.4.2':
-    resolution: {integrity: sha512-s+G/5bDVFx7Na8WVETfl8EhyPcbmgs5LIE1TsM0vGUOAtPihQGlVX1xpfmg5lsMv8+OChKaHsZIMnzpXY8pyAw==}
-
-  '@clawnify/integrations@0.4.0':
-    resolution: {integrity: sha512-epX7r9VHczmjHJuegsn1ogRM9SG8CsYLsyF6hfxN3uV4nDYjdWazNingZnAgOI+ynVj0ZLV8x2rUnNoUUnSuQw==}
-
-  '@clawnify/queue@0.1.1':
-    resolution: {integrity: sha512-6gfaz4B3rVVFWMB0IjJ0mt3ausETXpiWodRqShMBTRwVtNyCXJ4FO4/f3qc/TYtnA9ZZBPVeBLjbzg5nTqvULw==}
-
-  '@clawnify/routes@0.3.0':
-    resolution: {integrity: sha512-ALKVoN1ui9KXSSoybSKumEiJ7fTAe793y2HwCPGEkvXlgV29yAGXad8qVOeGYzrKe6KACJ8twFA4uheQrJSmqA==}
-    peerDependencies:
-      '@hono/zod-openapi': '>=0.18 <1'
-      hono: '*'
-
-  '@clawnify/services@0.1.0':
-    resolution: {integrity: sha512-JzCTrbV/pyqZ11ypVUEjxOqF57Yk6rMt+HSZB0XvgD93t8W8/6kBqvbEk0gdNBqreCfhB/LfdpR8drgpkVM5Jw==}
 
   '@cloudflare/containers@0.3.7':
     resolution: {integrity: sha512-DM9dm3FnIBSyiSJ1FLavKwl/lk3oAmTaynCzZQ9pZR0ncRPquSxkxd8Nu2MFILxmDDsPkxKsSNEh9mHHMty4Fw==}
@@ -830,19 +761,6 @@ packages:
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
 
-  '@hono/zod-openapi@0.18.4':
-    resolution: {integrity: sha512-6NHMHU96Hh32B1yDhb94Z4Z5/POsmEu2AXpWLWcBq9arskRnOMt2752yEoXoADV8WUAc7H1IkNaQHGj1ytXbYw==}
-    engines: {node: '>=16.0.0'}
-    peerDependencies:
-      hono: '>=4.3.6'
-      zod: 3.*
-
-  '@hono/zod-validator@0.4.3':
-    resolution: {integrity: sha512-xIgMYXDyJ4Hj6ekm9T9Y27s080Nl9NXHcJkOvkXPhubOLj8hZkOL8pDnnXfvCf5xEE8Q4oMFenQUZZREUY2gqQ==}
-    peerDependencies:
-      hono: '>=3.9.0'
-      zod: ^3.19.1
-
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
     engines: {node: '>=18'}
@@ -1010,13 +928,6 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
-
-  '@phosphor-icons/react@2.1.10':
-    resolution: {integrity: sha512-vt8Tvq8GLjheAZZYa+YG/pW7HDbov8El/MANW8pOAz4eGxrwhnbfrQZq0Cp4q8zBEu8NIhHdnr+r8thnfRSNYA==}
-    engines: {node: '>=10'}
-    peerDependencies:
-      react: '>= 16.8'
-      react-dom: '>= 16.8'
 
   '@poppinss/colors@4.1.6':
     resolution: {integrity: sha512-H9xkIdFswbS8n1d6vmRd8+c10t2Qe+rZITbbDHHkQixH5+2x1FDGmi/0K+WgWiqQFKPSlIYB7jlH6Kpfn6Fleg==}
@@ -1942,98 +1853,6 @@ packages:
   detect-node-es@1.1.0:
     resolution: {integrity: sha512-ypdmJU/TbBby2Dxibuv7ZLW3Bs1QEmM7nHjEANfohJLvE0XVujisn1qPJcZxg+qDucsr+bP6fLD1rPS3AhJ7EQ==}
 
-  drizzle-orm@0.45.2:
-    resolution: {integrity: sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q==}
-    peerDependencies:
-      '@aws-sdk/client-rds-data': '>=3'
-      '@cloudflare/workers-types': '>=4'
-      '@electric-sql/pglite': '>=0.2.0'
-      '@libsql/client': '>=0.10.0'
-      '@libsql/client-wasm': '>=0.10.0'
-      '@neondatabase/serverless': '>=0.10.0'
-      '@op-engineering/op-sqlite': '>=2'
-      '@opentelemetry/api': ^1.4.1
-      '@planetscale/database': '>=1.13'
-      '@prisma/client': '*'
-      '@tidbcloud/serverless': '*'
-      '@types/better-sqlite3': '*'
-      '@types/pg': '*'
-      '@types/sql.js': '*'
-      '@upstash/redis': '>=1.34.7'
-      '@vercel/postgres': '>=0.8.0'
-      '@xata.io/client': '*'
-      better-sqlite3: '>=7'
-      bun-types: '*'
-      expo-sqlite: '>=14.0.0'
-      gel: '>=2'
-      knex: '*'
-      kysely: '*'
-      mysql2: '>=2'
-      pg: '>=8'
-      postgres: '>=3'
-      prisma: '*'
-      sql.js: '>=1'
-      sqlite3: '>=5'
-    peerDependenciesMeta:
-      '@aws-sdk/client-rds-data':
-        optional: true
-      '@cloudflare/workers-types':
-        optional: true
-      '@electric-sql/pglite':
-        optional: true
-      '@libsql/client':
-        optional: true
-      '@libsql/client-wasm':
-        optional: true
-      '@neondatabase/serverless':
-        optional: true
-      '@op-engineering/op-sqlite':
-        optional: true
-      '@opentelemetry/api':
-        optional: true
-      '@planetscale/database':
-        optional: true
-      '@prisma/client':
-        optional: true
-      '@tidbcloud/serverless':
-        optional: true
-      '@types/better-sqlite3':
-        optional: true
-      '@types/pg':
-        optional: true
-      '@types/sql.js':
-        optional: true
-      '@upstash/redis':
-        optional: true
-      '@vercel/postgres':
-        optional: true
-      '@xata.io/client':
-        optional: true
-      better-sqlite3:
-        optional: true
-      bun-types:
-        optional: true
-      expo-sqlite:
-        optional: true
-      gel:
-        optional: true
-      knex:
-        optional: true
-      kysely:
-        optional: true
-      mysql2:
-        optional: true
-      pg:
-        optional: true
-      postgres:
-        optional: true
-      prisma:
-        optional: true
-      sql.js:
-        optional: true
-      sqlite3:
-        optional: true
-
   electron-to-chromium@1.5.302:
     resolution: {integrity: sha512-sM6HAN2LyK82IyPBpznDRqlTQAtuSaO+ShzFiWTvoMJLHyZ+Y39r8VMfHzwbU8MVBzQ4Wdn85+wlZl2TLGIlwg==}
 
@@ -2079,10 +1898,6 @@ packages:
     resolution: {integrity: sha512-w/XBfkibaTl3YDqASwfDUqkna4Z2p9cFSr1aHDt0WoMTECnRfBOv2WArlZILlqgWlmdIlALXGpM2AOhEk5W3IA==}
     engines: {node: '>=0.8'}
 
-  free-email-domains@1.9.62:
-    resolution: {integrity: sha512-zNGcoWi8vlE5jEgBTyRbK1mIczCIpQS5dqE/x0d5ZhOjc+uKAyNiTFdClxwvvJElLl1fXP20Dg2lBvz3XfB3yA==}
-    engines: {node: '>= 18'}
-
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -2109,10 +1924,6 @@ packages:
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
-
-  hono@4.12.2:
-    resolution: {integrity: sha512-gJnaDHXKDayjt8ue0n8Gs0A007yKXj4Xzb8+cNjZeYsSzzwKc0Lr+OZgYwVfB0pHfUs17EPoLvrOsEaJ9mj+Tg==}
-    engines: {node: '>=16.9.0'}
 
   is-fullwidth-code-point@3.0.0:
     resolution: {integrity: sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==}
@@ -2234,9 +2045,6 @@ packages:
 
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
-
-  openapi3-ts@4.5.0:
-    resolution: {integrity: sha512-jaL+HgTq2Gj5jRcfdutgRGLosCy/hT8sQf6VOy+P+g36cZOjI1iukdPnijC+4CmeRzg/jEllJUboEic2FhxhtQ==}
 
   path-to-regexp@6.3.0:
     resolution: {integrity: sha512-Yhpw4T9C6hPpgPeA28us07OJeqZ5EzQTkbfwuhsUg0c237RomFoETJgmp2sa3F/41gfLE6G5cqcYwznmeEeOlQ==}
@@ -2558,15 +2366,7 @@ packages:
   youch@4.1.0-beta.10:
     resolution: {integrity: sha512-rLfVLB4FgQneDr0dv1oddCVZmKjcJ6yX6mS4pU82Mq/Dt9a3cLZQ62pDBL4AUO+uVrCvtWz3ZFUL2HFAFJ/BXQ==}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
-
 snapshots:
-
-  '@asteasolutions/zod-to-openapi@7.3.4(zod@3.25.76)':
-    dependencies:
-      openapi3-ts: 4.5.0
-      zod: 3.25.76
 
   '@babel/code-frame@7.29.0':
     dependencies:
@@ -2679,95 +2479,6 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
-
-  '@clawnify/app@0.4.1(@cloudflare/workers-types@4.20260702.1)(@hono/zod-openapi@0.18.4(hono@4.12.2)(zod@3.25.76))(@phosphor-icons/react@2.1.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(hono@4.12.2)(react@19.2.7)':
-    dependencies:
-      '@clawnify/db': 0.4.2(@cloudflare/workers-types@4.20260702.1)
-      '@clawnify/routes': 0.3.0(@hono/zod-openapi@0.18.4(hono@4.12.2)(zod@3.25.76))(hono@4.12.2)
-      '@hono/zod-openapi': 0.18.4(hono@4.12.2)(zod@3.25.76)
-      hono: 4.12.2
-    optionalDependencies:
-      '@phosphor-icons/react': 2.1.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      react: 19.2.7
-    transitivePeerDependencies:
-      - '@aws-sdk/client-rds-data'
-      - '@cloudflare/workers-types'
-      - '@electric-sql/pglite'
-      - '@libsql/client'
-      - '@libsql/client-wasm'
-      - '@neondatabase/serverless'
-      - '@op-engineering/op-sqlite'
-      - '@opentelemetry/api'
-      - '@planetscale/database'
-      - '@prisma/client'
-      - '@tidbcloud/serverless'
-      - '@types/better-sqlite3'
-      - '@types/pg'
-      - '@types/sql.js'
-      - '@upstash/redis'
-      - '@vercel/postgres'
-      - '@xata.io/client'
-      - better-sqlite3
-      - bun-types
-      - expo-sqlite
-      - gel
-      - knex
-      - kysely
-      - mysql2
-      - pg
-      - postgres
-      - prisma
-      - sql.js
-      - sqlite3
-
-  '@clawnify/connections@0.5.1':
-    dependencies:
-      '@clawnify/integrations': 0.4.0
-
-  '@clawnify/db@0.4.2(@cloudflare/workers-types@4.20260702.1)':
-    dependencies:
-      drizzle-orm: 0.45.2(@cloudflare/workers-types@4.20260702.1)
-    transitivePeerDependencies:
-      - '@aws-sdk/client-rds-data'
-      - '@cloudflare/workers-types'
-      - '@electric-sql/pglite'
-      - '@libsql/client'
-      - '@libsql/client-wasm'
-      - '@neondatabase/serverless'
-      - '@op-engineering/op-sqlite'
-      - '@opentelemetry/api'
-      - '@planetscale/database'
-      - '@prisma/client'
-      - '@tidbcloud/serverless'
-      - '@types/better-sqlite3'
-      - '@types/pg'
-      - '@types/sql.js'
-      - '@upstash/redis'
-      - '@vercel/postgres'
-      - '@xata.io/client'
-      - better-sqlite3
-      - bun-types
-      - expo-sqlite
-      - gel
-      - knex
-      - kysely
-      - mysql2
-      - pg
-      - postgres
-      - prisma
-      - sql.js
-      - sqlite3
-
-  '@clawnify/integrations@0.4.0': {}
-
-  '@clawnify/queue@0.1.1': {}
-
-  '@clawnify/routes@0.3.0(@hono/zod-openapi@0.18.4(hono@4.12.2)(zod@3.25.76))(hono@4.12.2)':
-    dependencies:
-      '@hono/zod-openapi': 0.18.4(hono@4.12.2)(zod@3.25.76)
-      hono: 4.12.2
-
-  '@clawnify/services@0.1.0': {}
 
   '@cloudflare/containers@0.3.7': {}
 
@@ -3088,18 +2799,6 @@ snapshots:
 
   '@floating-ui/utils@0.2.11': {}
 
-  '@hono/zod-openapi@0.18.4(hono@4.12.2)(zod@3.25.76)':
-    dependencies:
-      '@asteasolutions/zod-to-openapi': 7.3.4(zod@3.25.76)
-      '@hono/zod-validator': 0.4.3(hono@4.12.2)(zod@3.25.76)
-      hono: 4.12.2
-      zod: 3.25.76
-
-  '@hono/zod-validator@0.4.3(hono@4.12.2)(zod@3.25.76)':
-    dependencies:
-      hono: 4.12.2
-      zod: 3.25.76
-
   '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.5':
@@ -3235,11 +2934,6 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
-
-  '@phosphor-icons/react@2.1.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
-    dependencies:
-      react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
 
   '@poppinss/colors@4.1.6':
     dependencies:
@@ -4076,10 +3770,6 @@ snapshots:
 
   detect-node-es@1.1.0: {}
 
-  drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260702.1):
-    optionalDependencies:
-      '@cloudflare/workers-types': 4.20260702.1
-
   electron-to-chromium@1.5.302: {}
 
   emoji-regex@8.0.0: {}
@@ -4187,8 +3877,6 @@ snapshots:
 
   frac@1.1.2: {}
 
-  free-email-domains@1.9.62: {}
-
   fsevents@2.3.3:
     optional: true
 
@@ -4206,8 +3894,6 @@ snapshots:
   graceful-fs@4.2.11: {}
 
   has-flag@4.0.0: {}
-
-  hono@4.12.2: {}
 
   is-fullwidth-code-point@3.0.0: {}
 
@@ -4300,10 +3986,6 @@ snapshots:
   nanoid@3.3.11: {}
 
   node-releases@2.0.27: {}
-
-  openapi3-ts@4.5.0:
-    dependencies:
-      yaml: 2.8.2
 
   path-to-regexp@6.3.0: {}
 
@@ -4605,7 +4287,8 @@ snapshots:
 
   yallist@3.1.1: {}
 
-  yaml@2.8.2: {}
+  yaml@2.8.2:
+    optional: true
 
   yargs-parser@21.1.1: {}
 
@@ -4631,5 +4314,3 @@ snapshots:
       '@speed-highlight/core': 1.2.15
       cookie: 1.1.1
       youch-core: 0.3.3
-
-  zod@3.25.76: {}
