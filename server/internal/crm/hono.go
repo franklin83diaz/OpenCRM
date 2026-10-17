@@ -9,6 +9,7 @@ package crm
 import (
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"opencrm/internal/web"
@@ -140,4 +141,58 @@ func checkType(path []any, v any, expected string) *web.Issue {
 	}
 	issue := invalidType(path, expected, v)
 	return &issue
+}
+
+// requiredIssue is zod's invalid_type for a key the input lacks: zod read it
+// as undefined, and its error map says "Required" for that.
+func requiredIssue(path []any, expected string) web.Issue {
+	return web.Issue{Code: "invalid_type", Expected: expected, Received: "undefined", Path: path, Message: "Required"}
+}
+
+// arrayTooSmall and arrayTooBig are .min(n) and .max(n) on a z.array. ZodArray
+// built these with no message of its own, so makeIssue kept the message key
+// where the (undefined) one was and put path after it.
+func arrayTooSmall(path []any, min int) web.Issue {
+	yes, no := true, false
+	return web.Issue{Code: "too_small", Minimum: min, Type: "array", Inclusive: &yes, Exact: &no, Path: path,
+		Message: "Array must contain at least " + strconv.Itoa(min) + " element(s)",
+		Keys:    []string{"code", "minimum", "type", "inclusive", "exact", "message", "path"}}
+}
+
+func arrayTooBig(path []any, max int) web.Issue {
+	yes, no := true, false
+	return web.Issue{Code: "too_big", Maximum: max, Type: "array", Inclusive: &yes, Exact: &no, Path: path,
+		Message: "Array must contain at most " + strconv.Itoa(max) + " element(s)",
+		Keys:    []string{"code", "maximum", "type", "inclusive", "exact", "message", "path"}}
+}
+
+// optionalStrings is a query schema of optional z.string() fields, checked in
+// the schema's order: a parameter sent twice arrives as a list.
+func optionalStrings(q map[string]any, keys ...string) []web.Issue {
+	var issues []web.Issue
+	for _, key := range keys {
+		if v, present := q[key]; present {
+			if issue := checkType(zodPath(key), v, "string"); issue != nil {
+				issues = append(issues, *issue)
+			}
+		}
+	}
+	return issues
+}
+
+// openapiJSONType is @hono/zod-openapi's own test of the Content-Type (a
+// prefix, case-sensitive), made before the json validator's.
+var openapiJSONType = regexp.MustCompile(`^application/([a-z\-.]+\+)?json`)
+
+// optionalJSONBody is the body of an OpenAPI route whose body isn't marked
+// required: zod-openapi ran the json validator only when the request had a
+// Content-Type passing openapiJSONType, and otherwise handed the handler {}
+// unchecked (checked false). ok is false for malformed JSON (malformedJSON).
+func optionalJSONBody(r *http.Request) (v any, checked, ok bool) {
+	ct := headerValue(r, "Content-Type")
+	if ct == "" || !openapiJSONType.MatchString(ct) {
+		return map[string]any{}, false, true
+	}
+	v, ok = openapiJSON(r)
+	return v, true, ok
 }

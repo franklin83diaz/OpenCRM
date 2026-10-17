@@ -809,7 +809,7 @@ type AccountHealth struct {
 }
 
 // ShortDay is "2026-10-03" as "3 Oct" (en-GB, UTC; September is "Sept" as in
-// current ICU).
+// current ICU — workerd, which ran the TS, prints "3 Sept" too).
 func ShortDay(day string) string {
 	d, ok := js.ParseDate(u16Slice(day, 0, 10) + "T00:00:00Z")
 	if !ok {

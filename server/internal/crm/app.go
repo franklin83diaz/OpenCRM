@@ -15,6 +15,9 @@ import (
 type App struct {
 	Env  clawnify.Env
 	Conn *clawnify.Connections
+	// done holds index.ts's per-isolate fast paths (backfills.go): which
+	// one-time checks have passed in this process.
+	done doneOnce
 }
 
 var routes []func(rt *web.Router, app *App)
