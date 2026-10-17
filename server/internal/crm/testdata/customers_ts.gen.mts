@@ -4,7 +4,8 @@
 // customers_ts_test.go replays each scenario through the Go port and wants
 // the same.
 //
-// Run from the repository root (needs node 22 and the repo's node_modules):
+// Run from the repository root (needs node 22, and the TS backend's own
+// node_modules: scripts/parity/run.sh installs them in .parity/ts-ref):
 //
 //	TZ=UTC npx tsx server/internal/crm/testdata/customers_ts.gen.mts [ts-src-dir] > server/internal/crm/testdata/customers_ts.json
 //

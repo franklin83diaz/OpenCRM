@@ -41,7 +41,16 @@ if [ "$(git -C "$REF" rev-parse HEAD)" != "$BASE" ]; then
   git -C "$REF" checkout -q --detach "$BASE" \
     || { echo "parity: $REF is not at $BASE and could not be moved there" >&2; exit 2; }
 fi
-[ -e "$REF/node_modules" ] || ln -s "$ROOT/node_modules" "$REF/node_modules"
+# Its own dependencies, from its own lockfile (hono, zod, @clawnify/*: this
+# repo no longer has them). Installed once per base commit and reused; a
+# node_modules symlink left by an older run.sh is replaced.
+[ -L "$REF/node_modules" ] && rm "$REF/node_modules"
+if [ ! -d "$REF/node_modules" ] || [ "$(cat "$P/ts-ref.deps" 2>/dev/null)" != "$BASE" ]; then
+  rm -f "$P/ts-ref.deps"
+  (cd "$REF" && pnpm install --frozen-lockfile --config.confirm-modules-purge=false) >"$P/install.log" 2>&1 \
+    || { tail -n 20 "$P/install.log" >&2; echo "parity: installing the TS reference's dependencies failed; see $P/install.log" >&2; exit 2; }
+  echo "$BASE" >"$P/ts-ref.deps"
+fi
 
 # 2. Fresh, identically seeded databases. Go's also gets the Go schema, all
 # CREATE … IF NOT EXISTS: the same tables, plus its accounts (users, sessions,

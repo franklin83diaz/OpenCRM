@@ -10,7 +10,8 @@
 // before the lock, a view of an unknown entity, options stored in another
 // order), and database errors (whose text is D1's there and SQLite's here).
 //
-// Run from the repository root (needs node 22 and the repo's node_modules):
+// Run from the repository root (needs node 22, and the TS backend's own
+// node_modules: scripts/parity/run.sh installs them in .parity/ts-ref):
 //
 //	TZ=UTC npx tsx server/internal/crm/testdata/settings_ts.gen.mts [ts-src-dir] > server/internal/crm/testdata/settings_ts.json
 //
