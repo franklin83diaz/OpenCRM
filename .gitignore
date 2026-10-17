@@ -6,3 +6,5 @@ data.db-wal
 .wrangler/
 .DS_Store
 .parity/
+# wrangler dev secrets (ADMIN_EMAIL, ADMIN_PASSWORD)
+.dev.vars*

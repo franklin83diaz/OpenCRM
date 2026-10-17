@@ -12,10 +12,12 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"opencrm/internal/auth"
 	"opencrm/internal/db"
 	"opencrm/internal/db/dbtest"
+	"opencrm/internal/web"
 )
 
 const (
@@ -23,6 +25,7 @@ const (
 	wrongLogin       = `{"error":"Wrong email or password"}`
 	tooMany          = `{"error":"Too many attempts. Try again in a few minutes."}`
 	adminsOnly       = `{"error":"Only an admin can manage accounts"}`
+	sessionsOnly     = `{"error":"Sign in with your password to manage accounts and tokens"}`
 	lastAdmin        = `{"error":"The CRM needs at least one active admin"}`
 	notYourself      = `{"error":"You can't delete, disable or demote your own account"}`
 	badPassword      = `{"error":"A password needs 8 to 72 characters"}`
@@ -33,7 +36,7 @@ const (
 const testPassword = "password-1"
 
 var testPasswordHash = sync.OnceValue(func() string {
-	h, err := auth.HashPassword(testPassword)
+	h, err := auth.HashPassword(context.Background(), testPassword)
 	if err != nil {
 		panic(err)
 	}
@@ -397,11 +400,16 @@ func TestAuthDisabledAccountIsSignedOut(t *testing.T) {
 	if res := a.do("POST", "/api/auth/login", map[string]any{"email": "bo@example.com", "password": testPassword}, nil); res.code != 401 || res.body != wrongLogin {
 		t.Errorf("disabled user's login = %s", res)
 	}
-	// Enabled again, the token works again (it was never deleted).
-	a.do("PATCH", "/api/users/u-bo", map[string]any{"disabled": false}, asSession(ada))
-	if res := a.do("GET", "/api/auth/me", nil, asToken(tok.Secret)); res.code != 200 {
-		t.Errorf("re-enabled user's token = %s", res)
+	// Disabling is what an admin does about a compromised account: its API
+	// tokens are deleted, so enabling it again doesn't bring them back.
+	if n := a.count("api_tokens WHERE user_id = 'u-bo'"); n != 0 {
+		t.Errorf("disabling left %d tokens", n)
 	}
+	a.do("PATCH", "/api/users/u-bo", map[string]any{"disabled": false}, asSession(ada))
+	if res := a.do("GET", "/api/auth/me", nil, asToken(tok.Secret)); res.code != 401 {
+		t.Errorf("re-enabled user's old token = %s", res)
+	}
+	a.login("bo@example.com", testPassword)
 }
 
 func TestAuthExpiredSession(t *testing.T) {
@@ -421,6 +429,8 @@ func TestAuthPasswordChange(t *testing.T) {
 	a.user("u-ada", "ada@example.com", "admin", false)
 	here := a.login("ada@example.com", testPassword)
 	there := a.login("ada@example.com", testPassword)
+	var tok struct{ Secret string }
+	json.Unmarshal([]byte(a.do("POST", "/api/tokens", map[string]any{"name": "ci"}, asSession(here)).body), &tok)
 
 	for _, c := range []struct {
 		body map[string]any
@@ -440,23 +450,39 @@ func TestAuthPasswordChange(t *testing.T) {
 	if res.code != 200 || res.body != `{"ok":true}` {
 		t.Fatalf("change = %s", res)
 	}
-	// This session stays; the others end.
+	// This session stays and the others end; her API tokens keep working
+	// (her scripts aren't broken by a password change).
 	if res := a.do("GET", "/api/auth/me", nil, asSession(here)); res.code != 200 {
 		t.Errorf("the session that changed it = %s", res)
 	}
 	if res := a.do("GET", "/api/auth/me", nil, asSession(there)); res.code != 401 {
 		t.Errorf("another session = %s", res)
 	}
+	if res := a.do("GET", "/api/auth/me", nil, asToken(tok.Secret)); res.code != 200 {
+		t.Errorf("her token after a password change = %s", res)
+	}
 	if res := a.do("POST", "/api/auth/login", map[string]any{"email": "ada@example.com", "password": testPassword}, nil); res.code != 401 {
 		t.Errorf("old password = %s", res)
 	}
 	a.login("ada@example.com", "password-2")
 
-	// Guessing the current password is limited like a login.
+	// Someone locking ada's email out of signing in doesn't stop her, signed
+	// in, from changing her password: the two have their own counts.
 	for i := 0; i < 10; i++ {
-		a.do("PUT", "/api/auth/password", map[string]any{"current_password": "guess-guess", "new_password": "password-3"}, asSession(here))
+		a.do("POST", "/api/auth/login", map[string]any{"email": "ada@example.com", "password": "guess-guess"}, nil)
 	}
-	if res := a.do("PUT", "/api/auth/password", map[string]any{"current_password": "password-2", "new_password": "password-3"}, asSession(here)); res.code != 429 || res.body != tooMany {
+	if res := a.do("POST", "/api/auth/login", map[string]any{"email": "ada@example.com", "password": "password-2"}, nil); res.code != 429 {
+		t.Fatalf("login after 10 failures = %s", res)
+	}
+	if res := a.do("PUT", "/api/auth/password", map[string]any{"current_password": "password-2", "new_password": "password-3"}, asSession(here)); res.code != 200 {
+		t.Errorf("password change while the login is locked = %s", res)
+	}
+
+	// Guessing the current password is limited too: 10 tries in 15 minutes.
+	for i := 0; i < 10; i++ {
+		a.do("PUT", "/api/auth/password", map[string]any{"current_password": "guess-guess", "new_password": "password-4"}, asSession(here))
+	}
+	if res := a.do("PUT", "/api/auth/password", map[string]any{"current_password": "password-3", "new_password": "password-4"}, asSession(here)); res.code != 429 || res.body != tooMany {
 		t.Errorf("11th guess = %s", res)
 	}
 }
@@ -537,11 +563,21 @@ func TestUsersManagedByAnAdmin(t *testing.T) {
 	if res := a.do("GET", "/api/auth/me", nil, asSession(bo)); !strings.Contains(res.body, `"role":"admin"`) {
 		t.Errorf("bo's session doesn't see the new role at once: %s", res)
 	}
+	var boTok struct{ Secret string }
+	json.Unmarshal([]byte(a.do("POST", "/api/tokens", map[string]any{"name": "ci"}, asSession(bo)).body), &boTok)
 	if res := a.do("PATCH", "/api/users/"+boID, map[string]any{"password": "new-bo-password"}, asSession(ada)); res.code != 200 {
 		t.Errorf("set password = %s", res)
 	}
+	// An admin resetting a password is answering a compromise: the account's
+	// sessions end and its API tokens are deleted.
 	if res := a.do("GET", "/api/auth/me", nil, asSession(bo)); res.code != 401 {
 		t.Errorf("bo's session after a new password = %s", res)
+	}
+	if res := a.do("GET", "/api/auth/me", nil, asToken(boTok.Secret)); res.code != 401 {
+		t.Errorf("bo's token after a new password = %s", res)
+	}
+	if n := a.count("api_tokens WHERE user_id = ?", boID); n != 0 {
+		t.Errorf("a new password left %d tokens", n)
 	}
 	a.login("bo@example.com", "new-bo-password")
 	for _, c := range []struct {
@@ -560,13 +596,18 @@ func TestUsersManagedByAnAdmin(t *testing.T) {
 	if res := a.do("PATCH", "/api/users/nope", map[string]any{"name": "x"}, asSession(ada)); res.code != 404 || res.body != `{"error":"Account not found"}` {
 		t.Errorf("patch unknown = %s", res)
 	}
-	// An admin can still rename herself and set her own password; this session stays.
-	if res := a.do("PATCH", "/api/users/u-ada", map[string]any{"name": "Ada L.", "password": "ada-new-password", "role": "admin", "disabled": false}, asSession(ada)); res.code != 200 {
-		t.Errorf("ada patches herself = %s", res)
+	// An admin can rename herself, but sets her own password with the
+	// current one (PUT /api/auth/password), not here.
+	if res := a.do("PATCH", "/api/users/u-ada", map[string]any{"name": "Ada L.", "role": "admin", "disabled": false}, asSession(ada)); res.code != 200 || !strings.Contains(res.body, `"name":"Ada L."`) {
+		t.Errorf("ada renames herself = %s", res)
 	}
-	if res := a.do("GET", "/api/auth/me", nil, asSession(ada)); res.code != 200 {
-		t.Errorf("ada's session after setting her own password = %s", res)
+	if res := a.do("PATCH", "/api/users/u-ada", map[string]any{"name": "Ada X.", "password": "ada-new-password"}, asSession(ada)); res.code != 400 || res.body != `{"error":"Change your own password from your account settings"}` {
+		t.Errorf("ada sets her own password = %s", res)
 	}
+	if n := a.count("users WHERE id = 'u-ada' AND name = 'Ada L.'"); n != 1 {
+		t.Error("the refused change was applied")
+	}
+	a.login("ada@example.com", testPassword)
 
 	// DELETE takes the account's sessions and tokens with it.
 	bo = a.login("bo@example.com", "new-bo-password")
@@ -606,6 +647,140 @@ func TestUsersNoAdminRemovesThemselves(t *testing.T) {
 	}
 	if n := a.count("users WHERE id = 'u-ada' AND role = 'admin' AND disabled = 0 AND name = 'Ada'"); n != 1 {
 		t.Error("a refused change was applied")
+	}
+}
+
+// A token reaches the CRM's data, not its accounts: managing tokens,
+// accounts and passwords takes a signed-in browser session, so a leaked token
+// can't mint more tokens or take over an account.
+func TestTokensCantManageAccounts(t *testing.T) {
+	a := newAuthAPI(t, &App{})
+	a.user("u-ada", "ada@example.com", "admin", false)
+	a.user("u-bo", "bo@example.com", "user", false)
+	ada := a.login("ada@example.com", testPassword)
+	var tok struct {
+		Token  struct{ ID string }
+		Secret string
+	}
+	json.Unmarshal([]byte(a.do("POST", "/api/tokens", map[string]any{"name": "ci"}, asSession(ada)).body), &tok)
+	for _, c := range []struct {
+		method, path string
+		body         any
+	}{
+		{"GET", "/api/tokens", nil},
+		{"POST", "/api/tokens", map[string]any{"name": "another"}},
+		{"DELETE", "/api/tokens/" + tok.Token.ID, nil},
+		{"GET", "/api/users", nil},
+		{"POST", "/api/users", map[string]any{"email": "eve@example.com", "password": "password-9", "role": "admin"}},
+		{"PATCH", "/api/users/u-bo", map[string]any{"password": "password-9"}},
+		{"PATCH", "/api/users/u-ada", map[string]any{"name": "x"}},
+		{"DELETE", "/api/users/u-bo", nil},
+		{"PUT", "/api/auth/password", map[string]any{"current_password": testPassword, "new_password": "password-9"}},
+	} {
+		if res := a.do(c.method, c.path, c.body, asToken(tok.Secret)); res.code != 403 || res.body != sessionsOnly {
+			t.Errorf("token %s %s = %s", c.method, c.path, res)
+		}
+	}
+	if n := a.count("api_tokens"); n != 1 {
+		t.Errorf("%d tokens", n)
+	}
+	if n := a.count("users"); n != 2 {
+		t.Errorf("%d users", n)
+	}
+
+	// It can still say whose it is, and "sign out": with no session behind
+	// it there is nothing to end, and the cookie is left alone.
+	if res := a.do("GET", "/api/auth/me", nil, asToken(tok.Secret)); res.code != 200 || !strings.Contains(res.body, `"id":"u-ada"`) {
+		t.Errorf("me with a token = %s", res)
+	}
+	h := asToken(tok.Secret)
+	h["Cookie"] = auth.CookieName + "=" + ada
+	res := a.do("POST", "/api/auth/logout", nil, h)
+	if res.code != 200 || res.body != `{"ok":true}` || res.header.Get("Set-Cookie") != "" {
+		t.Errorf("logout with a token = %s %v", res, res.header.Values("Set-Cookie"))
+	}
+	if res := a.do("GET", "/api/auth/me", nil, asSession(ada)); res.code != 200 {
+		t.Errorf("the session after a token's logout = %s", res)
+	}
+	// The same calls work from the session.
+	if res := a.do("GET", "/api/tokens", nil, asSession(ada)); res.code != 200 {
+		t.Errorf("tokens with the session = %s", res)
+	}
+	if res := a.do("GET", "/api/users", nil, asSession(ada)); res.code != 200 {
+		t.Errorf("users with the session = %s", res)
+	}
+}
+
+// While both bcrypt slots are busy, a login waits at most as long as the
+// request does (2 s at most) and then answers 429 without checking the
+// password, so a flood of logins can't starve the CRM of CPU.
+func TestAuthLoginWhenBcryptIsBusy(t *testing.T) {
+	a := newAuthAPI(t, &App{})
+	a.user("u-ada", "ada@example.com", "admin", false)
+	var releases []func()
+	for i := 0; i < 2; i++ {
+		release, err := auth.AcquireBcryptSlot(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		releases = append(releases, release)
+	}
+	defer func() {
+		for _, release := range releases {
+			release()
+		}
+	}()
+
+	body, _ := json.Marshal(map[string]any{"email": "ada@example.com", "password": testPassword})
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	r := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body)).WithContext(ctx)
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	start := time.Now()
+	a.h.ServeHTTP(w, r)
+	// The right password, yet no session: the password was never checked.
+	if w.Code != 429 || w.Body.String() != tooMany || w.Header().Get("Set-Cookie") != "" {
+		t.Errorf("login with bcrypt busy = %d %s", w.Code, w.Body.String())
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Errorf("took %v", d)
+	}
+	if n := a.count("sessions"); n != 0 {
+		t.Errorf("%d sessions", n)
+	}
+	// So do an admin's account writes that need a hash.
+	for _, release := range releases {
+		release()
+	}
+	releases = nil
+	ada := a.login("ada@example.com", testPassword)
+	for i := 0; i < 2; i++ {
+		release, _ := auth.AcquireBcryptSlot(context.Background())
+		releases = append(releases, release)
+	}
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel2()
+	r = httptest.NewRequest("POST", "/api/users", strings.NewReader(`{"email":"bo@example.com","password":"password-9"}`)).WithContext(ctx2)
+	r.Header.Set("Cookie", auth.CookieName+"="+ada)
+	w = httptest.NewRecorder()
+	a.h.ServeHTTP(w, r)
+	if w.Code != 429 || w.Body.String() != tooMany {
+		t.Errorf("create user with bcrypt busy = %d %s", w.Code, w.Body.String())
+	}
+}
+
+// Only a signed-in person or an API token may write tasks: the "agent" caller
+// Clawnify had no longer exists.
+func TestMayWrite(t *testing.T) {
+	for caller, want := range map[string]bool{"user": true, "api": true, "agent": false, "agent-browser": false, "public": false, "": false} {
+		r := httptest.NewRequest("POST", "/api/tasks", nil)
+		if caller != "" {
+			r = web.WithIdentity(r, caller, &web.User{ID: "u1", Email: "ada@example.com"})
+		}
+		if got := mayWrite(r); got != want {
+			t.Errorf("mayWrite(%q) = %v", caller, got)
+		}
 	}
 }
 

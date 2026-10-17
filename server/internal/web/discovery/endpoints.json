@@ -241,7 +241,7 @@
  {
   "method": "POST",
   "path": "/api/auth/logout",
-  "summary": "Sign out: end this session and drop its cookie"
+  "summary": "Sign out: end this session and drop its cookie (with an API token there is no session to end)"
  },
  {
   "method": "GET",
@@ -251,41 +251,41 @@
  {
   "method": "PUT",
   "path": "/api/auth/password",
-  "summary": "Change your password: {current_password, new_password}; signs you out everywhere else"
+  "summary": "Change your password: {current_password, new_password}; ends your other sessions, your API tokens keep working (browser session only)"
  },
  {
   "method": "GET",
   "path": "/api/users",
-  "summary": "List the accounts (admins only)"
+  "summary": "List the accounts (admins, browser session only)"
  },
  {
   "method": "POST",
   "path": "/api/users",
-  "summary": "Create an account: {email, name?, password, role?} (admins only)"
+  "summary": "Create an account: {email, name?, password, role?} (admins, browser session only)"
  },
  {
   "method": "PATCH",
   "path": "/api/users/{id}",
-  "summary": "Change an account's name, role or password, or disable it (admins only)"
+  "summary": "Change another account's name, role or password, or disable it; a new password or disabling ends its sessions and deletes its API tokens (admins, browser session only)"
  },
  {
   "method": "DELETE",
   "path": "/api/users/{id}",
-  "summary": "Delete an account, with its sessions and API tokens (admins only)"
+  "summary": "Delete an account, with its sessions and API tokens (admins, browser session only)"
  },
  {
   "method": "GET",
   "path": "/api/tokens",
-  "summary": "List your API tokens"
+  "summary": "List your API tokens (browser session only)"
  },
  {
   "method": "POST",
   "path": "/api/tokens",
-  "summary": "Create an API token: {name}; its secret is in this answer only"
+  "summary": "Create an API token: {name}; its secret is in this answer only (browser session only)"
  },
  {
   "method": "DELETE",
   "path": "/api/tokens/{id}",
-  "summary": "Delete one of your API tokens"
+  "summary": "Delete one of your API tokens (browser session only)"
  }
 ]

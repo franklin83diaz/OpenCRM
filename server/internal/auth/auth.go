@@ -287,11 +287,15 @@ func setCookie(w http.ResponseWriter, value string, maxAge int) {
 // ClientIP is the address a request came from, for the login limiter.
 // Cloudflare puts the visitor's address in CF-Connecting-IP (a client can't
 // set it: the edge overwrites it) and the Worker passes it on; the container
-// itself only sees the Worker's connection. Without the header (the dev
-// server), it is the connection's address.
+// itself only sees the Worker's connection. With Cloudflare's Pseudo IPv4 on,
+// that is a made-up IPv4 address and the real one, which the limiter groups
+// by /64, is in CF-Connecting-IPv6. Without either header (the dev server),
+// it is the connection's address.
 func ClientIP(r *http.Request) string {
-	if ip := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); ip != "" {
-		return ip
+	for _, h := range []string{"CF-Connecting-IPv6", "CF-Connecting-IP"} {
+		if ip := strings.TrimSpace(r.Header.Get(h)); ip != "" {
+			return ip
+		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

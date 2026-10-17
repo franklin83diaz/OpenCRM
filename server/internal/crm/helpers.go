@@ -68,10 +68,12 @@ func errMessage(err error) string {
 	return err.Error()
 }
 
-// mayWrite is whether a caller may change tasks: people, API keys and agents.
+// mayWrite is whether a caller may change tasks: a signed-in person or an
+// API token. (TS also let Clawnify's "agent" caller write; there is no such
+// caller now. Behind the auth middleware nobody else gets this far.)
 func mayWrite(r *http.Request) bool {
 	who := web.Caller(r)
-	return who == "user" || who == "api" || who == "agent"
+	return who == "user" || who == "api"
 }
 
 // headerValue is c.req.header(name): every value of the header, comma-joined.

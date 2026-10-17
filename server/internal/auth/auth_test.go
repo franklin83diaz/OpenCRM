@@ -22,37 +22,45 @@ const unauthorized = `{"error":"unauthorized","message":"Sign in to use the CRM.
 const crossSite = `{"error":"Cross-site request refused"}`
 
 func TestPasswords(t *testing.T) {
-	hash, err := auth.HashPassword("correct horse")
+	ctx := context.Background()
+	hash, err := auth.HashPassword(ctx, "correct horse")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(hash, "$2a$12$") {
 		t.Errorf("hash %q is not bcrypt at cost 12", hash)
 	}
-	if !auth.CheckPassword(hash, "correct horse") {
+	check := func(hash, pw string) bool {
+		ok, err := auth.CheckPassword(ctx, hash, pw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ok
+	}
+	if !check(hash, "correct horse") {
 		t.Error("the right password doesn't check")
 	}
-	if auth.CheckPassword(hash, "correct horsE") || auth.CheckPassword(hash, "") {
+	if check(hash, "correct horsE") || check(hash, "") {
 		t.Error("a wrong password checks")
 	}
 	// No account: the comparison still runs (against a dummy hash) and fails.
-	if auth.CheckPassword("", "correct horse") {
+	if check("", "correct horse") {
 		t.Error("an empty hash checks")
 	}
 
 	// bcrypt only reads 72 bytes: a longer password would be truncated
 	// silently, so it is refused instead; so is one under 8.
 	for _, pw := range []string{"", "short77", strings.Repeat("x", 73), strings.Repeat("é", 37)} {
-		if _, err := auth.HashPassword(pw); err == nil {
+		if _, err := auth.HashPassword(ctx, pw); err == nil {
 			t.Errorf("HashPassword(%d bytes) accepted", len(pw))
 		}
 	}
 	long := strings.Repeat("x", 72)
-	h72, err := auth.HashPassword(long)
+	h72, err := auth.HashPassword(ctx, long)
 	if err != nil {
 		t.Fatalf("72 bytes refused: %v", err)
 	}
-	if auth.CheckPassword(h72, long+"y") {
+	if check(h72, long+"y") {
 		t.Error("a 73-byte password matches its 72-byte prefix")
 	}
 	for pw, want := range map[string]bool{"1234567": false, "12345678": true, strings.Repeat("x", 72): true, strings.Repeat("x", 73): false, "ñññññññ": true /* 14 bytes */} {
@@ -125,6 +133,31 @@ func TestLimiter(t *testing.T) {
 	}
 	if !l.Allow("2001:db8:1:3::1", "v6-new@x") || !l.Allow("10.1.1.1", "v6-new2@x") {
 		t.Error("another /64 (or IPv4 address) is refused")
+	}
+
+	// Changing a password has its own count per account: 10 tries in 15
+	// minutes, apart from the logins' (someone locking ada's email out of
+	// signing in can't stop her, signed in, from changing her password).
+	for i := 0; i < 10; i++ {
+		if !l.AllowPasswordChange("u-ada") {
+			t.Fatalf("password change %d refused", i+1)
+		}
+	}
+	if l.AllowPasswordChange("u-ada") {
+		t.Error("11th password change try in 15 minutes allowed")
+	}
+	if !l.AllowPasswordChange("u-bo") {
+		t.Error("another account's password change refused")
+	}
+	l.PasswordChanged("u-ada")
+	if !l.AllowPasswordChange("u-ada") {
+		t.Error("a change doesn't forget the tries")
+	}
+	for i := 0; i < 10; i++ {
+		l.Allow("6.6.6."+string(rune('0'+i)), "locked@example.com")
+	}
+	if l.Allow("5.5.5.5", "locked@example.com") || !l.AllowPasswordChange("u-locked") {
+		t.Error("the login and password-change counts are not apart")
 	}
 
 	// A success forgets the email's failures.
@@ -373,5 +406,12 @@ func TestClientIP(t *testing.T) {
 	r.Header.Set("CF-Connecting-IP", "2001:db8::1")
 	if got := auth.ClientIP(r); got != "2001:db8::1" {
 		t.Errorf("ClientIP(CF-Connecting-IP) = %q", got)
+	}
+	// With Cloudflare's Pseudo IPv4, CF-Connecting-IP is a made-up IPv4
+	// address and the visitor's own is in CF-Connecting-IPv6.
+	r.Header.Set("CF-Connecting-IP", "240.1.2.3")
+	r.Header.Set("CF-Connecting-IPv6", "2001:db8:5::7")
+	if got := auth.ClientIP(r); got != "2001:db8:5::7" {
+		t.Errorf("ClientIP(CF-Connecting-IPv6) = %q", got)
 	}
 }

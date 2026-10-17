@@ -8,14 +8,17 @@ import (
 
 // Limiter slows down password guessing: at most 10 login attempts a minute
 // from one address, and 10 attempts in 15 minutes at one email that didn't end
-// in a successful sign-in. It lives in memory, which is right because the API
-// runs as a single container instance (max_instances = 1); a restart (the
-// container sleeping after 10 idle minutes, or a deploy) starts it afresh.
+// in a successful sign-in; and, apart from those, 10 tries in 15 minutes at an
+// account's current password when changing it. It lives in memory, which is
+// right because the API runs as a single container instance (max_instances =
+// 1); a restart (the container sleeping after 10 idle minutes, or a deploy)
+// starts it afresh.
 type Limiter struct {
 	mu        sync.Mutex
 	now       func() time.Time
 	ips       window
 	emails    window
+	changes   window
 	lastSweep time.Time
 }
 
@@ -36,6 +39,10 @@ func NewLimiter(now func() time.Time) *Limiter {
 		now:    now,
 		ips:    window{limit: ipAttempts, period: ipPeriod, hits: map[string][]time.Time{}},
 		emails: window{limit: emailFailures, period: emailPeriod, hits: map[string][]time.Time{}},
+		// The same allowance as an email's, but its own: someone locking an
+		// email out of signing in can't stop its owner, signed in, from
+		// changing the password.
+		changes: window{limit: emailFailures, period: emailPeriod, hits: map[string][]time.Time{}},
 	}
 }
 
@@ -65,6 +72,28 @@ func (l *Limiter) Succeeded(email string) {
 	delete(l.emails.hits, cut(email))
 }
 
+// AllowPasswordChange is whether the account userID may try its current
+// password again to change it; the try counts until PasswordChanged.
+func (l *Limiter) AllowPasswordChange(userID string) bool {
+	userID = cut(userID)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	l.sweep(now)
+	if l.changes.full(userID, now) {
+		return false
+	}
+	l.changes.add(userID, now)
+	return true
+}
+
+// PasswordChanged forgets userID's tries: the password was right.
+func (l *Limiter) PasswordChanged(userID string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.changes.hits, cut(userID))
+}
+
 // sweep drops keys whose attempts have all left their window, at most once a
 // minute, so the maps hold only what the last 15 minutes saw.
 func (l *Limiter) sweep(now time.Time) {
@@ -74,6 +103,7 @@ func (l *Limiter) sweep(now time.Time) {
 	l.lastSweep = now
 	l.ips.sweep(now)
 	l.emails.sweep(now)
+	l.changes.sweep(now)
 }
 
 // client is the key an address counts under. An IPv6 client is usually given

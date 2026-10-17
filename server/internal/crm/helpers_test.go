@@ -62,6 +62,11 @@ func (r *recorder) add(sql string, params []any) {
 // not be in the fixtures) and reads the caller from those headers as
 // @clawnify/app's caller() and user() did. Only tests use it: the CRM itself
 // ignores the headers.
+//
+// TS let Clawnify's "agent" caller write tasks, which then read "agent" as
+// created_by. The CRM's writers are now a session or an API token, so an
+// agent step replays as a token whose account goes by "agent": the same
+// writes, the same rows.
 func replayAPI(app *App) http.Handler {
 	rt := app.router()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +77,9 @@ func replayAPI(app *App) http.Handler {
 		var u *web.User
 		if id := clawnifyHeader(r, "X-Clawnify-User-Id"); id != "" {
 			u = &web.User{ID: id, Email: clawnifyHeader(r, "X-Clawnify-User-Email"), Name: clawnifyHeader(r, "X-Clawnify-User-Name")}
+		}
+		if caller == "agent" && u == nil {
+			caller, u = "api", &web.User{Email: "agent"}
 		}
 		rt.ServeHTTP(w, web.WithIdentity(r, caller, u))
 	})

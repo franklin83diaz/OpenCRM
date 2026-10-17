@@ -6,6 +6,10 @@ package crm
 // routes make and end what it checks. There is no sign-up: an admin creates
 // the accounts, and the first admin comes from the ADMIN_EMAIL and
 // ADMIN_PASSWORD secrets.
+//
+// A token reaches the CRM's data, not its accounts: tokens, accounts and
+// passwords are managed only from a browser session (sessionOnly), so a
+// leaked token can't mint more tokens, change a password or make an admin.
 
 import (
 	"context"
@@ -29,6 +33,8 @@ const (
 	errNoAccounts      = "No accounts yet: set ADMIN_EMAIL and ADMIN_PASSWORD and restart the CRM"
 	errCurrentPassword = "Your current password is wrong"
 	errAdminsOnly      = "Only an admin can manage accounts"
+	errSessionsOnly    = "Sign in with your password to manage accounts and tokens"
+	errOwnPassword     = "Change your own password from your account settings"
 	errEmailTaken      = "An account with this email already exists"
 	errLastAdmin       = "The CRM needs at least one active admin"
 	errNotYourself     = "You can't delete, disable or demote your own account"
@@ -170,7 +176,7 @@ func (app *App) ensureAdmin(ctx context.Context) error {
 	}
 	if js.Number(row["n"]) == 0 {
 		email, ok := accountEmail(app.AdminEmail)
-		hash, err := auth.HashPassword(app.AdminPassword)
+		hash, err := auth.HashPassword(ctx, app.AdminPassword)
 		switch {
 		case !ok:
 			log.Printf("auth: ADMIN_EMAIL is not an email address; no admin created")
@@ -210,7 +216,7 @@ func (app *App) BootstrapToken(ctx context.Context, secret string) error {
 	}
 	if row == nil {
 		pw, _ := auth.NewSecret("")
-		hash, err := auth.HashPassword(pw[:40])
+		hash, err := auth.HashPassword(ctx, pw[:40])
 		if err != nil {
 			return err
 		}
@@ -242,7 +248,9 @@ func (app *App) login(w http.ResponseWriter, r *http.Request) error {
 	if !app.limiter().Allow(auth.ClientIP(r), email) {
 		return jsonError(w, http.StatusTooManyRequests, errTooMany)
 	}
-	if err := app.ensureAdmin(ctx); err != nil {
+	if err := app.ensureAdmin(ctx); errors.Is(err, auth.ErrBusy) {
+		return jsonError(w, http.StatusTooManyRequests, errTooMany)
+	} else if err != nil {
 		return err
 	}
 	// Asked for every login, known email or not, so that the work (and the
@@ -262,7 +270,14 @@ func (app *App) login(w http.ResponseWriter, r *http.Request) error {
 	if row != nil {
 		hash, _ = row["password_hash"].(string)
 	}
-	if ok := auth.CheckPassword(hash, password); !ok || row == nil || js.Number(row["disabled"]) != 0 {
+	ok, err := auth.CheckPassword(ctx, hash, password)
+	if errors.Is(err, auth.ErrBusy) {
+		return jsonError(w, http.StatusTooManyRequests, errTooMany)
+	}
+	if err != nil {
+		return err
+	}
+	if !ok || row == nil || js.Number(row["disabled"]) != 0 {
 		return jsonError(w, http.StatusUnauthorized, errWrongLogin)
 	}
 	// The session the browser came with, if any, ends: a sign-in always
@@ -283,10 +298,14 @@ func (app *App) login(w http.ResponseWriter, r *http.Request) error {
 	return web.JSON(w, http.StatusOK, userBody{&web.User{ID: u.ID, Email: u.Email, Name: u.Name, Role: u.Role}})
 }
 
-// logout ends this session and drops its cookie.
+// logout ends this session and drops its cookie. Signed in with a token
+// there is no session to end (tokens are deleted with DELETE /api/tokens/{id},
+// from a session), and a cookie that came along is not the token's to drop.
 func (app *App) logout(w http.ResponseWriter, r *http.Request) error {
-	if err := auth.EndSession(r.Context(), w, r); err != nil {
-		return err
+	if web.Caller(r) == "user" {
+		if err := auth.EndSession(r.Context(), w, r); err != nil {
+			return err
+		}
 	}
 	return web.JSON(w, http.StatusOK, okBody{true})
 }
@@ -296,10 +315,14 @@ func (app *App) me(w http.ResponseWriter, r *http.Request) error {
 	return web.JSON(w, http.StatusOK, userBody{web.CurrentUser(r)})
 }
 
-// changePassword sets a new password after checking the current one (guesses
-// count against the login limiter), and signs the account out everywhere
-// else: a session that was stolen ends with the old password.
+// changePassword sets a new password after checking the current one (tries
+// are limited per account, apart from the logins), and ends the account's
+// other sessions: one that was stolen ends with the old password. Its API
+// tokens keep working, so a password change doesn't break its scripts.
 func (app *App) changePassword(w http.ResponseWriter, r *http.Request) error {
+	if !sessionOnly(w, r) {
+		return nil
+	}
 	ctx := r.Context()
 	me := web.CurrentUser(r)
 	body := web.Object(web.Body(r))
@@ -308,7 +331,7 @@ func (app *App) changePassword(w http.ResponseWriter, r *http.Request) error {
 	if !auth.ValidPassword(next) {
 		return jsonError(w, http.StatusBadRequest, auth.ErrPasswordLength.Error())
 	}
-	if !app.limiter().Allow(auth.ClientIP(r), me.Email) {
+	if !app.limiter().AllowPasswordChange(me.ID) {
 		return jsonError(w, http.StatusTooManyRequests, errTooMany)
 	}
 	row, err := db.Get(ctx, "SELECT password_hash FROM users WHERE id = ?", me.ID)
@@ -319,36 +342,51 @@ func (app *App) changePassword(w http.ResponseWriter, r *http.Request) error {
 	if row != nil {
 		hash, _ = row["password_hash"].(string)
 	}
-	if !auth.CheckPassword(hash, current) {
+	ok, err := auth.CheckPassword(ctx, hash, current)
+	if errors.Is(err, auth.ErrBusy) {
+		return jsonError(w, http.StatusTooManyRequests, errTooMany)
+	}
+	if err != nil {
+		return err
+	}
+	if !ok {
 		return jsonError(w, http.StatusBadRequest, errCurrentPassword)
 	}
-	app.limiter().Succeeded(me.Email)
-	newHash, err := auth.HashPassword(next)
+	app.limiter().PasswordChanged(me.ID)
+	newHash, err := auth.HashPassword(ctx, next)
+	if errors.Is(err, auth.ErrBusy) {
+		return jsonError(w, http.StatusTooManyRequests, errTooMany)
+	}
 	if err != nil {
 		return err
 	}
 	if _, err := db.Run(ctx, "UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?", newHash, me.ID); err != nil {
 		return err
 	}
-	if err := auth.DeleteSessions(ctx, me.ID, thisSession(r)); err != nil {
+	if err := auth.DeleteSessions(ctx, me.ID, auth.SessionToken(r)); err != nil {
 		return err
 	}
 	return web.JSON(w, http.StatusOK, okBody{true})
 }
 
-// thisSession is the request's session cookie value when it was signed in by
-// one ("" for a token), so a change of password keeps it.
-func thisSession(r *http.Request) string {
+// sessionOnly answers 403 unless the request was signed in with a session
+// cookie: tokens, accounts and passwords aren't an API token's business.
+func sessionOnly(w http.ResponseWriter, r *http.Request) bool {
 	if web.Caller(r) != "user" {
-		return ""
+		jsonError(w, http.StatusForbidden, errSessionsOnly)
+		return false
 	}
-	return auth.SessionToken(r)
+	return true
 }
 
 // ── Accounts (admin only) ──
 
-// adminOnly answers 403 unless the caller is an admin.
+// adminOnly answers 403 unless the caller is an admin, signed in with a
+// session (sessionOnly).
 func adminOnly(w http.ResponseWriter, r *http.Request) (*web.User, bool) {
+	if !sessionOnly(w, r) {
+		return nil, false
+	}
 	me := web.CurrentUser(r)
 	if me == nil || me.Role != "admin" {
 		jsonError(w, http.StatusForbidden, errAdminsOnly)
@@ -411,9 +449,12 @@ func (app *App) createUser(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 	password, _ := body["password"].(string)
-	hash, err := auth.HashPassword(password)
+	hash, err := auth.HashPassword(ctx, password)
 	if errors.Is(err, auth.ErrPasswordLength) {
 		return jsonError(w, http.StatusBadRequest, err.Error())
+	}
+	if errors.Is(err, auth.ErrBusy) {
+		return jsonError(w, http.StatusTooManyRequests, errTooMany)
 	}
 	if err != nil {
 		return err
@@ -435,9 +476,11 @@ func (app *App) createUser(w http.ResponseWriter, r *http.Request) error {
 }
 
 // updateUser changes an account: {name?, role?, disabled?, password?}. A new
-// password or disabling it signs it out everywhere (but for the admin's own
-// session, setting their own password). No admin can demote or disable
-// themselves, and the last active admin stays one.
+// password or disabling it is how an admin answers a compromised account: it
+// ends the account's sessions and deletes its API tokens. No admin can
+// demote or disable themselves, or set their own password here (that takes
+// the current one: PUT /api/auth/password), and the last active admin stays
+// one.
 func (app *App) updateUser(w http.ResponseWriter, r *http.Request) error {
 	me, ok := adminOnly(w, r)
 	if !ok {
@@ -484,6 +527,9 @@ func (app *App) updateUser(w http.ResponseWriter, r *http.Request) error {
 	if id == me.ID && removesAdmin {
 		return jsonError(w, http.StatusBadRequest, errNotYourself)
 	}
+	if id == me.ID && password != "" {
+		return jsonError(w, http.StatusBadRequest, errOwnPassword)
+	}
 	target, err := readMember(ctx, id)
 	if err != nil {
 		return err
@@ -492,7 +538,10 @@ func (app *App) updateUser(w http.ResponseWriter, r *http.Request) error {
 		return jsonError(w, http.StatusNotFound, errNoAccount)
 	}
 	if password != "" {
-		hash, err := auth.HashPassword(password)
+		hash, err := auth.HashPassword(ctx, password)
+		if errors.Is(err, auth.ErrBusy) {
+			return jsonError(w, http.StatusTooManyRequests, errTooMany)
+		}
 		if err != nil {
 			return err
 		}
@@ -514,12 +563,11 @@ func (app *App) updateUser(w http.ResponseWriter, r *http.Request) error {
 	if res.Changes == 0 {
 		return app.unchanged(w, ctx, id)
 	}
-	if signsOut {
-		keep := ""
-		if id == me.ID {
-			keep = thisSession(r)
+	if signsOut { // never the admin's own account: refused above
+		if err := auth.DeleteSessions(ctx, id, ""); err != nil {
+			return err
 		}
-		if err := auth.DeleteSessions(ctx, id, keep); err != nil {
+		if _, err := db.Run(ctx, "DELETE FROM api_tokens WHERE user_id = ?", id); err != nil {
 			return err
 		}
 	}
@@ -575,6 +623,9 @@ func (app *App) deleteUser(w http.ResponseWriter, r *http.Request) error {
 // ── API tokens (each person's own) ──
 
 func (app *App) listTokens(w http.ResponseWriter, r *http.Request) error {
+	if !sessionOnly(w, r) {
+		return nil
+	}
 	rows, err := db.Query(r.Context(), "SELECT "+tokenColumns+" FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC, rowid DESC", web.CurrentUser(r).ID)
 	if err != nil {
 		return err
@@ -591,6 +642,9 @@ func (app *App) listTokens(w http.ResponseWriter, r *http.Request) error {
 // createToken makes a token, {name}. Its secret is in this answer only: the
 // database keeps its hash.
 func (app *App) createToken(w http.ResponseWriter, r *http.Request) error {
+	if !sessionOnly(w, r) {
+		return nil
+	}
 	ctx := r.Context()
 	body := web.Object(web.Body(r))
 	name, _ := body["name"].(string)
@@ -616,6 +670,9 @@ func (app *App) createToken(w http.ResponseWriter, r *http.Request) error {
 
 // deleteToken deletes one of the caller's own tokens; anyone else's is 404.
 func (app *App) deleteToken(w http.ResponseWriter, r *http.Request) error {
+	if !sessionOnly(w, r) {
+		return nil
+	}
 	res, err := db.Run(r.Context(), "DELETE FROM api_tokens WHERE id = ? AND user_id = ?", r.PathValue("id"), web.CurrentUser(r).ID)
 	if err != nil {
 		return err
