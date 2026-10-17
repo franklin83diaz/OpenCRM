@@ -53,10 +53,6 @@ export default [
   {
     name: "stages",
     run: async (call) => {
-      // run.sh waits for TS on GET /api/stats, which makes Northline a
-      // customer (its contact's won deal), and for Go on /llms.txt: the first
-      // read of the stats evens the two out when this file runs alone.
-      await call("GET", "/api/stats");
       await call("GET", "/api/stages");
       await call("GET", "/api/stages?x=1", { headers: agent });
 

@@ -133,4 +133,15 @@ func TestSQLite(t *testing.T) {
 	if err != nil || res.Changes != 1 {
 		t.Errorf("insert contact = %#v, %v", res, err)
 	}
+
+	// D1 binds a boolean as the number 1 or 0, a REAL like every JS number:
+	// a TEXT column keeps "1.0", an INTEGER one 1.
+	if _, err := db.Run(ctx, "INSERT INTO custom_field_defs (id, entity_type, key, label, custom_field, position) VALUES (?, ?, ?, ?, ?, ?)",
+		"d1", "deal", "k", true, false, true); err != nil {
+		t.Fatal(err)
+	}
+	row, err = db.Get(ctx, "SELECT label, custom_field, position FROM custom_field_defs WHERE id = ? AND position = ?", "d1", true)
+	if want := (db.Row{"label": "1.0", "custom_field": "0.0", "position": float64(1)}); err != nil || !reflect.DeepEqual(row, want) {
+		t.Errorf("booleans bound = %#v, %v; want %#v", row, err, want)
+	}
 }

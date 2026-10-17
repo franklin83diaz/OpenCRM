@@ -79,9 +79,10 @@ wait_for() {
   tail -n 20 "$P/$3.log" >&2 || true
   return 1
 }
-# Only discovery is ported to Go so far, so the Go server is probed on /llms.txt.
+# Both are probed on GET /api/stats, which also runs its backfill (a company
+# whose deal is won becomes a customer), so both start from the same data.
 wait_for $TS_PORT "TS server" ts /api/stats
-wait_for $GO_PORT "Go server" go /llms.txt
+wait_for $GO_PORT "Go server" go /api/stats
 
 # 4. Run.
 set +e

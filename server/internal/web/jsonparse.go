@@ -1,7 +1,6 @@
 package web
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -22,8 +21,9 @@ func (e *JSONSyntaxError) Error() string { return e.Message }
 // *JSONSyntaxError when it is not JSON (an empty body included). JSON null is
 // nil, which a route reading a property of it must treat as TS did (a TypeError).
 func JSONBody(r *http.Request) (any, error) {
-	// The fetch body's text() is a UTF-8 decode, which drops a leading BOM.
-	return ParseJSON(string(bytes.TrimPrefix(readBody(r), []byte("\xef\xbb\xbf"))))
+	// workerd's Request.json() parses the body with a leading BOM kept: such a
+	// body is not JSON ("Unexpected token '\ufeff', …"), as the parity run shows.
+	return ParseJSON(string(readBody(r)))
 }
 
 // ParseJSON is JSON.parse: maps, []any, float64, string, bool or nil. Numbers

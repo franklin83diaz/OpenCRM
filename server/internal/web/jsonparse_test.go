@@ -71,9 +71,14 @@ func TestParseJSONValues(t *testing.T) {
 }
 
 func TestJSONBody(t *testing.T) {
-	r := httptest.NewRequest("POST", "/", strings.NewReader("\xef\xbb\xbf{\"a\":1}"))
+	r := httptest.NewRequest("POST", "/", strings.NewReader("{\"a\":1}"))
 	v, err := web.JSONBody(r)
 	if err != nil || v.(map[string]any)["a"] != 1.0 {
+		t.Errorf("object body: %v, %v", v, err)
+	}
+	// workerd keeps a leading BOM, so the body isn't JSON.
+	r = httptest.NewRequest("POST", "/", strings.NewReader("\xef\xbb\xbf{\"a\":1}"))
+	if v, err := web.JSONBody(r); err == nil || err.Error() != "Unexpected token '\ufeff', \"\ufeff{\"a\":1}\" is not valid JSON" {
 		t.Errorf("BOM body: %v, %v", v, err)
 	}
 	r = httptest.NewRequest("POST", "/", strings.NewReader(""))
