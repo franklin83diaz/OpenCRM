@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"opencrm/internal/db"
 )
 
 // The Review Focus cases this port owns, against the Go server alone. The
@@ -102,5 +104,38 @@ func TestCompaniesBulkDeleteChunks(t *testing.T) {
 	row, err := rec.inner.Query(ctx, "SELECT id, partner_id FROM contacts ORDER BY id", nil)
 	if err != nil || len(row) != 2 || row[0]["partner_id"] != nil || row[1]["partner_id"] != "co-keep" {
 		t.Fatalf("relations after: %v %v", row, err)
+	}
+}
+
+// A body past the 25 MiB cap answers what a body that isn't JSON answers on
+// its route, even when its first 25 MiB are good JSON: the OpenAPI routes'
+// "Malformed JSON", the {error} of a route that read it with no .catch. And
+// nothing is written.
+func TestBodyPastTheCap(t *testing.T) {
+	api, signedIn := signedInAPI(t)
+	pad := strings.Repeat(" ", 25<<20)
+	for _, c := range []struct {
+		path, body string
+		status     int
+		answer     string
+	}{
+		{"/api/companies", `{"name":"Too big"}` + pad, 400, "Malformed JSON in request body"},
+		{"/api/activities", `{"entity_type":"company","entity_id":"x","body":"Too big"}` + pad, 500, `{"error":"Request body too large: the limit is 25 MiB"}`},
+	} {
+		r := httptest.NewRequest("POST", c.path, strings.NewReader(c.body))
+		r.Header.Set("Content-Type", "application/json")
+		for k, v := range signedIn {
+			r.Header.Set(k, v)
+		}
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, r)
+		if w.Code != c.status || w.Body.String() != c.answer {
+			t.Errorf("POST %s past the cap = %d %.200s; want %d %s", c.path, w.Code, w.Body.String(), c.status, c.answer)
+		}
+	}
+	for _, table := range []string{"companies", "activities"} {
+		if row, err := db.Get(context.Background(), "SELECT COUNT(*) AS n FROM "+table); err != nil || row["n"] != 0.0 {
+			t.Errorf("%s: %v, %v", table, row, err)
+		}
 	}
 }

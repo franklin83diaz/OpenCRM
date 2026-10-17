@@ -29,6 +29,25 @@ func TestJSONDoesNotEscapeHTML(t *testing.T) {
 	}
 }
 
+// What the API writes is only ever what its Content-Type says: a browser
+// doesn't sniff a JSON or text answer into something it would run.
+func TestAnswersAreNotSniffed(t *testing.T) {
+	for name, write := range map[string]func(w http.ResponseWriter) error{
+		"JSON": func(w http.ResponseWriter) error { return web.JSON(w, 200, map[string]any{"x": "<script>"}) },
+		"Text": func(w http.ResponseWriter) error {
+			return web.Text(w, 404, "text/plain; charset=UTF-8", "404 Not Found")
+		},
+	} {
+		rec := httptest.NewRecorder()
+		if err := write(rec); err != nil {
+			t.Fatal(err)
+		}
+		if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+			t.Errorf("%s: X-Content-Type-Options = %q", name, got)
+		}
+	}
+}
+
 // JSON.stringify writes NaN and ±Infinity as null; encoding/json refuses them.
 func TestJSONWritesNonFiniteNumbersAsNull(t *testing.T) {
 	type inner struct {
@@ -278,6 +297,66 @@ func TestRouterErrors(t *testing.T) {
 	want := []string{"GET /api/openapi.json", "GET /llms.txt", "GET /api/fails", "GET /api/panics", "GET /api/items/{id}"}
 	if got := app.(*web.Router).Patterns(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Patterns = %q; want %q", got, want)
+	}
+}
+
+// Every request body is capped at 25 MiB. One past the cap reads as a body
+// that isn't JSON, whatever its first 25 MiB say, so a route answers it as it
+// answers an unparseable body; and no more of it is read. A body at the cap
+// reads in full.
+func TestBodyCap(t *testing.T) {
+	if web.MaxBody != 25<<20 {
+		t.Errorf("MaxBody = %d; want 25 MiB", web.MaxBody)
+	}
+	type read struct {
+		body     any
+		jsonErr  error
+		raw      int
+		rawFirst bool
+	}
+	var got read
+	app := newApp(func(rt *web.Router) {
+		rt.Handle("POST /api/x", func(w http.ResponseWriter, r *http.Request) error {
+			got = read{}
+			got.body = web.Body(r)
+			_, got.jsonErr = web.JSONBody(r)
+			got.raw = len(web.RawBody(r))
+			return web.JSON(w, 200, struct{}{})
+		})
+		rt.Handle("POST /api/raw", func(w http.ResponseWriter, r *http.Request) error {
+			got = read{rawFirst: true, raw: len(web.RawBody(r))}
+			got.body = web.Body(r)
+			return web.JSON(w, 200, struct{}{})
+		})
+	})
+	post := func(path, body string) {
+		t.Helper()
+		r := httptest.NewRequest("POST", path, strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		app.ServeHTTP(rec, r)
+		if rec.Code != 200 {
+			t.Fatalf("POST %s = %d %s", path, rec.Code, rec.Body.String())
+		}
+	}
+
+	atCap := `{"a":1}` + strings.Repeat(" ", web.MaxBody-7)
+	post("/api/x", atCap)
+	if m, _ := got.body.(map[string]any); m["a"] != 1.0 || got.jsonErr != nil || got.raw != web.MaxBody {
+		t.Errorf("a body at the cap: %#v, %v, %d bytes", got.body, got.jsonErr, got.raw)
+	}
+
+	overCap := atCap + " "
+	for _, path := range []string{"/api/x", "/api/raw"} {
+		post(path, overCap)
+		if got.body != nil || got.raw != 0 {
+			t.Errorf("%s: a body past the cap reads as %#v, %d raw bytes; want nil, 0", path, got.body, got.raw)
+		}
+		if !got.rawFirst && !errors.Is(got.jsonErr, web.ErrBodyTooLarge) {
+			t.Errorf("%s: JSONBody past the cap: %v", path, got.jsonErr)
+		}
+	}
+	if web.ErrBodyTooLarge.Error() != "Request body too large: the limit is 25 MiB" {
+		t.Errorf("ErrBodyTooLarge = %q", web.ErrBodyTooLarge)
 	}
 }
 

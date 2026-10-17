@@ -202,6 +202,8 @@ func TestAuthWrongPasswordAndUnknownEmailLookAlike(t *testing.T) {
 		"too long":          map[string]any{"email": "ada@example.com", "password": testPassword + strings.Repeat("x", 80)},
 		"not JSON":          "email=ada@example.com",
 		"empty":             nil,
+		// A login reads at most 64 KiB: one past that isn't JSON, whatever it starts with.
+		"past 64 KiB": `{"email":"ada@example.com","password":"` + testPassword + `"}` + strings.Repeat(" ", 64<<10),
 	} {
 		res := a.do("POST", "/api/auth/login", body, nil)
 		if res.code != 401 || res.body != wrongLogin || res.header.Get("Set-Cookie") != "" {
@@ -244,11 +246,22 @@ func TestAuthLoginLimiter(t *testing.T) {
 	a.login("ada@example.com", testPassword) // other accounts are not locked
 }
 
+// With no accounts, a login says how to make the first one, whether the
+// secrets are missing or set to something that can't make an account.
 func TestAuthNoAccountsYet(t *testing.T) {
-	a := newAuthAPI(t, &App{})
-	res := a.do("POST", "/api/auth/login", map[string]any{"email": "ada@example.com", "password": testPassword}, nil)
-	if res.code != 503 || res.body != `{"error":"No accounts yet: set ADMIN_EMAIL and ADMIN_PASSWORD and restart the CRM"}` {
-		t.Errorf("login with no accounts = %s", res)
+	const noAccounts = `{"error":"No accounts yet: set ADMIN_EMAIL to an email address and ADMIN_PASSWORD to 8–72 characters, then restart the CRM"}`
+	for name, app := range map[string]*App{
+		"no secrets":          {},
+		"no password":         {AdminEmail: "ada@example.com"},
+		"not an email":        {AdminEmail: "ada", AdminPassword: testPassword},
+		"a short password":    {AdminEmail: "ada@example.com", AdminPassword: "short"},
+		"a too-long password": {AdminEmail: "ada@example.com", AdminPassword: strings.Repeat("x", 73)},
+	} {
+		a := newAuthAPI(t, app)
+		res := a.do("POST", "/api/auth/login", map[string]any{"email": "ada@example.com", "password": testPassword}, nil)
+		if res.code != 503 || res.body != noAccounts {
+			t.Errorf("%s: login with no accounts = %s", name, res)
+		}
 	}
 }
 
@@ -771,6 +784,71 @@ func TestAuthLoginWhenBcryptIsBusy(t *testing.T) {
 	if w.Code != 429 || w.Body.String() != tooMany {
 		t.Errorf("create user with bcrypt busy = %d %s", w.Code, w.Body.String())
 	}
+}
+
+// A login refused because no bcrypt slot came free checked no password, so
+// it counts against neither the address's attempts nor the email's failures:
+// a flood that keeps bcrypt busy locks nobody out. Both places a login can
+// find bcrypt busy: making the first admin, and checking the password.
+func TestAuthBusyLoginsDontCount(t *testing.T) {
+	now := time.Now()
+	a := newAuthAPI(t, &App{AdminEmail: "ada@example.com", AdminPassword: testPassword, Now: func() time.Time { return now }})
+	from := map[string]string{"CF-Connecting-IP": "203.0.113.9"}
+	login := func(password string) response {
+		return a.do("POST", "/api/auth/login", map[string]any{"email": "ada@example.com", "password": password}, from)
+	}
+	busyLogins := func() {
+		t.Helper()
+		var releases []func()
+		for i := 0; i < 2; i++ {
+			release, err := auth.AcquireBcryptSlot(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			releases = append(releases, release)
+		}
+		defer func() {
+			for _, release := range releases {
+				release()
+			}
+		}()
+		body, _ := json.Marshal(map[string]any{"email": "ada@example.com", "password": testPassword})
+		for i := 0; i < 12; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			r := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(body)).WithContext(ctx)
+			r.Header.Set("Content-Type", "application/json")
+			r.Header.Set("CF-Connecting-IP", from["CF-Connecting-IP"])
+			w := httptest.NewRecorder()
+			a.h.ServeHTTP(w, r)
+			cancel()
+			if w.Code != 429 || w.Body.String() != tooMany {
+				t.Fatalf("busy login %d = %d %s", i+1, w.Code, w.Body.String())
+			}
+		}
+	}
+	// Then the whole allowance is left: 9 failures and the right password,
+	// from the same address, at the same email.
+	allowanceLeft := func(what string) {
+		t.Helper()
+		for i := 0; i < 9; i++ {
+			if res := login("wrong-password"); res.code != 401 {
+				t.Fatalf("after busy logins (%s), failure %d = %s", what, i+1, res)
+			}
+		}
+		if res := login(testPassword); res.code != 200 {
+			t.Fatalf("after busy logins (%s), the right password = %s", what, res)
+		}
+	}
+
+	busyLogins() // no accounts yet: the first admin can't be made
+	if n := a.count("users"); n != 0 {
+		t.Fatalf("%d users made while bcrypt was busy", n)
+	}
+	allowanceLeft("making the first admin")
+
+	now = now.Add(16 * time.Minute) // past both windows
+	busyLogins()                    // the admin exists: the password can't be checked
+	allowanceLeft("checking the password")
 }
 
 // Only a signed-in person or an API token may write tasks: the "agent" caller

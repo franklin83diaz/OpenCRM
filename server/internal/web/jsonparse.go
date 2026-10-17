@@ -18,12 +18,17 @@ type JSONSyntaxError struct{ Message string }
 func (e *JSONSyntaxError) Error() string { return e.Message }
 
 // JSONBody is c.req.json() without a .catch: the parsed body, or a
-// *JSONSyntaxError when it is not JSON (an empty body included). JSON null is
-// nil, which a route reading a property of it must treat as TS did (a TypeError).
+// *JSONSyntaxError when it is not JSON (an empty body included), or
+// ErrBodyTooLarge past its cap. JSON null is nil, which a route reading a
+// property of it must treat as TS did (a TypeError).
 func JSONBody(r *http.Request) (any, error) {
+	raw, tooLarge := readBody(r)
+	if tooLarge {
+		return nil, ErrBodyTooLarge
+	}
 	// workerd's Request.json() parses the body with a leading BOM kept: such a
 	// body is not JSON ("Unexpected token '\ufeff', …"), as the parity run shows.
-	return ParseJSON(string(readBody(r)))
+	return ParseJSON(string(raw))
 }
 
 // ParseJSON is JSON.parse: maps, []any, float64, string, bool or nil. Numbers

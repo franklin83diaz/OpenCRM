@@ -8,7 +8,8 @@ import (
 
 // Limiter slows down password guessing: at most 10 login attempts a minute
 // from one address, and 10 attempts in 15 minutes at one email that didn't end
-// in a successful sign-in; and, apart from those, 10 tries in 15 minutes at an
+// in a successful sign-in (an attempt that never checked a password is taken
+// back: Unchecked); and, apart from those, 10 tries in 15 minutes at an
 // account's current password when changing it. It lives in memory, which is
 // right because the API runs as a single container instance (max_instances =
 // 1); a restart (the container sleeping after 10 idle minutes, or a deploy)
@@ -20,6 +21,7 @@ type Limiter struct {
 	emails    window
 	changes   window
 	lastSweep time.Time
+	attempts  uint64 // numbers each counted attempt, for Unchecked
 }
 
 const (
@@ -37,32 +39,53 @@ func NewLimiter(now func() time.Time) *Limiter {
 	}
 	return &Limiter{
 		now:    now,
-		ips:    window{limit: ipAttempts, period: ipPeriod, hits: map[string][]time.Time{}},
-		emails: window{limit: emailFailures, period: emailPeriod, hits: map[string][]time.Time{}},
+		ips:    window{limit: ipAttempts, period: ipPeriod, hits: map[string][]hit{}},
+		emails: window{limit: emailFailures, period: emailPeriod, hits: map[string][]hit{}},
 		// The same allowance as an email's, but its own: someone locking an
 		// email out of signing in can't stop its owner, signed in, from
 		// changing the password.
-		changes: window{limit: emailFailures, period: emailPeriod, hits: map[string][]time.Time{}},
+		changes: window{limit: emailFailures, period: emailPeriod, hits: map[string][]hit{}},
 	}
 }
 
-// Allow is whether an attempt to sign in as email from ip may go ahead. An
-// allowed attempt counts against ip right away, and against email until
-// Succeeded clears it: counting it before the password is checked means a
-// burst of parallel guesses can't all slip in before the first one fails.
-// A refused attempt counts against nothing.
-func (l *Limiter) Allow(ip, email string) bool {
+// Attempt is a sign-in attempt Allow let through, for Unchecked.
+type Attempt struct {
+	ip, email string
+	n         uint64
+}
+
+// Allow is whether an attempt to sign in as email from ip may go ahead, and
+// that attempt. An allowed attempt counts against ip right away, and against
+// email until Succeeded clears it: counting it before the password is checked
+// means a burst of parallel guesses can't all slip in before the first one
+// fails. A refused attempt counts against nothing.
+func (l *Limiter) Allow(ip, email string) (Attempt, bool) {
 	ip, email = client(ip), cut(email)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := l.now()
 	l.sweep(now)
 	if l.ips.full(ip, now) || l.emails.full(email, now) {
-		return false
+		return Attempt{}, false
 	}
-	l.ips.add(ip, now)
-	l.emails.add(email, now)
-	return true
+	l.attempts++
+	l.ips.add(ip, now, l.attempts)
+	l.emails.add(email, now, l.attempts)
+	return Attempt{ip: ip, email: email, n: l.attempts}, true
+}
+
+// Unchecked takes back an attempt that ended without checking a password (no
+// bcrypt slot came free, the CRM has no accounts yet): only a guess counts,
+// against its address or its email. It takes back that attempt alone, if it
+// still counts; calling it again does nothing.
+func (l *Limiter) Unchecked(a Attempt) {
+	if a.n == 0 {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.ips.remove(a.ip, a.n)
+	l.emails.remove(a.email, a.n)
 }
 
 // Succeeded forgets email's attempts: its owner signed in.
@@ -83,7 +106,7 @@ func (l *Limiter) AllowPasswordChange(userID string) bool {
 	if l.changes.full(userID, now) {
 		return false
 	}
-	l.changes.add(userID, now)
+	l.changes.add(userID, now, 0)
 	return true
 }
 
@@ -138,18 +161,25 @@ func cut(key string) string {
 type window struct {
 	limit  int
 	period time.Duration
-	hits   map[string][]time.Time
+	hits   map[string][]hit
+}
+
+// hit is one counted attempt: when, and its number (Limiter.attempts; 0 for
+// a password-change try, which is never taken back).
+type hit struct {
+	at time.Time
+	n  uint64
 }
 
 // recent is key's hits within the period, oldest first, and stores them back.
-func (w *window) recent(key string, now time.Time) []time.Time {
+func (w *window) recent(key string, now time.Time) []hit {
 	hits := w.hits[key]
 	i := 0
-	for i < len(hits) && now.Sub(hits[i]) >= w.period {
+	for i < len(hits) && now.Sub(hits[i].at) >= w.period {
 		i++
 	}
 	if i > 0 {
-		hits = append([]time.Time(nil), hits[i:]...)
+		hits = append([]hit(nil), hits[i:]...)
 		if len(hits) == 0 {
 			delete(w.hits, key)
 		} else {
@@ -163,17 +193,33 @@ func (w *window) full(key string, now time.Time) bool {
 	return len(w.recent(key, now)) >= w.limit
 }
 
-func (w *window) add(key string, now time.Time) {
-	hits := append(w.recent(key, now), now)
+func (w *window) add(key string, now time.Time, n uint64) {
+	hits := append(w.recent(key, now), hit{now, n})
 	if len(hits) > w.limit {
 		hits = hits[len(hits)-w.limit:]
 	}
 	w.hits[key] = hits
 }
 
+// remove drops attempt n from key's hits, if it is there.
+func (w *window) remove(key string, n uint64) {
+	hits := w.hits[key]
+	for i, h := range hits {
+		if h.n == n {
+			hits = append(hits[:i:i], hits[i+1:]...)
+			if len(hits) == 0 {
+				delete(w.hits, key)
+			} else {
+				w.hits[key] = hits
+			}
+			return
+		}
+	}
+}
+
 func (w *window) sweep(now time.Time) {
 	for key, hits := range w.hits {
-		if len(hits) == 0 || now.Sub(hits[len(hits)-1]) >= w.period {
+		if len(hits) == 0 || now.Sub(hits[len(hits)-1].at) >= w.period {
 			delete(w.hits, key)
 		}
 	}

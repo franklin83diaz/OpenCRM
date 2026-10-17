@@ -89,49 +89,50 @@ func TestNewSecret(t *testing.T) {
 func TestLimiter(t *testing.T) {
 	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
 	l := auth.NewLimiter(func() time.Time { return now })
+	allow := func(ip, email string) bool { _, ok := l.Allow(ip, email); return ok }
 
 	// 10 attempts a minute from one address, whatever the email.
 	for i := 0; i < 10; i++ {
-		if !l.Allow("1.1.1.1", "a"+string(rune('a'+i))+"@x") {
+		if !allow("1.1.1.1", "a"+string(rune('a'+i))+"@x") {
 			t.Fatalf("attempt %d refused", i+1)
 		}
 	}
-	if l.Allow("1.1.1.1", "new@x") {
+	if allow("1.1.1.1", "new@x") {
 		t.Error("11th attempt in a minute allowed")
 	}
-	if !l.Allow("2.2.2.2", "new@x") {
+	if !allow("2.2.2.2", "new@x") {
 		t.Error("another address is refused")
 	}
 	now = now.Add(61 * time.Second)
-	if !l.Allow("1.1.1.1", "new2@x") {
+	if !allow("1.1.1.1", "new2@x") {
 		t.Error("still refused a minute later")
 	}
 
 	// 10 failures in 15 minutes for one email, from any addresses.
 	for i := 0; i < 10; i++ {
-		if !l.Allow("10.0.0."+string(rune('0'+i)), "ada@example.com") {
+		if !allow("10.0.0."+string(rune('0'+i)), "ada@example.com") {
 			t.Fatalf("failure %d refused", i+1)
 		}
 		now = now.Add(time.Minute)
 	}
-	if l.Allow("9.9.9.9", "ada@example.com") {
+	if allow("9.9.9.9", "ada@example.com") {
 		t.Error("11th try for one email in 15 minutes allowed")
 	}
 	now = now.Add(6 * time.Minute) // the first failure is now 16 minutes old
-	if !l.Allow("9.9.9.9", "ada@example.com") {
+	if !allow("9.9.9.9", "ada@example.com") {
 		t.Error("still refused once the oldest failure left the window")
 	}
 
 	// An IPv6 client holds a whole /64: its addresses share one count.
 	for i := 0; i < 10; i++ {
-		if !l.Allow(fmt.Sprintf("2001:db8:1:2::%x", i+1), fmt.Sprintf("v6-%d@x", i)) {
+		if !allow(fmt.Sprintf("2001:db8:1:2::%x", i+1), fmt.Sprintf("v6-%d@x", i)) {
 			t.Fatalf("IPv6 attempt %d refused", i+1)
 		}
 	}
-	if l.Allow("2001:db8:1:2:ffff::1", "v6-new@x") {
+	if allow("2001:db8:1:2:ffff::1", "v6-new@x") {
 		t.Error("another address in the same /64 is a new client")
 	}
-	if !l.Allow("2001:db8:1:3::1", "v6-new@x") || !l.Allow("10.1.1.1", "v6-new2@x") {
+	if !allow("2001:db8:1:3::1", "v6-new@x") || !allow("10.1.1.1", "v6-new2@x") {
 		t.Error("another /64 (or IPv4 address) is refused")
 	}
 
@@ -154,21 +155,85 @@ func TestLimiter(t *testing.T) {
 		t.Error("a change doesn't forget the tries")
 	}
 	for i := 0; i < 10; i++ {
-		l.Allow("6.6.6."+string(rune('0'+i)), "locked@example.com")
+		allow("6.6.6."+string(rune('0'+i)), "locked@example.com")
 	}
-	if l.Allow("5.5.5.5", "locked@example.com") || !l.AllowPasswordChange("u-locked") {
+	if allow("5.5.5.5", "locked@example.com") || !l.AllowPasswordChange("u-locked") {
 		t.Error("the login and password-change counts are not apart")
 	}
 
 	// A success forgets the email's failures.
 	for i := 0; i < 9; i++ {
-		l.Allow("8.8.8."+string(rune('0'+i)), "bo@example.com")
+		allow("8.8.8."+string(rune('0'+i)), "bo@example.com")
 	}
 	l.Succeeded("bo@example.com")
 	for i := 0; i < 10; i++ {
-		if !l.Allow("7.7.7."+string(rune('0'+i)), "bo@example.com") {
+		if !allow("7.7.7."+string(rune('0'+i)), "bo@example.com") {
 			t.Fatalf("after a success, attempt %d refused", i+1)
 		}
+	}
+}
+
+// An attempt that ended without checking a password (no bcrypt slot came
+// free, no accounts yet) is taken back: it counts against neither its address
+// nor its email. Exactly that attempt, not a newer one.
+func TestLimiterUncheckedAttempts(t *testing.T) {
+	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
+	l := auth.NewLimiter(func() time.Time { return now })
+	allow := func(ip, email string) bool { _, ok := l.Allow(ip, email); return ok }
+
+	for i := 0; i < 25; i++ {
+		a, ok := l.Allow("1.1.1.1", "ada@example.com")
+		if !ok {
+			t.Fatalf("unchecked attempt %d refused", i+1)
+		}
+		l.Unchecked(a)
+		l.Unchecked(a) // twice is once
+	}
+	// Both whole allowances are left.
+	for i := 0; i < 10; i++ {
+		if !allow("1.1.1.1", "ada@example.com") {
+			t.Fatalf("after unchecked attempts, attempt %d refused", i+1)
+		}
+	}
+	if allow("1.1.1.1", "bo@example.com") {
+		t.Error("11th attempt from the address allowed")
+	}
+	if allow("2.2.2.2", "ada@example.com") {
+		t.Error("11th attempt at the email allowed")
+	}
+
+	// Taken back is the attempt itself: a newer one at the same address and
+	// email keeps counting, until a minute after it was made.
+	now = now.Add(15 * time.Minute)
+	older, _ := l.Allow("3.3.3.3", "cy@example.com")
+	now = now.Add(30 * time.Second)
+	if !allow("3.3.3.3", "cy@example.com") {
+		t.Fatal("second attempt refused")
+	}
+	l.Unchecked(older)
+	now = now.Add(31 * time.Second) // the older one would have left the minute by now
+	for i := 0; i < 9; i++ {
+		if !allow("3.3.3.3", fmt.Sprintf("cy%d@example.com", i)) {
+			t.Fatalf("attempt %d refused", i+2)
+		}
+	}
+	if allow("3.3.3.3", "cy-new@example.com") {
+		t.Error("the newer attempt was taken back instead of the older")
+	}
+
+	// After a success cleared the email's failures, taking back an attempt
+	// from before it leaves the failures since alone.
+	now = now.Add(15 * time.Minute)
+	before, _ := l.Allow("4.4.4.4", "dee@example.com")
+	l.Succeeded("dee@example.com")
+	for i := 0; i < 10; i++ {
+		if !allow(fmt.Sprintf("5.5.5.%d", i), "dee@example.com") {
+			t.Fatalf("failure %d refused", i+1)
+		}
+	}
+	l.Unchecked(before)
+	if allow("6.6.6.6", "dee@example.com") {
+		t.Error("taking back an attempt from before the success forgave a failure after it")
 	}
 }
 
@@ -447,7 +512,8 @@ func TestLimiterKeysFromRequests(t *testing.T) {
 		if ipv6 != "" {
 			r.Header.Set("CF-Connecting-IPv6", ipv6)
 		}
-		return l.Allow(auth.ClientIP(r), fmt.Sprintf("k%d-%s@x", i, ip))
+		_, ok := l.Allow(auth.ClientIP(r), fmt.Sprintf("k%d-%s@x", i, ip))
+		return ok
 	}
 	// Class E + IPv6: each request a different pseudo address, one /64.
 	for i := 0; i < 10; i++ {

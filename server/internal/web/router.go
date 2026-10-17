@@ -14,6 +14,7 @@ type HandlerFunc func(w http.ResponseWriter, r *http.Request) error
 // Router dispatches on Go 1.22 patterns ("GET /api/companies/{id}").
 // Unlike http.ServeMux it never answers 405 or redirects: anything that is not
 // a registered route goes to the not-found handler, which is what Hono did.
+// Every request body is capped at MaxBody.
 type Router struct {
 	mux      *http.ServeMux
 	notFound HandlerFunc
@@ -44,6 +45,9 @@ func (rt *Router) Patterns() []string { return append([]string(nil), rt.patterns
 func (rt *Router) NotFound(h HandlerFunc) { rt.notFound = h }
 
 func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Body != nil && r.Body != http.NoBody {
+		r.Body = http.MaxBytesReader(w, r.Body, MaxBody)
+	}
 	// For a wrong method ServeMux.Handler hands back its 405 handler with an
 	// empty pattern, and for an uncleaned path ("//", "/x/..") or a missing
 	// trailing slash a redirect; Hono answered all of those with its not-found.

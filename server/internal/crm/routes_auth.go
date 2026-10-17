@@ -30,7 +30,7 @@ import (
 const (
 	errWrongLogin      = "Wrong email or password"
 	errTooMany         = "Too many attempts. Try again in a few minutes."
-	errNoAccounts      = "No accounts yet: set ADMIN_EMAIL and ADMIN_PASSWORD and restart the CRM"
+	errNoAccounts      = "No accounts yet: set ADMIN_EMAIL to an email address and ADMIN_PASSWORD to 8–72 characters, then restart the CRM"
 	errCurrentPassword = "Your current password is wrong"
 	errAdminsOnly      = "Only an admin can manage accounts"
 	errSessionsOnly    = "Sign in with your password to manage accounts and tokens"
@@ -238,16 +238,25 @@ func (app *App) BootstrapToken(ctx context.Context, secret string) error {
 // login signs in with {email, password}: the account and a session cookie.
 // A wrong password, an unknown email and a disabled account get the same
 // answer after the same work (one bcrypt check), so it doesn't say which
-// emails have accounts. Attempts are limited per address and per email.
+// emails have accounts. Attempts are limited per address and per email, and
+// only one that checked a password counts: a login that ended before that
+// (bcrypt busy, 429; no accounts yet, 503; a database error) is taken back.
 func (app *App) login(w http.ResponseWriter, r *http.Request) error {
 	r.Body = http.MaxBytesReader(w, r.Body, maxLoginBody)
 	body := web.Object(web.Body(r))
 	email, _ := accountEmail(body["email"])
 	password, _ := body["password"].(string)
 	ctx := r.Context()
-	if !app.limiter().Allow(auth.ClientIP(r), email) {
+	attempt, ok := app.limiter().Allow(auth.ClientIP(r), email)
+	if !ok {
 		return jsonError(w, http.StatusTooManyRequests, errTooMany)
 	}
+	checked := false
+	defer func() {
+		if !checked {
+			app.limiter().Unchecked(attempt)
+		}
+	}()
 	if err := app.ensureAdmin(ctx); errors.Is(err, auth.ErrBusy) {
 		return jsonError(w, http.StatusTooManyRequests, errTooMany)
 	} else if err != nil {
@@ -270,13 +279,14 @@ func (app *App) login(w http.ResponseWriter, r *http.Request) error {
 	if row != nil {
 		hash, _ = row["password_hash"].(string)
 	}
-	ok, err := auth.CheckPassword(ctx, hash, password)
+	ok, err = auth.CheckPassword(ctx, hash, password)
 	if errors.Is(err, auth.ErrBusy) {
 		return jsonError(w, http.StatusTooManyRequests, errTooMany)
 	}
 	if err != nil {
 		return err
 	}
+	checked = true
 	if !ok || row == nil || js.Number(row["disabled"]) != 0 {
 		return jsonError(w, http.StatusUnauthorized, errWrongLogin)
 	}
