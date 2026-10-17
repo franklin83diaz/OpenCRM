@@ -6,11 +6,6 @@
  },
  {
   "method": "GET",
-  "path": "/api/widgets",
-  "summary": "Dashboard widgets: a bounded summary of this app for the current caller"
- },
- {
-  "method": "GET",
   "path": "/api/companies",
   "summary": "List companies with pagination, search, and filtering"
  },
@@ -137,7 +132,7 @@
  {
   "method": "GET",
   "path": "/api/customers",
-  "summary": "How each customer is doing (worst first), what to do first, and calls with customers in the next 7 days"
+  "summary": "How each customer is doing (worst first) and why, what to do first, and what the CRM can see of calls and email"
  },
  {
   "method": "GET",

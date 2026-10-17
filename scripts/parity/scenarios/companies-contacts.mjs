@@ -1,5 +1,5 @@
-// Companies and contacts area: dashboard stats and widgets, and the companies
-// and contacts lists (pagination, sort incl. relation and count: sorts, search,
+// Companies and contacts area: dashboard stats, and the companies and
+// contacts lists (pagination, sort incl. relation and count: sorts, search,
 // ?filters= JSON with tz, footer aggregates), create, update, delete and
 // bulk-delete. Later calls use the ids earlier creates returned (ids are
 // numbered per scenario by first appearance).
@@ -18,7 +18,7 @@
 // and detaching relations on delete are the TS-replay test in
 // server/internal/crm (companies_contacts_ts_test.go). So are paths that end
 // in a database error (a NaN page, a foreign key), whose message is D1's in TS
-// and SQLite's here, and widgets that fail their schema (the seed's pass).
+// and SQLite's here.
 // "Cedar & Co <b>" coming back unescaped is asserted on the raw bytes in
 // routes_companies_test.go: this runner compares parsed JSON.
 
@@ -32,18 +32,14 @@ const idOf = (res, key) => res.body?.[key]?.id ?? `missing-${key}`;
 
 export default [
   {
-    name: "stats and widgets",
+    name: "stats",
     run: async (call) => {
       // The first read gives Northline its customer_since (its contact's won deal).
       await call("GET", "/api/stats");
       await call("GET", "/api/stats?x=1");
-      await call("GET", "/api/widgets");
-      await call("GET", "/api/widgets?x=1");
       // Other methods and paths are not routes.
       await call("POST", "/api/stats", { body: {} });
       await call("GET", "/api/stats/");
-      await call("POST", "/api/widgets", { body: {} });
-      await call("GET", "/api/widgets/x");
     },
   },
   {

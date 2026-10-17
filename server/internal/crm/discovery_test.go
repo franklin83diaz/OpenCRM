@@ -13,10 +13,12 @@ import (
 	"opencrm/internal/db/dbtest"
 )
 
-// The routes that existed only for Clawnify, the integrations (Gmail,
-// Calendar, Slack, Granola) and AI. The CRM no longer has them: each answers
-// the not-found JSON, and the discovery documents don't list them.
+// The routes that existed only for Clawnify (its dashboard's widgets), the
+// integrations (Gmail, Calendar, Slack, Granola) and AI. The CRM no longer
+// has them: each answers the not-found JSON, and the discovery documents
+// don't list them.
 var removedRoutes = []string{
+	"GET /api/widgets",
 	"GET /api/integrations/status",
 	"POST /api/integrations/email",
 	"POST /api/integrations/meeting",
@@ -48,7 +50,7 @@ var removedRoutes = []string{
 
 // removedPrefixes are the paths no discovery document may mention anywhere.
 var removedPrefixes = []string{
-	"/api/integrations", "/api/email-sync", "/emails", "/api/meetings", "/api/insights", "/api/ai-columns",
+	"/api/widgets", "/api/integrations", "/api/email-sync", "/emails", "/api/meetings", "/api/insights", "/api/ai-columns",
 }
 
 var pathParam = regexp.MustCompile(`\{[^}]*\}|:[A-Za-z_]+`)

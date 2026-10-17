@@ -1,15 +1,14 @@
 // Generates companies_contacts_ts.json: scenarios (seed, steps) and what the
-// TS routes at 0068887 answered — GET /api/stats, GET /api/widgets and the
-// companies and contacts routes (list, aggregates, create, update, delete,
-// bulk-delete) — with every SQL statement and its params.
+// TS routes at 0068887 answered — GET /api/stats and the companies and
+// contacts routes (list, aggregates, create, update, delete, bulk-delete) —
+// with every SQL statement and its params.
 // companies_contacts_ts_test.go replays each scenario through the Go server
 // and wants the same.
 //
 // These are what the parity scenario (scripts/parity/scenarios/
 // companies-contacts.mjs) can't reach: custom fields (no ported route creates
 // them yet), relations, database errors (whose text is D1's there and
-// SQLite's here), widgets that fail their schema, and the statements a bulk
-// delete of 150 ids runs.
+// SQLite's here), and the statements a bulk delete of 150 ids runs.
 //
 // Run from the repository root (needs node 22, and the TS backend's own
 // node_modules: scripts/parity/run.sh installs them in .parity/ts-ref):
@@ -77,9 +76,8 @@ initDB({ DB: d1 }); // the app's middleware does this per request; the custom-fi
 
 type Step =
   // dbError: the answer is a database error, whose text differs between
-  // node:sqlite and SQLite in Go: only the status is compared. days: dates
-  // (the widgets' weeks) depend on the day it runs. raw: compare the bytes.
-  | { op: "request"; method: string; path: string; body?: unknown; headers?: Record<string, string>; dbError?: boolean; days?: boolean; raw?: boolean }
+  // node:sqlite and SQLite in Go: only the status is compared.
+  | { op: "request"; method: string; path: string; body?: unknown; headers?: Record<string, string>; dbError?: boolean }
   | { op: "field"; input: Record<string, unknown> }
   | { op: "relation"; input: Record<string, unknown> }
   | { op: "sql"; sql: string };
@@ -331,30 +329,6 @@ const scenarios: Scenario[] = [
       req("POST", "/api/contacts", { first_name: "X", company_id: "no-such-company" }, { dbError: true }),
       req("PUT", "/api/contacts/ct-ann", { company_id: "no-such-company" }, { dbError: true }),
       get("/api/contacts?sort=first_name&order=asc"),
-    ],
-  },
-  {
-    name: "widgets",
-    seed: [
-      ...seed,
-      `INSERT INTO stages (key, label, color, position, is_won, is_lost) VALUES
-        ('long', '${"A".repeat(79)}😀 and more', 'amber', 2, 0, 0)`,
-      `INSERT INTO deals (id, name, value, stage, created_at) VALUES
-        ('d-5', 'Long ${"b".repeat(73)}🎉🎉', 1234567.5, 'long', '2020-02-01 00:00:00'),
-        ('d-6', 'Odd', -2.5, 'long', '2020-02-02 00:00:00'),
-        ('d-7', 'Half', 0.5, 'prospect', '2020-02-03 00:00:00'),
-        ('d-8', 'Nothing', NULL, 'prospect', '2019-12-31 00:00:00'),
-        ('d-9', 'Text', 'abc', 'prospect', '2020-02-05 00:00:00'),
-        ('d-10', 'Big', 1152921504606846976, 'qualified', '2020-02-06 00:00:00')`,
-    ],
-    steps: [
-      get("/api/widgets", { days: true, raw: true }),
-      { op: "sql", sql: "UPDATE deals SET name = '' WHERE id IN ('d-6', 'd-10')" },
-      { op: "sql", sql: "UPDATE deals SET value = 1e80 WHERE id = 'd-7'" },
-      { op: "sql", sql: "UPDATE stages SET label = '' WHERE key = 'prospect'" },
-      get("/api/widgets", { raw: true }),
-      { op: "sql", sql: "UPDATE deals SET name = '' WHERE id IN ('d-5', 'd-9')" },
-      get("/api/widgets", { raw: true }),
     ],
   },
 ];

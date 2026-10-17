@@ -17,15 +17,15 @@ import (
 )
 
 // testdata/companies_contacts_ts.json holds scenarios (seed, steps) and what
-// the TS routes at 0068887 answered — stats, widgets, and the companies and
-// contacts lists, aggregates and writes — with every SQL statement and its
+// the TS routes at 0068887 answered — stats, and the companies and contacts
+// lists, aggregates and writes — with every SQL statement and its
 // params: run by testdata/companies_contacts_ts.gen.mts, the whole Hono app
 // under node with @clawnify/db over node:sqlite and crypto.randomUUID handing
 // out ids in creation order. This test replays each scenario through the Go
 // server (New) and wants the same. They cover what the parity scenario can't
-// reach: custom fields and relations, database errors, widgets that fail
-// their schema, and the statements of chunked bulk deletes. The expectations
-// are frozen: the TS source goes away once the port is done.
+// reach: custom fields and relations, database errors, and the statements of
+// chunked bulk deletes. The expectations are frozen: the TS source goes away
+// once the port is done.
 
 type ccStep struct {
 	Op      string            `json:"op"`
@@ -34,8 +34,7 @@ type ccStep struct {
 	Body    json.RawMessage   `json:"body"`
 	Headers map[string]string `json:"headers"`
 	DBError bool              `json:"dbError"`
-	Days    bool              `json:"days"`
-	Raw     bool              `json:"raw"`
+	Raw     bool              `json:"raw"` // compare the bytes
 	Input   map[string]any    `json:"input"`
 	SQL     string            `json:"sql"`
 }
@@ -58,10 +57,7 @@ type ccScenario struct {
 	} `json:"expect"`
 }
 
-var (
-	sqliteStamp = regexp.MustCompile(`\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)
-	isoDayShape = regexp.MustCompile(`\d{4}-\d{2}-\d{2}`)
-)
+var sqliteStamp = regexp.MustCompile(`\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)
 
 // sequentialUUIDs hands out ids in creation order, as the generator did.
 func sequentialUUIDs(t *testing.T) {
@@ -161,26 +157,18 @@ func TestCompaniesContactsMatchTS(t *testing.T) {
 
 			// Timestamps the seed wrote are compared; datetime('now') ones are not.
 			fixed := map[string]bool{}
-			days := false
 			for _, s := range sc.Seed {
 				for _, m := range sqliteStamp.FindAllString(s, -1) {
 					fixed[m] = true
 				}
 			}
-			for _, st := range sc.Steps {
-				days = days || st.Days
-			}
-			norm := func(s string, days bool) string {
-				s = sqliteStamp.ReplaceAllStringFunc(s, func(m string) string {
+			norm := func(s string) string {
+				return sqliteStamp.ReplaceAllStringFunc(s, func(m string) string {
 					if fixed[m] {
 						return m
 					}
 					return "<now>"
 				})
-				if days {
-					s = isoDayShape.ReplaceAllString(s, "<day>")
-				}
-				return s
 			}
 
 			for i, st := range sc.Steps {
@@ -202,7 +190,7 @@ func TestCompaniesContactsMatchTS(t *testing.T) {
 						t.Fatalf("step %d (%s %s): %v", i, st.Op, st.Input["key"], err)
 					}
 					got, _ := json.Marshal(def)
-					if g, w := norm(canonicalJSON(string(got)), false), norm(canonicalJSON(string(want.Def)), false); g != w {
+					if g, w := norm(canonicalJSON(string(got))), norm(canonicalJSON(string(want.Def))); g != w {
 						t.Errorf("step %d (%s %s)\n got  %s\n want %s", i, st.Op, st.Input["key"], g, w)
 					}
 				case "request":
@@ -237,11 +225,11 @@ func TestCompaniesContactsMatchTS(t *testing.T) {
 							t.Errorf("%s: want a database error, got %s", label, got)
 						}
 					case st.Raw:
-						if g, wt := norm(got, st.Days), norm(want.Body, st.Days); g != wt {
+						if g, wt := norm(got), norm(want.Body); g != wt {
 							t.Errorf("%s\n got  %s\n want %s", label, g, wt)
 						}
 					default:
-						if g, wt := norm(canonicalJSON(got), false), norm(canonicalJSON(want.Body), false); g != wt {
+						if g, wt := norm(canonicalJSON(got)), norm(canonicalJSON(want.Body)); g != wt {
 							t.Errorf("%s\n got  %s\n want %s", label, g, wt)
 						}
 					}
@@ -256,10 +244,10 @@ func TestCompaniesContactsMatchTS(t *testing.T) {
 			for i := 0; i < len(got) || i < len(sc.Expect.Statements); i++ {
 				var g, w string
 				if i < len(got) {
-					g = norm(canonical(tsStatement{got[i].SQL, finiteParams(got[i].Params)}), days)
+					g = norm(canonical(tsStatement{got[i].SQL, finiteParams(got[i].Params)}))
 				}
 				if i < len(sc.Expect.Statements) {
-					w = norm(canonical(sc.Expect.Statements[i]), days)
+					w = norm(canonical(sc.Expect.Statements[i]))
 				}
 				if g != w {
 					t.Fatalf("statement %d of %d\n got  %s\n want %s", i, len(sc.Expect.Statements), g, w)

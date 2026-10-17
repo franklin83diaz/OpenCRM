@@ -7,7 +7,6 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 
 ## API
 - `GET /api/stats` — Get dashboard statistics
-- `GET /api/widgets` — Dashboard widgets: a bounded summary of this app for the current caller
 - `GET /api/companies` — List companies with pagination, search, and filtering
 - `POST /api/companies` — Create a new company
 - `PUT /api/companies/{id}` — Update a company
@@ -33,7 +32,7 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 - `PUT /api/tasks/{id}` — Update a task, or mark it done (done: true) or open again (done: false)
 - `DELETE /api/tasks/{id}` — Delete a task
 - `POST /api/deals/{id}/updates` — Log what happened on a deal, what it finished, and its next step
-- `GET /api/customers` — How each customer is doing (worst first), what to do first, and calls with customers in the next 7 days
+- `GET /api/customers` — How each customer is doing (worst first) and why, what to do first, and what the CRM can see of calls and email
 - `GET /api/lookup` — What the CRM knows about an email address before someone writes to it
 - `POST /api/lookup` — What the CRM knows about up to 100 addresses at once
 - `GET /api/companies/aggregates`
