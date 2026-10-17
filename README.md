@@ -51,6 +51,18 @@ pnpm dev
 
 Open `http://localhost:5175` in your browser and sign in with the email and password from `.dev.vars`: the first sign-in creates that admin. Data persists in the local D1 database under `.wrangler/state`.
 
+### A faster loop for Go changes
+
+Under `pnpm dev`, every change to the Go code means a new container image, built with Docker. While you work on the API, run it natively instead, on the same local database, and point Vite at it:
+
+```bash
+pnpm db:migrate        # once: the local D1 database
+ls .wrangler/state/v3/d1/miniflare-D1DatabaseObject/[0-9a-f]*.sqlite   # its file (not metadata.sqlite)
+cd server && go run ./cmd/devserver -sqlite ../.wrangler/state/v3/d1/miniflare-D1DatabaseObject/<that file>.sqlite
+```
+
+The dev server serves the API on port 8790. In another terminal, from the repository root, `API_URL=http://localhost:8790 pnpm exec vite` serves the UI on port 5175 and sends its `/api` calls there. After a Go change, stop the dev server and run it again: `go run` rebuilds it in seconds. It reads `ADMIN_EMAIL` and `ADMIN_PASSWORD` from its environment, not from `.dev.vars`; a database you have already signed in to under `pnpm dev` needs neither.
+
 ### Agent Mode (for OpenClaw / Browser-Use)
 
 Append `?agent=true` to the URL:
@@ -72,11 +84,13 @@ An agent that calls the API instead uses an API token; `/llms.txt` describes the
 ## Accounts and API tokens
 
 - **Sign-in** — people sign in with their email and password; a session lasts 30 days. Every `/api` call needs a signed-in person or an API token, except the sign-in itself and `GET /api/openapi.json`.
-- **The first admin** comes from `ADMIN_EMAIL` and `ADMIN_PASSWORD`: `.dev.vars` locally, `wrangler secret put` in production. The CRM creates that account at the first sign-in while it has no accounts, and ignores the two values once it has one.
+- **The first admin** comes from `ADMIN_EMAIL` and `ADMIN_PASSWORD` (an email address, and 8 to 72 characters): `.dev.vars` locally, `wrangler secret put` in production. The CRM creates that account at the first sign-in while it has no accounts, and ignores the two values once it has one. Until then, a sign-in answers "No accounts yet" when the values are missing or can't make an account.
+- **Secrets reach the container when it starts.** After you set or change one, redeploy (`pnpm run deploy`), or wait until the container has gone to sleep (after 10 minutes without a request): the next request starts it with the new values.
+- **After your first sign-in**, change the bootstrap password in Settings → Account. You may then delete the secret: `pnpm wrangler secret delete ADMIN_PASSWORD`.
 - **Users** (Settings → Users, admins only) — an admin adds people with a role (admin or user), renames them, changes their role, sets a new password, disables or deletes them. A new password, disabling or deleting signs that person out and deletes their API tokens. The CRM always keeps at least one active admin, and nobody can disable, demote or delete themselves.
 - **Your password** (Settings → Account) — 8 to 72 characters. Changing it signs out your other sessions; your API tokens keep working.
 - **API tokens** (Settings → API tokens) — each person makes their own, for agents and scripts. A token (`crm_…`) is shown once; send it as `Authorization: Bearer crm_…`. It acts as you on the CRM's data, but can't manage tokens, accounts or passwords: those answer 403 to a token. Revoke one at any time.
-- **Sign-in attempts** are limited: 10 a minute from one address, and 10 failed attempts in 15 minutes for one email.
+- **Sign-in attempts** are limited: 10 a minute from one address, and 10 failed attempts in 15 minutes for one email. Only an attempt whose password was checked counts: one turned away because the server was busy doesn't.
 
 ```bash
 curl -H "Authorization: Bearer crm_…" https://<your-crm>/api/stats
@@ -90,7 +104,9 @@ pnpm typecheck   # the UI and the Worker
 scripts/parity/run.sh
 ```
 
-The API began as a TypeScript (Hono) backend, and the parity harness holds the Go one to it: `scripts/parity/run.sh` checks that backend out at commit `0068887` into `.parity/ts-ref` (installing its own dependencies the first time), seeds two identical local databases, runs it and the Go server side by side on ports 8788 and 8790, sends both the same calls, and prints the mismatches — expected: 0. Name scenarios (`scripts/parity/run.sh deals customers`) to run only those.
+The API began as a TypeScript (Hono) backend, and the parity harness holds the Go one to it: `scripts/parity/run.sh` checks that backend out at commit `0068887` into `.parity/ts-ref` (installing its own dependencies the first time), seeds two identical local databases, runs it and the Go server side by side on ports 8788 and 8790, sends both the same calls, and prints the mismatches — expected: 0. Name scenarios (`scripts/parity/run.sh deals customers`) to run only those. The harness runs on Linux only: it uses `ss` and `setsid`.
+
+[`server/README.md`](server/README.md) is the guide to the Go code: its packages, how to add a route, and its tests.
 
 ## Deploy
 
@@ -98,14 +114,27 @@ Cloudflare Containers need the **Workers Paid** plan, and Docker must be running
 
 ```bash
 pnpm wrangler login
-pnpm wrangler d1 create open-crm-db    # put the database_id it prints in wrangler.toml
+pnpm wrangler d1 create open-crm-db    # prints the database's id: wrangler.toml's database_id, under [[d1_databases]]
 pnpm db:migrate:remote                 # apply server/schema.sql to that database
-pnpm wrangler secret put ADMIN_EMAIL
+pnpm run deploy                        # vite build && wrangler deploy: creates the Worker
+pnpm wrangler secret put ADMIN_EMAIL   # the first admin's secrets, on the Worker that now exists
 pnpm wrangler secret put ADMIN_PASSWORD
-pnpm run deploy                        # vite build && wrangler deploy
 ```
 
-Use `pnpm run deploy`: a bare `pnpm deploy` is pnpm's own command. Then open the URL wrangler prints and sign in as the admin; change the password in Settings → Account. After 10 minutes without a request the container goes to sleep; the next request starts it again and waits while it starts. Your data stays in D1 meanwhile.
+Between the first two steps, put the id `d1 create` prints in `wrangler.toml`: it replaces `"local"` as `database_id`, under `[[d1_databases]]`. Use `pnpm run deploy`: a bare `pnpm deploy` is pnpm's own command.
+
+Then open the URL wrangler prints and sign in as the admin. Change the password in Settings → Account, and you may delete the `ADMIN_PASSWORD` secret (see [Accounts and API tokens](#accounts-and-api-tokens)). If the CRM was opened before the secrets were set, its container started without them: redeploy, or wait for it to sleep. After 10 minutes without a request the container goes to sleep; the next request starts it again and waits while it starts. Your data stays in D1 meanwhile.
+
+### Upgrading an existing deployment
+
+Apply the schema before you deploy a new version:
+
+```bash
+pnpm db:migrate:remote   # server/schema.sql, on the production database
+pnpm run deploy
+```
+
+`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts. Without them, signing in fails. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
 
 ## Tech Stack
 
@@ -129,17 +158,18 @@ browser ──► Worker (src/worker) ──► the built UI (dist/)
                  Worker answers with env.DB ◄───┘  http://d1.internal
 ```
 
-A container can't see Worker bindings, so the Go server reaches D1 over plain HTTP at `http://d1.internal`, a host that exists only in the container's network, and the Worker answers it with its `DB` binding. The Worker also passes the container `ADMIN_EMAIL` and `ADMIN_PASSWORD`, and the visitor's address for the sign-in limit.
+A container can't see Worker bindings, so the Go server reaches D1 over plain HTTP at `http://d1.internal`, a host that exists only in the container's network, and the Worker answers it with its `DB` binding. That is the container's only way out: it has no internet access. The Worker also passes the container `ADMIN_EMAIL` and `ADMIN_PASSWORD`, and the visitor's address for the sign-in limit.
 
 ```
 src/
   worker/index.ts     — the Worker: the container class, the D1 bridge, the request forwarding
   client/             — the React app (Vite)
 server/
+  README.md           — the Go code's guide: packages, routes, tests
   main.go             — the API server in the container (port 8080)
   schema.sql          — the D1 schema (pnpm db:migrate, pnpm db:migrate:remote)
   Dockerfile          — the container image: one static binary on distroless
-  cmd/devserver/      — the API on a local SQLite file, without a container (the parity harness runs it)
+  cmd/devserver/      — the API on a local SQLite file, without a container (the fast loop above; the parity harness runs it)
   internal/
     crm/              — the routes and the rules (next steps, customer health, lookup)
     auth/             — sign-in, sessions, API tokens, the sign-in limit
@@ -222,7 +252,6 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/stats` | Aggregate counts and total deal value |
-| GET | `/api/widgets` | A short summary of the deals: created this month, open pipeline value and by stage, per week, the latest |
 | GET | `/api/contacts` | List contacts (paginated, sortable, searchable) |
 | GET | `/api/contacts/:id` | Get a single contact |
 | POST | `/api/contacts` | Create a contact |
