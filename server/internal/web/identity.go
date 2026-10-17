@@ -6,7 +6,7 @@ import (
 )
 
 // Clawnify's proxy tells the app who is calling in X-Clawnify-* headers; these
-// read them as @clawnify/app's caller(), orgId() and user() did.
+// read them as @clawnify/app's caller() and user() did.
 
 var callers = map[string]bool{
 	"user": true, "api": true, "agent": true, "agent-browser": true,
@@ -25,11 +25,6 @@ func Caller(r *http.Request) string {
 		return v
 	}
 	return "public"
-}
-
-// OrgID is the calling org, "" when the request carries none.
-func OrgID(r *http.Request) string {
-	return header(r, "X-Clawnify-Org-Id")
 }
 
 // User is the signed-in person behind a request. Absent fields are nil (null).

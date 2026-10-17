@@ -35,6 +35,9 @@ function makeNormalizer() {
   return { str, walk };
 }
 
+// A call's opts.compare, when given, picks what of its parsed body is compared
+// (status and content type always are): for a body the Go server is meant to
+// answer differently, such as the discovery documents of a CRM with fewer routes.
 function makeCaller(base, record) {
   return async (method, p, opts = {}) => {
     const headers = { ...(opts.headers || {}) };
@@ -54,7 +57,8 @@ function makeCaller(base, record) {
       isJson = true;
     } catch {}
     const contentType = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    record.push({ method, path: p, status: res.status, contentType, isJson, body: parsed, raw: text });
+    const compared = opts.compare ? opts.compare(parsed) : parsed;
+    record.push({ method, path: p, status: res.status, contentType, isJson, body: compared, raw: text });
     return { status: res.status, body: parsed };
   };
 }

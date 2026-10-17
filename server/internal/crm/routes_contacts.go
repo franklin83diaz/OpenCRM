@@ -14,9 +14,7 @@ import (
 
 // ── Contacts ───────────────────────────────────────────────────────
 //
-// Route order: as for companies (routes_companies.go). GET
-// /api/contacts/{id}/emails (routes_email.go) has a segment more, so it never
-// meets these.
+// Route order: as for companies (routes_companies.go).
 
 func init() {
 	register(func(rt *web.Router, app *App) {

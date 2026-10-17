@@ -14,8 +14,8 @@ import (
 
 // ── Stages (the pipeline vocabulary — data, not code) ──────────────
 // `key` is immutable and stored on deals.stage. Behavior hangs on the
-// semantic flags, never on names: is_won → celebrate + Slack notify,
-// is_lost → excluded from pipeline value.
+// semantic flags, never on names: is_won → celebrate (routes_deals.go's
+// celebrateWin), is_lost → excluded from pipeline value.
 //
 // Route order: nothing else matches /api/stages or /api/stages/{key}, so
 // ServeMux's choice is Hono's (GET /api/stages/{key} is not a route).

@@ -1,17 +1,14 @@
 package web_test
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"opencrm/internal/web"
 	"opencrm/internal/web/discovery"
@@ -257,6 +254,10 @@ func TestRouterErrors(t *testing.T) {
 	if rec.Code != 200 || rec.Body.String() != `{"id":"a b"}` {
 		t.Errorf("GET /api/items/a%%20b = %d %s", rec.Code, rec.Body.String())
 	}
+	want := []string{"GET /api/openapi.json", "GET /llms.txt", "GET /api/fails", "GET /api/panics", "GET /api/items/{id}"}
+	if got := app.(*web.Router).Patterns(); !reflect.DeepEqual(got, want) {
+		t.Errorf("Patterns = %q; want %q", got, want)
+	}
 }
 
 func TestIdentity(t *testing.T) {
@@ -284,14 +285,6 @@ func TestIdentity(t *testing.T) {
 		*u.Name != "Ana  María López" || *u.FirstName != "Ana" || *u.LastName != "María López" {
 		t.Errorf("CurrentUser = %#v", u)
 	}
-
-	if got := web.OrgID(r); got != "" {
-		t.Errorf("OrgID(no header) = %q", got)
-	}
-	r.Header.Set("X-Clawnify-Org-Id", "org_1")
-	if got := web.OrgID(r); got != "org_1" {
-		t.Errorf("OrgID = %q", got)
-	}
 }
 
 func TestOrigin(t *testing.T) {
@@ -304,55 +297,6 @@ func TestOrigin(t *testing.T) {
 	r.Header.Set("X-Forwarded-Host", "crm.example.com")
 	if got := web.Origin(r); got != "https://crm.example.com" {
 		t.Errorf("Origin(forwarded) = %q", got)
-	}
-}
-
-func TestBackgroundOutlivesTheRequest(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	r := httptest.NewRequest("GET", "/api/stats", nil).WithContext(ctx)
-	done := make(chan error, 1)
-	release := make(chan struct{})
-	web.Background(r, func(ctx context.Context) {
-		<-release
-		done <- ctx.Err()
-	})
-	cancel() // the response has gone out
-	close(release)
-	if !web.Drain(time.Second) {
-		t.Fatal("Drain timed out")
-	}
-	if err := <-done; err != nil {
-		t.Errorf("background ctx was canceled with the request: %v", err)
-	}
-}
-
-// Drain must tolerate Background starting work while it waits — including
-// from an idle state, which is a misuse of a bare sync.WaitGroup. Run with -race.
-func TestBackgroundDuringDrain(t *testing.T) {
-	r := httptest.NewRequest("GET", "/api/stats", nil)
-	var ran atomic.Int32
-	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(2)
-		go func() { defer wg.Done(); web.Drain(time.Second) }()
-		go func() { defer wg.Done(); web.Background(r, func(context.Context) { ran.Add(1) }) }()
-	}
-	wg.Wait()
-	if !web.Drain(time.Second) || ran.Load() != 100 {
-		t.Fatalf("after drain, %d of 100 background jobs ran", ran.Load())
-	}
-
-	// Work started while Drain waits is waited for too.
-	release := make(chan struct{})
-	web.Background(r, func(context.Context) { <-release; ran.Add(1) })
-	drained := make(chan bool)
-	go func() { drained <- web.Drain(5 * time.Second) }()
-	for i := 0; i < 10; i++ {
-		web.Background(r, func(context.Context) { ran.Add(1) })
-	}
-	close(release)
-	if !<-drained || ran.Load() != 111 {
-		t.Fatalf("Drain returned before all work finished: %d of 111 ran", ran.Load())
 	}
 }
 

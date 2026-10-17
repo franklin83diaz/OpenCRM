@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"opencrm/internal/clawnify"
 	"opencrm/internal/db"
 	"opencrm/internal/db/dbtest"
 	"opencrm/internal/web"
@@ -122,18 +121,13 @@ func TestDealValue(t *testing.T) {
 	}
 }
 
-// TestWonDealTellsNoOne: the port leaves integrations out, so a deal moved
-// into a won stage is logged and makes its company a customer, and nothing
-// reaches Clawnify even when SLACK_CHANNEL is set and Slack is connected
-// (TS posted the win there).
+// TestWonDealTellsNoOne: a deal moved into a won stage is logged and makes
+// its company a customer, and that is all — TS also posted the win to Slack,
+// and the CRM has no integrations.
 func TestWonDealTellsNoOne(t *testing.T) {
 	ctx := dbtest.Setup(t)
-	broker := &scriptedBroker{connected: []string{"slack"}, rules: []tsRule{{Action: "SLACK_SEND_MESSAGE", Data: map[string]any{"ok": true}}}}
-	srv := httptest.NewServer(broker)
-	t.Cleanup(srv.Close)
-	env := clawnify.Env{Token: "tok", APIURL: srv.URL, SlackChannel: "wins"}
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-	api := New(&App{Env: env, Conn: clawnify.NewConnections(env, nil), Now: func() time.Time { return now }})
+	api := New(&App{Now: func() time.Time { return now }})
 	for _, sql := range []string{
 		"INSERT INTO companies (id, name) VALUES ('co-acme', 'Acme')",
 		"INSERT INTO deals (id, name, company_id, value, stage, close_date) VALUES ('d-1', 'Acme', 'co-acme', 1200, 'prospect', '2099-01-01')",
@@ -148,9 +142,6 @@ func TestWonDealTellsNoOne(t *testing.T) {
 	api.ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", w.Code, w.Body.String())
-	}
-	if len(broker.calls) != 0 {
-		t.Errorf("broker calls %v, want none", broker.calls)
 	}
 	rows, err := db.Query(ctx, "SELECT type, body, meta FROM activities WHERE entity_id = 'd-1'")
 	if err != nil {

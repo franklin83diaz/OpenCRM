@@ -111,26 +111,6 @@
  },
  {
   "method": "GET",
-  "path": "/api/meetings",
-  "summary": "List meetings with people from outside (calendar + Granola), newest first"
- },
- {
-  "method": "GET",
-  "path": "/api/meetings/{id}",
-  "summary": "Get a meeting"
- },
- {
-  "method": "PATCH",
-  "path": "/api/meetings/{id}",
-  "summary": "Link a meeting to a company, unlink it, or mark it as not an account meeting"
- },
- {
-  "method": "POST",
-  "path": "/api/meetings/{id}/digest",
-  "summary": "Read a call again after its digest failed"
- },
- {
-  "method": "GET",
   "path": "/api/tasks",
   "summary": "List tasks: open ones by due date (undated last), done ones newest first"
  },
@@ -153,21 +133,6 @@
   "method": "POST",
   "path": "/api/deals/{id}/updates",
   "summary": "Log what happened on a deal, what it finished, and its next step"
- },
- {
-  "method": "GET",
-  "path": "/api/insights",
-  "summary": "List what calls said about accounts: ideas to propose, room to expand, risks. Newest first"
- },
- {
-  "method": "PUT",
-  "path": "/api/insights/{id}",
-  "summary": "Mark an insight done or dismissed, or open it again"
- },
- {
-  "method": "POST",
-  "path": "/api/insights/{id}/deal",
-  "summary": "Turn an expansion into a deal at the first stage of the pipeline"
  },
  {
   "method": "GET",
@@ -199,86 +164,6 @@
  {
   "method": "POST",
   "path": "/api/activities"
- },
- {
-  "method": "GET",
-  "path": "/api/integrations/status"
- },
- {
-  "method": "POST",
-  "path": "/api/integrations/email"
- },
- {
-  "method": "POST",
-  "path": "/api/integrations/meeting"
- },
- {
-  "method": "GET",
-  "path": "/api/email-sync"
- },
- {
-  "method": "PUT",
-  "path": "/api/email-sync"
- },
- {
-  "method": "GET",
-  "path": "/api/email-sync/labels"
- },
- {
-  "method": "POST",
-  "path": "/api/email-sync/run"
- },
- {
-  "method": "POST",
-  "path": "/api/email-sync/sync-now"
- },
- {
-  "method": "GET",
-  "path": "/api/contacts/:id/emails"
- },
- {
-  "method": "GET",
-  "path": "/api/emails/:mailbox/:id"
- },
- {
-  "method": "GET",
-  "path": "/api/meetings/sync"
- },
- {
-  "method": "PUT",
-  "path": "/api/meetings/sync"
- },
- {
-  "method": "POST",
-  "path": "/api/meetings/run"
- },
- {
-  "method": "POST",
-  "path": "/api/meetings/sync-now"
- },
- {
-  "method": "GET",
-  "path": "/api/ai-columns"
- },
- {
-  "method": "PUT",
-  "path": "/api/ai-columns/:entity/:key"
- },
- {
-  "method": "DELETE",
-  "path": "/api/ai-columns/:entity/:key"
- },
- {
-  "method": "POST",
-  "path": "/api/ai-columns/:entity/:key/fill"
- },
- {
-  "method": "POST",
-  "path": "/api/ai-columns/:entity/:key/cells/:id"
- },
- {
-  "method": "POST",
-  "path": "/api/ai-columns/run"
  },
  {
   "method": "POST",

@@ -1,6 +1,6 @@
 // Package web is the thin layer between net/http and the ported routes: a
-// router that fails the way Hono did, JSON in and out with JS's rules, the
-// Clawnify identity headers, and waitUntil.
+// router that fails the way Hono did, JSON in and out with JS's rules, and
+// who is calling.
 package web
 
 import (
@@ -17,6 +17,7 @@ type HandlerFunc func(w http.ResponseWriter, r *http.Request) error
 type Router struct {
 	mux      *http.ServeMux
 	notFound HandlerFunc
+	patterns []string
 }
 
 // NewRouter returns a router whose not-found answer is Hono's default, plain
@@ -33,7 +34,11 @@ func NewRouter() *Router {
 // Handle registers h for pattern. Like ServeMux, a "GET" pattern also serves HEAD.
 func (rt *Router) Handle(pattern string, h HandlerFunc) {
 	rt.mux.Handle(pattern, route(h))
+	rt.patterns = append(rt.patterns, pattern)
 }
+
+// Patterns lists the registered routes, in the order Handle added them.
+func (rt *Router) Patterns() []string { return append([]string(nil), rt.patterns...) }
 
 // NotFound sets what unmatched requests get.
 func (rt *Router) NotFound(h HandlerFunc) { rt.notFound = h }

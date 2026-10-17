@@ -6,8 +6,8 @@
 // pickers. Later calls use the ids earlier creates returned (ids are numbered
 // per scenario by first appearance).
 //
-// Not ported, so not called here: the insights routes and the Slack message
-// on a won deal (the port leaves integrations and AI out).
+// Not called here, being gone from the CRM (no integrations, no AI): the
+// insights routes, a contact's emails and the Slack message on a won deal.
 //
 // Scenarios run in file order on one database, after companies-contacts.mjs
 // and customers.mjs and before the others, so what is created here is deleted
@@ -232,7 +232,6 @@ export default [
       await call("GET", "/api/companies/bulk-delete");
       await call("GET", "/api/contacts/import");
       await call("GET", "/api/companies/import");
-      await call("GET", "/api/contacts/contact-alex/emails");
       await call("GET", "/api/contacts/contact-alex/");
       await call("GET", "/api/deals/board/");
       await call("PUT", "/api/deals/board", { body: { name: "x" } });

@@ -20,7 +20,7 @@ import (
 // tells the CRM happened on a deal. People, API keys and agents may write
 // them (mayWrite); TS had no try around these writes, so a database error is
 // Hono's plain 500. (TS's insights routes, what calls said about accounts,
-// are not ported: the port leaves integrations and AI out.)
+// are gone with the AI.)
 //
 // Route order: nothing else matches /api/tasks/{id}; POST
 // /api/deals/{id}/updates has a segment more than the deal {id} routes, so

@@ -7,11 +7,13 @@ package crm
 // app.get/app.post routes never did.
 
 import (
+	"errors"
 	"math"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"opencrm/internal/web"
 )
@@ -451,4 +453,69 @@ func zodIssues(schema zodCheck, v any) []web.Issue {
 		}
 	}
 	return append(issues, unions...)
+}
+
+// errURIMalformed is the URIError decodeURIComponent threw.
+var errURIMalformed = errors.New("URI malformed")
+
+// decodeURIComponent is JS's: each %XX escape decoded; a multi-byte character
+// must be spelled as escapes that form valid UTF-8, else "URI malformed".
+func decodeURIComponent(s string) (string, error) {
+	if !strings.Contains(s, "%") {
+		return s, nil
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		if s[i] != '%' {
+			b.WriteByte(s[i])
+			i++
+			continue
+		}
+		c, ok := escapedByte(s, i)
+		if !ok {
+			return "", errURIMalformed
+		}
+		i += 3
+		if c < 0x80 {
+			b.WriteByte(c)
+			continue
+		}
+		var n int
+		switch {
+		case c&0xE0 == 0xC0:
+			n = 1
+		case c&0xF0 == 0xE0:
+			n = 2
+		case c&0xF8 == 0xF0:
+			n = 3
+		default:
+			return "", errURIMalformed
+		}
+		seq := []byte{c}
+		for j := 0; j < n; j++ {
+			cc, ok := escapedByte(s, i)
+			if !ok || cc&0xC0 != 0x80 {
+				return "", errURIMalformed
+			}
+			seq = append(seq, cc)
+			i += 3
+		}
+		if !utf8.Valid(seq) { // overlong forms, surrogates, past U+10FFFF
+			return "", errURIMalformed
+		}
+		b.Write(seq)
+	}
+	return b.String(), nil
+}
+
+// escapedByte reads the %XX escape at s[i].
+func escapedByte(s string, i int) (byte, bool) {
+	if i+2 >= len(s) || s[i] != '%' {
+		return 0, false
+	}
+	v, err := strconv.ParseUint(s[i+1:i+3], 16, 8)
+	if err != nil {
+		return 0, false
+	}
+	return byte(v), true
 }

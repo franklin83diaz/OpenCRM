@@ -581,8 +581,8 @@ func (app *App) updateDeal(w http.ResponseWriter, r *http.Request) error {
 // win on its timeline, and its company a customer (the Customers page) from
 // its close date. stage is the stage as the request sent it.
 //
-// TS also told Slack (SLACK_CHANNEL, when set and Slack was connected); the
-// port leaves integrations out, so a win is only recorded here.
+// TS also posted the win to Slack; the CRM has no integrations, so a win is
+// only recorded here.
 func (app *App) celebrateWin(ctx context.Context, id, stage string, st, updated db.Row) error {
 	value := js.Number(updated["value"])
 	if math.IsNaN(value) || value == 0 {

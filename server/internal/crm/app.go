@@ -6,16 +6,12 @@ import (
 	"net/http"
 	"time"
 
-	"opencrm/internal/clawnify"
 	"opencrm/internal/web"
 	"opencrm/internal/web/discovery"
 )
 
-// App is what every route can reach beyond the request: the deployment's
-// configuration and clients.
+// App is what every route can reach beyond the request.
 type App struct {
-	Env  clawnify.Env
-	Conn *clawnify.Connections
 	// Now is the clock for what TS read with new Date() or Date.now(); nil is
 	// time.Now. Tests set it to replay TS at a fixed time.
 	Now func() time.Time

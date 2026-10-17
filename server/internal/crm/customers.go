@@ -9,6 +9,7 @@ package crm
 
 import (
 	"context"
+	"errors"
 	"math"
 	"sort"
 	"time"
@@ -80,6 +81,9 @@ func localDay(ms, tz float64) (string, error) {
 	}
 	return isoDay(time.UnixMilli(int64(t))), nil // int64() truncates toward zero, as new Date(t) did
 }
+
+// errInvalidTime is the RangeError toISOString threw on a date that is none.
+var errInvalidTime = errors.New("Invalid time value")
 
 // msOf is now.getTime().
 func msOf(now time.Time) float64 { return float64(now.UnixMilli()) }

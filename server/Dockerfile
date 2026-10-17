@@ -5,7 +5,7 @@ WORKDIR /src
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /api .
 
-# distroless/static carries CA certificates, for HTTPS calls to Clawnify.
+# distroless/static: no shell, a nonroot user, and the static binary.
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /api /api
 EXPOSE 8080
