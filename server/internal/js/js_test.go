@@ -167,3 +167,29 @@ func TestParseInt(t *testing.T) {
 		t.Errorf("ParseInt(-0) = %v, want -0", got)
 	}
 }
+
+func TestParseFloat(t *testing.T) {
+	// Expected values are node's parseFloat.
+	nan, inf := math.NaN(), math.Inf(1)
+	negZero := math.Copysign(0, -1)
+	cases := []struct {
+		in   string
+		want float64
+	}{
+		{"1,200.50", 1}, {" 12.5e1x", 125}, {"abc", nan}, {"", nan}, {"  -.5e-1", -0.05},
+		{"Infinity", inf}, {"-Infinityx", -inf}, {"+Infinity", inf}, {"0x10", 0}, {"1e", 1},
+		{"1e+", 1}, {"1.", 1}, {"-0", negZero}, {"   3.25", 3.25}, {".", nan},
+		{"+.", nan}, {"1_000", 1}, {"1e999", inf}, {"-1e-999", negZero}, {"007.5", 7.5},
+		{"5e-324", 5e-324}, {"Inf", nan},
+	}
+	for _, c := range cases {
+		got := ParseFloat(c.in)
+		same := got == c.want && math.Signbit(got) == math.Signbit(c.want)
+		if math.IsNaN(c.want) {
+			same = math.IsNaN(got)
+		}
+		if !same {
+			t.Errorf("ParseFloat(%q) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}

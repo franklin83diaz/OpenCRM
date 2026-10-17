@@ -114,6 +114,28 @@ func ParseInt(s string) float64 {
 	return n
 }
 
+// floatPrefix is parseFloat's StrDecimalLiteral: the longest prefix that is
+// a sign, then Infinity or a decimal with an optional exponent.
+var floatPrefix = regexp.MustCompile(`^[+-]?(?:Infinity|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)`)
+
+// ParseFloat is parseFloat(s): leading JS whitespace skipped, then the
+// longest prefix that reads as a decimal number ("12abc" is 12, "1e3x" is
+// 1000, " -.5" is -0.5, "Infinity" is +Inf); NaN when there is none.
+func ParseFloat(s string) float64 {
+	m := floatPrefix.FindString(strings.TrimLeftFunc(s, isJSSpace))
+	switch strings.TrimLeft(m, "+-") {
+	case "":
+		return math.NaN()
+	case "Infinity":
+		if m[0] == '-' {
+			return math.Inf(-1)
+		}
+		return math.Inf(1)
+	}
+	f, _ := strconv.ParseFloat(m, 64) // well-formed: out of range is ±Inf or 0, as in JS
+	return f
+}
+
 var decimalPattern = regexp.MustCompile(`^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$`)
 
 // Number is JS Number(v) for values that come out of JSON and the database.
