@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 )
@@ -18,7 +19,11 @@ import (
 //	← 200 {"results": [{...}], "meta": {"changes": n, "last_row_id": n}}
 //	← non-200 {"error": "<D1's message>"}
 //
-// D1's message comes back verbatim as the error text, as TS saw it.
+// D1's message comes back verbatim as the error text, as TS saw it. JSON has
+// no NaN or Infinity, which TS bound into D1 as numbers (?page=abc is NaN, a
+// deal value "Infinity" is Infinity), so a param that is one crosses as
+// {"$num": "NaN" | "Infinity" | "-Infinity"}, and the Worker binds it as that
+// number again.
 func NewD1(baseURL string, hc *http.Client) Driver {
 	if hc == nil {
 		hc = http.DefaultClient
@@ -65,8 +70,41 @@ func (d *d1) Run(ctx context.Context, sql string, params []any) (Result, error) 
 	return Result{Changes: int64(res.Meta.Changes), LastRowID: int64(res.Meta.LastRowID)}, nil
 }
 
+// nonFinite is a NaN or ±Infinity param on the wire.
+type nonFinite struct {
+	Num string `json:"$num"`
+}
+
+// wireParams is params as the bridge carries them: a non-finite number
+// becomes a nonFinite, everything else is sent as it is. The caller's slice
+// is left alone.
+func wireParams(params []any) []any {
+	var out []any // a copy, once there is a number to replace
+	for i, p := range params {
+		f, ok := p.(float64)
+		if !ok || !(math.IsNaN(f) || math.IsInf(f, 0)) {
+			continue
+		}
+		if out == nil {
+			out = append([]any(nil), params...)
+		}
+		switch {
+		case math.IsNaN(f):
+			out[i] = nonFinite{"NaN"}
+		case f > 0:
+			out[i] = nonFinite{"Infinity"}
+		default:
+			out[i] = nonFinite{"-Infinity"}
+		}
+	}
+	if out == nil {
+		return params
+	}
+	return out
+}
+
 func (d *d1) call(ctx context.Context, sql string, params []any, mode string) (*d1Response, error) {
-	body, err := json.Marshal(d1Request{SQL: sql, Params: params, Mode: mode})
+	body, err := json.Marshal(d1Request{SQL: sql, Params: wireParams(params), Mode: mode})
 	if err != nil {
 		return nil, err
 	}

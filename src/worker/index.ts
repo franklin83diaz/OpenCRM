@@ -25,10 +25,26 @@ export class Api extends Container<Env> {
 // The D1 bridge. Wire protocol (fixed; the Go side is server/internal/db/d1.go):
 //   POST /query {sql, params, mode: "all" | "run"}
 //   → 200 {results, meta: {changes, last_row_id}}  |  500 {error: D1's message}
+// JSON has no NaN or Infinity, so a param that is one arrives as
+// {"$num": "NaN" | "Infinity" | "-Infinity"} and is bound as that number, as
+// the TS app bound it.
 interface D1Query {
   sql: string;
   params?: unknown[];
   mode?: "all" | "run";
+}
+
+const NON_FINITE: Record<string, number> = { NaN: NaN, Infinity: Infinity, "-Infinity": -Infinity };
+
+function d1Param(p: unknown): unknown {
+  if (p !== null && typeof p === "object" && !Array.isArray(p)) {
+    const keys = Object.keys(p);
+    const num = (p as { $num?: unknown }).$num;
+    if (keys.length === 1 && keys[0] === "$num" && typeof num === "string" && Object.hasOwn(NON_FINITE, num)) {
+      return NON_FINITE[num];
+    }
+  }
+  return p;
 }
 
 Api.outboundByHost = {
@@ -38,7 +54,7 @@ Api.outboundByHost = {
     }
     try {
       const { sql, params = [], mode = "all" } = await req.json<D1Query>();
-      const stmt = env.DB.prepare(sql).bind(...params);
+      const stmt = env.DB.prepare(sql).bind(...params.map(d1Param));
       const r = mode === "run" ? await stmt.run() : await stmt.all();
       return Response.json({
         results: r.results ?? [],

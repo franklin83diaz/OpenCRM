@@ -3,6 +3,8 @@ package db_test
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -74,6 +76,40 @@ func TestD1(t *testing.T) {
 	_, err = db.Query(ctx, "SELECT boom")
 	if err == nil || err.Error() != "D1_ERROR: boom" {
 		t.Errorf("Query error = %v; want D1_ERROR: boom", err)
+	}
+}
+
+// JSON has no NaN or Infinity, but TS bound them into D1 as numbers (?page=abc
+// is NaN, a deal value "Infinity" is Infinity). Such a param crosses the
+// bridge as {"$num": ...}, which the Worker binds as that number again; every
+// other param is sent as it is.
+func TestD1NonFiniteParams(t *testing.T) {
+	var body string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		body = string(b)
+		w.Write([]byte(`{"results":[],"meta":{"changes":0,"last_row_id":0}}`))
+	}))
+	t.Cleanup(srv.Close)
+	db.Use(db.NewD1(srv.URL, srv.Client()))
+
+	params := []any{math.NaN(), math.Inf(1), math.Inf(-1), 1.5, 0.0, math.Copysign(0, -1), 7, int64(8), "NaN", true, nil}
+	if _, err := db.Query(context.Background(), "SELECT ? LIMIT ? OFFSET ?", params...); err != nil {
+		t.Fatal(err)
+	}
+	want := `{"sql":"SELECT ? LIMIT ? OFFSET ?","params":[{"$num":"NaN"},{"$num":"Infinity"},{"$num":"-Infinity"},1.5,0,-0,7,8,"NaN",true,null],"mode":"all"}`
+	if body != want {
+		t.Errorf("bridge body\n got  %s\n want %s", body, want)
+	}
+	if !math.IsNaN(params[0].(float64)) || !math.IsInf(params[1].(float64), 1) {
+		t.Error("the caller's params were changed")
+	}
+
+	if _, err := db.Run(context.Background(), "UPDATE deals SET value = ?", math.Inf(1)); err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"sql":"UPDATE deals SET value = ?","params":[{"$num":"Infinity"}],"mode":"run"}`; body != want {
+		t.Errorf("bridge body\n got  %s\n want %s", body, want)
 	}
 }
 
