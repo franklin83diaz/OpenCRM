@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/http"
 	"regexp"
 	"slices"
 	"sort"
@@ -97,9 +98,17 @@ func LogActivity(ctx context.Context, entityType, entityID, typ, body string, me
 // holds { key: value }; only keys with a matching def that has a column are
 // written, each coerced/validated for its type. Runs as a follow-up UPDATE so
 // the built-in INSERT/UPDATE paths stay untouched. An enum violation is a
-// *FieldError (the first, in JS order of the sorted keys — TS named the first
-// in the body's order).
+// *FieldError. A map has no order: the keys are written in JS order of the
+// sorted keys. Where TS's object kept a request body's order, use
+// ApplyCustomValuesInOrder with the order ResolveCustomWrite saw.
 func ApplyCustomValues(ctx context.Context, entity EntityType, table, id string, custom map[string]any) error {
+	return ApplyCustomValuesInOrder(ctx, entity, table, id, custom, jsKeyOrder(sortedKeys(custom)))
+}
+
+// ApplyCustomValuesInOrder is ApplyCustomValues visiting custom's keys in
+// order (Object.entries order): the SET list, and which enum violation is
+// named first, follow it. Keys in order that custom lacks are skipped.
+func ApplyCustomValuesInOrder(ctx context.Context, entity EntityType, table, id string, custom map[string]any, order []string) error {
 	if custom == nil {
 		return nil
 	}
@@ -113,7 +122,10 @@ func ApplyCustomValues(ctx context.Context, entity EntityType, table, id string,
 	}
 	var sets []string
 	var params []any
-	for _, key := range jsKeyOrder(sortedKeys(custom)) {
+	for _, key := range order {
+		if _, ok := custom[key]; !ok {
+			continue
+		}
 		def, ok := byKey[key]
 		if !ok || !HasColumn(def) {
 			continue // ignore unknown keys: only defined properties with a column are writable
@@ -190,7 +202,14 @@ func ResolveCustomWrite(ctx context.Context, entity EntityType, body map[string]
 			candidates[k] = v
 		}
 	}
+	return classifyCustomWrite(ctx, entity, customWriteOrder(body, raw), candidates)
+}
 
+// customWriteOrder is the order of a write's candidate keys as TS's merged
+// object listed them (see ResolveCustomWrite): the values ResolveCustomWrite
+// returns were added in this order, which is the order TS wrote them in.
+func customWriteOrder(body map[string]any, raw string) []string {
+	bag, _ := body["custom"].(map[string]any)
 	var order []string
 	seen := map[string]bool{}
 	add := func(k string, ok bool) {
@@ -211,7 +230,7 @@ func ResolveCustomWrite(ctx context.Context, entity EntityType, body map[string]
 			add(k, ok)
 		}
 	}
-	return classifyCustomWrite(ctx, entity, jsKeyOrder(order), candidates)
+	return jsKeyOrder(order)
 }
 
 // UnknownFieldsError builds the 422 body when a write named unknown keys —
@@ -881,4 +900,249 @@ func objectMembers(raw string) ([]string, map[string]json.RawMessage) {
 		vals[k] = v
 	}
 	return keys, vals
+}
+
+// ── What the entity routes repeat ──────────────────────────────────
+// index.ts wrote these steps out in each list and write handler (companies,
+// contacts, deals); here they are once.
+
+// paginationQueryIssues is the list routes' zod query schema,
+// PaginationQuery.extend({<extra>: z.string().optional(), …}): page, limit,
+// sort, order (z.enum(["asc", "desc"])), search, filters, tz, then extra.
+func paginationQueryIssues(q map[string]any, extra ...string) []web.Issue {
+	var issues []web.Issue
+	for _, key := range append([]string{"page", "limit", "sort", "order", "search", "filters", "tz"}, extra...) {
+		v, present := q[key]
+		if !present {
+			continue
+		}
+		var issue *web.Issue
+		if key == "order" {
+			issue = checkEnum(zodPath(key), v, []string{"asc", "desc"})
+		} else {
+			issue = checkType(zodPath(key), v, "string")
+		}
+		if issue != nil {
+			issues = append(issues, *issue)
+		}
+	}
+	return issues
+}
+
+// textAt is m[key] when it is a string (a query value, or a validated body's
+// field), else "".
+func textAt(q map[string]any, key string) string {
+	s, _ := q[key].(string)
+	return s
+}
+
+// firstQueryValues is c.req.query() on a plain route: each parameter's first
+// value, decoded as Hono did. Nothing is validated.
+func firstQueryValues(r *http.Request) map[string]any {
+	out := map[string]any{}
+	for k, vs := range honoQueries(r) {
+		out[k] = vs[0]
+	}
+	return out
+}
+
+// listPage is a list's page, limit and offset: parseInt'd, page at least 1
+// (default 1), limit 1 to 100 (default 25). One that isn't a number stays
+// NaN, as Math.max left it, and the query fails binding it.
+func listPage(q map[string]any) (page, limit, offset float64) {
+	p, l := textAt(q, "page"), textAt(q, "limit")
+	if p == "" {
+		p = "1"
+	}
+	if l == "" {
+		l = "25"
+	}
+	page = math.Max(1, js.ParseInt(p))
+	limit = math.Min(100, math.Max(1, js.ParseInt(l)))
+	return page, limit, (page - 1) * limit
+}
+
+// listOrder is the sort direction: asc or desc (the default).
+func listOrder(q map[string]any) string {
+	order := strings.ToLower(textAt(q, "order"))
+	if order != "asc" && order != "desc" {
+		return "desc"
+	}
+	return order
+}
+
+// listSortSQL is what a companies or contacts list orders by, over the table
+// aliased `alias`: "count:<many side>" counts the linked records; a real
+// column (built-in or custom) sorts by itself, or by the linked record's name
+// when it holds one; anything else sorts by id.
+func listSortSQL(ctx context.Context, entity EntityType, alias, sort string, cols map[string]bool, many map[string]ManyLink) (string, error) {
+	if sort == "" {
+		sort = "id"
+	}
+	if side, ok := CountOf(sort); ok {
+		if link, ok := many[side]; ok {
+			return CountSQL(link, alias+"."), nil
+		}
+	}
+	if !cols[sort] {
+		sort = "id"
+	}
+	byName, err := RelationSortSQL(ctx, entity, alias, sort)
+	if err != nil || byName != "" {
+		return byName, err
+	}
+	return alias + "." + QuoteIdent(sort), nil
+}
+
+// whereOf joins a list's conditions: "" when there are none.
+func whereOf(where []string) string {
+	if len(where) == 0 {
+		return ""
+	}
+	return " WHERE " + strings.Join(where, " AND ")
+}
+
+// tryList is tryJSON for the list and aggregate routes, which answered a bad
+// filter (a *FieldError: too many values) with 400 and anything else with 500.
+func tryList(w http.ResponseWriter, fn func() (int, any, error)) error {
+	status, body, err := fn()
+	if err != nil {
+		status = http.StatusInternalServerError
+		var fe *FieldError
+		if errors.As(err, &fe) {
+			status = http.StatusBadRequest
+		}
+		return web.JSON(w, status, errorBody{errMessage(err)})
+	}
+	return web.JSON(w, status, body)
+}
+
+// orZero is `row?.<key> || 0`.
+func orZero(row db.Row, key string) any {
+	if row == nil || !js.Truthy(row[key]) {
+		return 0.0
+	}
+	return row[key]
+}
+
+// writeBodyIssues is a create or update route's zod body schema: an object of
+// the given string fields, then `custom` (CustomValues), passthrough.
+func writeBodyIssues(v any, fields []stringField) []web.Issue {
+	body, isObject := v.(map[string]any)
+	if !isObject {
+		return []web.Issue{invalidType(zodPath(), "object", v)}
+	}
+	issues := stringFieldIssues(body, fields)
+	if issue, bad := CustomValuesIssue(body); bad {
+		issues = append(issues, issue)
+	}
+	return issues
+}
+
+// customSet is a write's custom values, with their keys in the order TS's
+// object listed them: the order they are written in.
+type customSet struct {
+	values map[string]any
+	order  []string
+}
+
+// apply writes them to row id (ApplyCustomValuesInOrder).
+func (c customSet) apply(ctx context.Context, entity EntityType, table, id string) error {
+	return ApplyCustomValuesInOrder(ctx, entity, table, id, c.values, c.order)
+}
+
+// customWrite is what every create and update checks of a body's custom
+// fields before writing: the writable custom values, or the answer that
+// refuses the write — 422 when it names fields that don't exist, 400 when a
+// required one is missing (mode "create" or "update", see
+// MissingRequiredCustom) or a relation names no record. raw is the request's
+// JSON text (web.RawBody), for the order of the keys.
+func customWrite(ctx context.Context, entity EntityType, body map[string]any, raw, mode string) (custom customSet, status int, answer any, err error) {
+	values, unknown, err := ResolveCustomWrite(ctx, entity, body, raw)
+	if err != nil {
+		return custom, 0, nil, err
+	}
+	unknownErr, err := UnknownFieldsError(ctx, entity, unknown)
+	if err != nil {
+		return custom, 0, nil, err
+	}
+	if unknownErr != nil {
+		return custom, http.StatusUnprocessableEntity, unknownErr, nil
+	}
+	missing, err := MissingRequiredCustom(ctx, entity, values, mode)
+	if err != nil {
+		return custom, 0, nil, err
+	}
+	if len(missing) > 0 {
+		return custom, http.StatusBadRequest, errorBody{"Missing required field(s): " + strings.Join(missing, ", ")}, nil
+	}
+	relationErr, err := RelationWriteError(ctx, entity, values)
+	if err != nil {
+		return custom, 0, nil, err
+	}
+	if relationErr != "" {
+		return custom, http.StatusBadRequest, errorBody{relationErr}, nil
+	}
+	return customSet{values, customWriteOrder(body, raw)}, 0, nil, nil
+}
+
+// bulkIDsIssues is the bulk-delete body schema,
+// z.object({ ids: z.array(z.string().min(1)).min(1).max(500) }).
+func bulkIDsIssues(v any) []web.Issue {
+	body, isObject := v.(map[string]any)
+	if !isObject {
+		return []web.Issue{invalidType(zodPath(), "object", v)}
+	}
+	raw, present := body["ids"]
+	if !present {
+		return []web.Issue{requiredIssue(zodPath("ids"), "array")}
+	}
+	list, isArray := raw.([]any)
+	if !isArray {
+		return []web.Issue{invalidType(zodPath("ids"), "array", raw)}
+	}
+	var issues []web.Issue
+	if len(list) < 1 {
+		issues = append(issues, arrayTooSmall(zodPath("ids"), 1))
+	}
+	if len(list) > 500 {
+		issues = append(issues, arrayTooBig(zodPath("ids"), 500))
+	}
+	for i, item := range list {
+		s, isString := item.(string)
+		if !isString {
+			issues = append(issues, invalidType(zodPath("ids", i), "string", item))
+		} else if s == "" {
+			issues = append(issues, stringTooSmall(zodPath("ids", i), 1))
+		}
+	}
+	return issues
+}
+
+type deletedBody struct {
+	Deleted float64 `json:"deleted"`
+}
+
+// bulkDelete deletes many records of entity at once: the table's selection
+// bar. Chunked under D1's 100-parameter cap; not one transaction, so a
+// failure mid-way leaves the earlier chunks deleted (the list refetches
+// either way). ids is the validated body's list; repeats count once.
+func bulkDelete(ctx context.Context, entity EntityType, ids []any) (deletedBody, error) {
+	unique := []string{}
+	seen := map[string]bool{}
+	for _, v := range ids {
+		if id := v.(string); !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+	var out deletedBody
+	for _, part := range Chunk(unique, 90) {
+		res, err := db.Run(ctx, fmt.Sprintf("DELETE FROM %s WHERE id IN (%s)", EntityTables[entity], marks(len(part))), stringParams(part)...)
+		if err != nil {
+			return out, err
+		}
+		out.Deleted += float64(res.Changes)
+	}
+	return out, DetachRelations(ctx, entity, unique)
 }

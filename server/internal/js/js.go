@@ -14,8 +14,12 @@ import (
 	"unicode"
 )
 
-// UUID is crypto.randomUUID(): a random (version 4) UUID in lower case.
-func UUID() string {
+// UUID is crypto.randomUUID(): a random (version 4) UUID in lower case. It is
+// a variable so a test that replays TS can hand out ids in creation order, as
+// its generator did with crypto.randomUUID: lists sort by id.
+var UUID = randomUUID
+
+func randomUUID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		panic(err) // crypto/rand never fails on the platforms we run on

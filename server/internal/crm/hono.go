@@ -166,6 +166,58 @@ func arrayTooBig(path []any, max int) web.Issue {
 		Keys:    []string{"code", "maximum", "type", "inclusive", "exact", "message", "path"}}
 }
 
+// stringTooSmall and stringTooBig are .min(n) and .max(n) on a z.string(),
+// in ZodString's key order (the same as ZodArray's). JS counts the length in
+// UTF-16 units (u16Len).
+func stringTooSmall(path []any, min int) web.Issue {
+	yes, no := true, false
+	return web.Issue{Code: "too_small", Minimum: min, Type: "string", Inclusive: &yes, Exact: &no, Path: path,
+		Message: "String must contain at least " + strconv.Itoa(min) + " character(s)",
+		Keys:    []string{"code", "minimum", "type", "inclusive", "exact", "message", "path"}}
+}
+
+func stringTooBig(path []any, max int) web.Issue {
+	yes, no := true, false
+	return web.Issue{Code: "too_big", Maximum: max, Type: "string", Inclusive: &yes, Exact: &no, Path: path,
+		Message: "String must contain at most " + strconv.Itoa(max) + " character(s)",
+		Keys:    []string{"code", "maximum", "type", "inclusive", "exact", "message", "path"}}
+}
+
+// stringField is one key of a z.object body schema whose value is a
+// z.string(): .min(min) when min > 0, .nullable() and/or .optional().
+type stringField struct {
+	key      string
+	min      int
+	nullable bool
+	optional bool
+}
+
+// stringFieldIssues checks body against fields, in the schema's key order: a
+// missing required key is "Required", a value of another type invalid_type,
+// a short string too_small. Keys the schema doesn't name raise nothing
+// (.passthrough() keeps them, a plain z.object drops them).
+func stringFieldIssues(body map[string]any, fields []stringField) []web.Issue {
+	var issues []web.Issue
+	for _, f := range fields {
+		v, present := body[f.key]
+		switch {
+		case !present:
+			if !f.optional {
+				issues = append(issues, requiredIssue(zodPath(f.key), "string"))
+			}
+		case v == nil && f.nullable:
+		default:
+			s, isString := v.(string)
+			if !isString {
+				issues = append(issues, invalidType(zodPath(f.key), "string", v))
+			} else if f.min > 0 && u16Len(s) < f.min {
+				issues = append(issues, stringTooSmall(zodPath(f.key), f.min))
+			}
+		}
+	}
+	return issues
+}
+
 // optionalStrings is a query schema of optional z.string() fields, checked in
 // the schema's order: a parameter sent twice arrives as a list.
 func optionalStrings(q map[string]any, keys ...string) []web.Issue {
