@@ -157,9 +157,10 @@ explicit and only offered when an email column is mapped and no Company column i
 
 The cost that kept this out of the first slice — a maintained free-email exclusion
 list — turned out to be **solved reference data, not hand-curation**: the
-`free-email-domains` package (~12.8k providers, zero deps, pure JSON) is loaded
-once into a `Set`, so a personal-provider email never spawns a "Gmail" company and
-the list stays current via dependency bumps. Per import, distinct non-freemail
+`free-email-domains` package (~12.8k providers, zero deps, pure JSON), copied into
+the Go server as `server/internal/crm/freemail.txt` and loaded once into a set, so
+a personal-provider email never spawns a "Gmail" company; refreshing the list is
+regenerating that file. Per import, distinct non-freemail
 domains are resolved set-based (same shape as the name path): match an existing
 company by `domain` first — including one the name phase just created, so a mapped
 `Acme`/`acme.com` absorbs an `@acme.com` contact — else create a company named from

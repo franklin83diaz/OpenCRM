@@ -1,7 +1,31 @@
 # OpenCRM — agent guide
 
-A CRM with **companies**, **contacts**, and a **deals** pipeline, plus an activity
-timeline and Clawnify integrations. Preact + Hono + D1.
+A CRM with **companies**, **contacts**, and a **deals** pipeline, plus tasks and
+an activity timeline. React + Go + D1: the API is a Go server in a Cloudflare
+Container. `GET /llms.txt` lists every endpoint; `GET /api/openapi.json` is the
+spec.
+
+## Authentication
+
+Every `/api` call needs an account, except `POST /api/auth/login` and
+`GET /api/openapi.json`. Send a personal API token:
+
+```
+Authorization: Bearer crm_…
+```
+
+- A person signed in to the CRM makes the token in Settings → **API tokens**
+  and gives it to you; its secret is shown only once. `GET /api/auth/me` says
+  whose it is.
+- A token acts as its owner on the CRM's data: what you create or log is
+  recorded as theirs.
+- A token can't manage tokens, accounts or passwords: `/api/tokens`,
+  `/api/users` and `PUT /api/auth/password` answer 403 to it. That is a
+  person's job, in the browser; don't try to work around it.
+- Without a valid token every call answers 401
+  `{"error":"unauthorized","message":"Sign in to use the CRM."}`. A token stops
+  working when it is revoked, or when an admin disables or deletes its owner or
+  sets them a new password. Ask the person for a new one.
 
 ## Core entities
 
@@ -10,8 +34,8 @@ timeline and Clawnify integrations. Preact + Hono + D1.
   both optional. Setting a contact on a deal with no company gives it the
   contact's company; send `company_id` to set or clear it yourself.
 - `GET /api/stats` — counts + total pipeline value (excludes lost deals).
-- `GET /api/widgets` — the tiles the Clawnify home page shows: deals created
-  this month, open pipeline value and by stage, deals per week, latest deals.
+- `GET /api/widgets` — a short summary of the deals: created this month, open
+  pipeline value and by stage, deals per week, latest deals.
 
 ## Pipeline stages (data, not code)
 
@@ -24,7 +48,8 @@ validate the stage key (400 lists valid keys).
 - `DELETE /api/stages/{key}?reassign_to=<key>` — reassign_to is required when
   the stage still has deals.
 - **Semantics ride on flags, not names**: moving a deal to an `is_won: 1` stage
-  fires the Slack celebration; `is_lost: 1` stages are excluded from pipeline value.
+  logs the win on its timeline and makes its company a customer (from the deal's
+  close date); `is_lost: 1` stages are excluded from pipeline value.
 
 ## Custom fields
 
@@ -37,90 +62,32 @@ stays lenient and does not enforce required.
 
 ## Activity timeline
 
-Every contact/company/deal has a timeline. Integrations and notes write to it.
+Every contact/company/deal has a timeline. Notes, deal updates, and deals won or
+lost write to it.
 
 - `GET /api/activities?entity_type=contact&entity_id=<id>` — newest first.
 - `POST /api/activities` `{ entity_type, entity_id, type, body }` — log a note.
 
-## Integrations (Clawnify connections)
+## Tasks and customers
 
-These use the org's Clawnify connections — no keys live in this app. Check what's
-wired first: `GET /api/integrations/status` → `{ email, meeting, slack, notes, mailbox }` (`notes`:
-Granola; `mailbox`: the address email goes out from, once email sync is set up).
+The CRM doesn't read email or calendars. What it knows about contact with an
+account is what was logged: an update on one of its deals (below), or an
+activity of type `call`, `message`, `email` or `meeting` on the company, its
+contacts or its deals.
 
-- **Send an email** — `POST /api/integrations/email`
-  `{ to: [addresses], cc?, bcc?, subject, body }`, or `{ contact_id, subject, body }`
-  to email one contact. Sends from the org's Gmail connection (`gmail`), or its
-  Google Workspace one (`googlesuper`) when Gmail isn't connected, and logs it on
-  every recipient who is a contact. At most 50 recipients.
-  - **Reply** inside a synced thread: add `reply_to: { mailbox, id }` (an email from
-    `GET /api/contacts/{id}/emails`). The thread keeps its subject; `body` is required.
-  - **Forward** a synced email: add `forward: { mailbox, id }`; `body` is an optional
-    note above it. Only when the mailbox shares everything; 403 otherwise.
-- **Schedule a meeting** — `POST /api/integrations/meeting`
-  `{ contact_id, summary, start_datetime, timezone, duration_minutes }`.
-  Creates a Google Calendar event (`googlecalendar`, or `googlesuper` when Calendar
-  isn't connected) with the contact and logs it.
-  `start_datetime` is local wall-clock, e.g. `2026-07-16T13:00:00`; `timezone` is
-  an IANA zone, e.g. `America/New_York`.
-- **Deal-won Slack alert** — when a deal moves to a stage with `is_won: 1`, if
-  `SLACK_CHANNEL` is set and Slack is connected, the app posts automatically.
-
-If a capability isn't connected, the endpoint returns an error — tell the user to
-connect it in the Clawnify dashboard; don't try to work around it.
-
-## Gmail sync
-
-The org's connected Gmail can be synced (Settings → **Email**): for each email with
-a contact, the CRM keeps who wrote to whom and when. Email bodies stay in Gmail.
-
-- `GET /api/contacts/{id}/emails`: the contact's synced emails, newest first,
-  `{ emails, total, sync_on }`. Each email has `direction` (`sent`/`received`),
-  `from_email`, `to_emails`, `sent_at`, and `subject` only when the mailbox's
-  visibility shares subjects (otherwise `null`).
-- `GET /api/emails/{mailbox}/{id}`: one email's text, read live from Gmail, with
-  `subject`, `from`, `to` and `cc` (for Reply all). Only when the mailbox shares
-  everything (`can_open: true` on the email); 403 otherwise.
-- Contacts carry `last_contacted_at` (read-only), so "who haven't we emailed in a
-  month" is a filter on the contacts list: `last_contacted_at` `before` a date.
-- `GET /api/email-sync` shows the settings and progress; `POST /api/email-sync/sync-now`
-  syncs now.
-
-You can read synced emails and run a sync, but not change what a mailbox shares
-or turn sync on or off: that is a person's decision, made in Settings → Email.
-Don't work around a hidden subject by opening the email in the browser.
-
-## Meetings, tasks, insights and customers
-
-The org's calendar and Granola call notes can be synced (Settings → **Meetings**).
-Every meeting with people from outside is linked to its company (by the people
-invited), and each linked call with a Granola note is read once by the AI: a
-summary, how it went (`sentiment`, -2 to 2), tasks promised in it and insights.
-Transcripts stay in Granola. Meetings with only the team are never listed.
-
-- `GET /api/meetings?company_id=&when=upcoming|past&link=unmatched`: meetings,
-  newest first (upcoming: soonest first). `link=unmatched` lists the ones waiting
-  for a person to link. `PATCH /api/meetings/{id}` `{ company_id }` links one
-  (its other unmatched meetings from the same domain follow), `{ company_id: null }`
-  unlinks, `{ ignored: true }` marks it as not an account meeting.
-- `GET /api/tasks?company_id=&status=open|done|all&owed_by=us|them`: tasks, open
-  ones by due date. `owed_by: us` is something we promised; `them` is something
-  we're waiting on. `POST /api/tasks` `{ title, company_id?, due_date?, owed_by? }`,
+- `GET /api/tasks?company_id=&deal_id=&status=open|done|all&owed_by=us|them`: tasks,
+  open ones by due date. `owed_by: us` is something we promised; `them` is something
+  we're waiting on. `POST /api/tasks` `{ title, company_id?, contact_id?, deal_id?, due_date?, owed_by? }`,
   `PUT /api/tasks/{id}` `{ done: true }` to complete one, `DELETE /api/tasks/{id}`.
-- `GET /api/insights?company_id=&kind=idea|expansion|risk`: what calls said beyond
-  tasks, each with the `quote` it came from. `PUT /api/insights/{id}`
-  `{ status: done|dismissed }`; `POST /api/insights/{id}/deal` turns an expansion
-  into a deal at the first stage.
 - `GET /api/customers`: every company with `customer_since` set, worst first,
   each with `status` (red/yellow/green, or `unknown` when nothing is against it
   but the CRM can't see whether anyone has been in touch) and the `reasons` in
-  plain words; `focus` (the few things to do first) and `upcoming` (calls with
-  customers this week). Silence is only judged through what the CRM can see:
-  calls when the meeting sync is on, emails when the email sync is on and has
-  read that contact's history. `sight` says whether each sync is `seen`, `off`,
-  `importing` or `failing`, and a reason names what it can't see ("No contact in
-  30 days (calls aren't synced)"). Say that part too: never report an account
-  as quiet when the CRM can't see it.
+  plain words; and `focus`, the few things to do first. Red: one of our promises
+  is overdue. Yellow: waiting on them, or a renewal within 30 days or passed.
+  `sight` says what the CRM can see of calls and emails: with no sync, `off`,
+  and a reason says so ("Calls aren't synced, email isn't synced"). An account
+  is green only when contact with it was logged in the last 21 days. Say that part too: never
+  report an account as quiet, or as fine, when the CRM can't see it.
   A company becomes a customer with `PUT /api/companies/{id}` `{ customer_since: "YYYY-MM-DD" }`,
   or from the close date of its first won deal (never later than today). A date
   already set stays: if a deal was marked won by mistake, clear `customer_since`
@@ -129,36 +96,31 @@ Transcripts stay in Granola. Meetings with only the team are never listed.
 - `GET /api/lookup?email=&domain=`: what the CRM knows about an address before
   anyone writes to it. The contact with exactly that address; their company (else
   the one on `domain`, else on the address's own work domain), with
-  `customer_since` when it is a customer; its and the contact's `deals` (open
-  first, each with `state` open, won or lost); `last_call_at`; and the
-  `next_meeting` booked. Check it before a cold email: a customer, an open deal or
-  a booked call means a person should decide whether it goes out.
+  `customer_since` when it is a customer; and its and the contact's `deals` (open
+  first, each with `state` open, won or lost). Check it before a cold email: a
+  customer or an open deal means a person should decide whether it goes out.
   `POST /api/lookup` `{ "addresses": [{ "email", "domain"? }] }` answers up to 100
   at once, in order (`results`), to check a batch before they join a campaign.
 
 To answer "how is <customer> doing" or "what did we promise <company>", read
-these, and quote the reasons and the call's words rather than paraphrasing them.
-Turning the sync on or off, and what it reads, is a person's decision made in
-Settings → Meetings; you can run it (`POST /api/meetings/sync-now`).
+these, and quote the reasons rather than paraphrasing them.
 
 ## Deals: next steps and updates
 
-Every open deal (stage neither won nor lost) has a next step: the soonest of the
-next call booked with its company and its open tasks with a date, ours or
-theirs. A task without a date is not a next step.
+Every open deal (stage neither won nor lost) has a next step: the soonest of its
+open tasks with a date, ours or theirs. A task without a date is not a next step.
 
 - `GET /api/deals/progress`: open deals, worst first, each with `progress`:
   `status` (red/yellow/green/unknown), the `reasons` in plain words, `next_step`,
   and `days_quiet`. `GET /api/deals/{id}` and the board carry `progress` too.
-  Red: one of our promises is overdue, the last call went badly, a risk is
-  open, or no next step and no contact in 14 days. Yellow: no next step, no
-  contact in 14 days, waiting on them, or the close date has passed. As for
-  customers, silence is only judged through what the CRM can see: say so.
+  Red: one of our promises is overdue. Yellow: no next step, waiting on them, or
+  the close date has passed. Green only when nothing is against it and contact
+  with its company was logged in the last 14 days; otherwise `unknown`. As for customers, say
+  what the CRM can't see.
 - `GET /api/tasks?deal_id=`: the deal's tasks, and its company's on no deal.
 
 When the user tells you what happened on a deal (a phone call, a WhatsApp or
-text message, an email from an inbox the CRM doesn't read, a meeting moved or
-held in person), log it in one call:
+text message, an email, a meeting), log it in one call:
 `POST /api/deals/{id}/updates`
 `{ kind: call|message|email|meeting|note, summary, at?, done_task_ids?, next_step?: { title, due_date, owed_by }, close_date? }`.
 
@@ -169,9 +131,8 @@ held in person), log it in one call:
 - Find the deal through its company: `GET /api/companies?search=<name>`, then
   `GET /api/deals?company_id=<id>` (`search` on deals matches only a deal's name
   and notes). Ask when two deals could match; never log an update on a guess.
-- Don't log what the CRM already reads: calendar meetings and Gmail are synced
-  when `GET /api/integrations/status` says so, and a moved meeting updates on
-  its own there.
+- The CRM reads no inbox or calendar, so a call, an email or a meeting counts
+  only once it is logged here.
 - Next steps are this CRM's tasks, not your own task list. Move the stage with
   `PUT /api/deals/{id}` `{ stage }`.
 
@@ -182,28 +143,6 @@ columns to fields, import. Programmatically: `POST /api/contacts/import`
 `{ contacts: [{ first_name, last_name?, email?, phone?, title?, status?, company? }] }`.
 Company names are resolved to existing companies or created. Rows without a first
 name are skipped. Returns `{ imported, companiesCreated, skipped }`.
-
-## AI columns
-
-A column can be filled by AI from the rest of each record: on Companies,
-Industry and Notes; on Contacts, Title and Status; and the org's own attributes
-except URLs, emails, phones and relations. A person turns it on from the
-column header's spark and may give instructions that quote fields as
-`{{field}}` (e.g. `{{name}}`, `{{domain}}`). Instructions that quote the domain
-(`{{domain}}` on companies, `{{company_domain}}` on contacts) also give the AI
-that company's homepage, read through Clawnify's page reader and kept 30 days
-per company.
-
-- `GET /api/ai-columns?entity_type=company|contact`: the fields the AI can
-  fill, the columns it fills (with their `prompt`), and cells being filled or
-  that failed (`error` says why).
-- `POST /api/ai-columns/{entity}/{field}/fill` `{ ids: [...] }`: fill the empty
-  cells among these records, at most 20 per request. A column fills one batch
-  at a time (409 while one runs). It never overwrites a value.
-- `POST /api/ai-columns/{entity}/{field}/cells/{id}`: write one cell again,
-  replacing its value.
-
-Fills spend the org's Clawnify credits: fill what the user asked for, not more.
 
 ## Agent-mode UI
 
