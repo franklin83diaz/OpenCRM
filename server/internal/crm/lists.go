@@ -278,6 +278,13 @@ func CoerceForImport(value any, def CustomFieldDef) any {
 // record's id. The keys come in first-seen order, each row's in JS order of
 // its sorted keys.
 func ResolveImportCustomColumns(ctx context.Context, entity EntityType, customs []map[string]any) (keys []string, defByKey map[string]CustomFieldDef, err error) {
+	return ResolveImportCustomColumnsInOrder(ctx, entity, customs, nil)
+}
+
+// ResolveImportCustomColumnsInOrder is ResolveImportCustomColumns visiting
+// row i's keys in orders[i] (Object.entries order, as the request listed
+// them); a row without one is visited in JS order of its sorted keys.
+func ResolveImportCustomColumnsInOrder(ctx context.Context, entity EntityType, customs []map[string]any, orders [][]string) (keys []string, defByKey map[string]CustomFieldDef, err error) {
 	defs, err := ListDefs(ctx, &entity)
 	if err != nil {
 		return nil, nil, err
@@ -290,10 +297,14 @@ func ResolveImportCustomColumns(ctx context.Context, entity EntityType, customs 
 	}
 	keys = []string{}
 	present := map[string]bool{}
-	for _, custom := range customs {
-		for _, k := range jsKeyOrder(sortedKeys(custom)) {
-			v := custom[k]
-			if _, ok := defByKey[k]; ok && v != nil && v != "" && !present[k] {
+	for i, custom := range customs {
+		order := jsKeyOrder(sortedKeys(custom))
+		if i < len(orders) && orders[i] != nil {
+			order = orders[i]
+		}
+		for _, k := range order {
+			v, has := custom[k]
+			if _, ok := defByKey[k]; ok && has && v != nil && v != "" && !present[k] {
 				present[k] = true
 				keys = append(keys, k)
 			}

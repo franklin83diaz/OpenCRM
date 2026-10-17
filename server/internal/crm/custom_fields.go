@@ -85,6 +85,9 @@ type CustomFieldDef struct {
 	InverseDefID *string     `json:"inverse_def_id"`
 	CreatedAt    string      `json:"created_at"`
 	UpdatedAt    string      `json:"updated_at"`
+	// optionsText is the stored options JSON, for the order of its keys:
+	// writing the options back keeps it, as JSON.stringify(JSON.parse(…)) did.
+	optionsText string
 }
 
 // Option is def.options[name]: nil when absent or when options is not an object.
@@ -251,6 +254,7 @@ func rowToDef(row db.Row) CustomFieldDef {
 		FieldType:    colText(row["field_type"]),
 		CustomField:  colText(row["custom_field"]),
 		Options:      parseOptions(row["options"]),
+		optionsText:  colText(row["options"]),
 		Position:     js.Number(row["position"]),
 		RelationType: nullableText(row["relation_type"]),
 		TargetEntity: (*EntityType)(nullableText(row["target_entity"])),
@@ -332,7 +336,7 @@ type CustomFieldInput struct {
 	Label       string
 	FieldType   any // the base type; nil is "string"
 	CustomField any // widget uid; nil is ""
-	Options     any // JSON-encoded as given; nil is {}
+	Options     any // JSON-encoded as given (json.RawMessage as is); nil is {}
 	Position    any // nil is 0
 }
 
@@ -481,15 +485,19 @@ func CreateRelation(ctx context.Context, input RelationInput) (*CustomFieldDef, 
 // body; nil when there is no such def. Key + field_type are immutable
 // (changing storage would need a destructive column migration). Each value is
 // bound as sent (`patch.label ?? def.label`); one that can't be bound fails
-// the write with the db package's error.
+// the write with the db package's error. Sent options are JSON-encoded as
+// given (json.RawMessage as is).
 func UpdateDef(ctx context.Context, id string, patch map[string]any) (*CustomFieldDef, error) {
 	def, err := GetDef(ctx, id)
 	if err != nil || def == nil {
 		return nil, err
 	}
-	options, err := stringify(orDefault(patch["options"], def.Options))
-	if err != nil {
-		return nil, err
+	// Options the patch doesn't send are written back in their stored key order.
+	options := jsStringify(def.Options, readKeyOrder(def.optionsText))
+	if sent := patch["options"]; sent != nil {
+		if options, err = stringify(sent); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := db.Run(ctx,
 		"UPDATE custom_field_defs SET label = ?, custom_field = ?, options = ?, position = ?, updated_at = datetime('now') WHERE id = ?",
