@@ -6,17 +6,20 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"opencrm/internal/db"
 	"opencrm/internal/db/sqlite"
+	"opencrm/internal/web"
 )
 
 // Helpers the tests share. The *_ts_test.go files replay what the TS app at
@@ -51,6 +54,37 @@ func (r *recorder) add(sql string, params []any) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.log = append(r.log, tsStatement{SQL: sql, Params: append([]any{}, params...)})
+}
+
+// replayAPI serves the routes as the frozen fixtures were recorded: when
+// Clawnify's proxy said who was calling in X-Clawnify-* headers, before the
+// CRM had accounts. It skips the auth middleware (whose own statements would
+// not be in the fixtures) and reads the caller from those headers as
+// @clawnify/app's caller() and user() did. Only tests use it: the CRM itself
+// ignores the headers.
+func replayAPI(app *App) http.Handler {
+	rt := app.router()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		caller := "public"
+		if v := clawnifyHeader(r, "X-Clawnify-Caller"); clawnifyCallers[v] {
+			caller = v
+		}
+		var u *web.User
+		if id := clawnifyHeader(r, "X-Clawnify-User-Id"); id != "" {
+			u = &web.User{ID: id, Email: clawnifyHeader(r, "X-Clawnify-User-Email"), Name: clawnifyHeader(r, "X-Clawnify-User-Name")}
+		}
+		rt.ServeHTTP(w, web.WithIdentity(r, caller, u))
+	})
+}
+
+var clawnifyCallers = map[string]bool{
+	"user": true, "api": true, "agent": true, "agent-browser": true,
+	"public": true, "bypass": true, "system": true, "app": true,
+}
+
+// clawnifyHeader is the trimmed header value, "" when absent or blank.
+func clawnifyHeader(r *http.Request, name string) string {
+	return strings.TrimSpace(strings.Join(r.Header.Values(name), ", "))
 }
 
 // recordedDB is a fresh database with the schema and seed, installed behind a recorder.

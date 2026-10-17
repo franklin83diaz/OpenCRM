@@ -36,7 +36,7 @@ export default [
     run: async (call) => {
       // The first read gives Northline its customer_since (its contact's won deal).
       await call("GET", "/api/stats");
-      await call("GET", "/api/stats?x=1", { headers: { "X-Clawnify-Caller": "agent" } });
+      await call("GET", "/api/stats?x=1");
       await call("GET", "/api/widgets");
       await call("GET", "/api/widgets?x=1");
       // Other methods and paths are not routes.

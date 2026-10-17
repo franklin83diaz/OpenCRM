@@ -355,3 +355,40 @@ CREATE TABLE IF NOT EXISTS insights (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_insights_company ON insights(company_id, status);
+
+-- The CRM's own accounts. An admin creates them (roles 'admin' | 'user'); the
+-- first admin comes from the ADMIN_EMAIL / ADMIN_PASSWORD secrets while the
+-- table is empty. password_hash is bcrypt; disabled accounts can't sign in,
+-- and their sessions and API tokens stop working.
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  name TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  password_hash TEXT NOT NULL,
+  disabled INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+-- A signed-in browser (the crm_session cookie). Only the SHA-256 of the
+-- cookie's value is stored, so a copy of the database signs no one in.
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
+);
+-- Personal API tokens (Authorization: Bearer crm_…) for agents and scripts: a
+-- token acts as its user. Only the SHA-256 is stored; prefix is the start of
+-- the secret, to tell tokens apart.
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  prefix TEXT NOT NULL,
+  last_used_at TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);

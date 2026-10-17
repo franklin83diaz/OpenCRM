@@ -1,0 +1,141 @@
+package auth
+
+import (
+	"net/netip"
+	"sync"
+	"time"
+)
+
+// Limiter slows down password guessing: at most 10 login attempts a minute
+// from one address, and 10 attempts in 15 minutes at one email that didn't end
+// in a successful sign-in. It lives in memory, which is right because the API
+// runs as a single container instance (max_instances = 1); a restart (the
+// container sleeping after 10 idle minutes, or a deploy) starts it afresh.
+type Limiter struct {
+	mu        sync.Mutex
+	now       func() time.Time
+	ips       window
+	emails    window
+	lastSweep time.Time
+}
+
+const (
+	ipAttempts    = 10
+	ipPeriod      = time.Minute
+	emailFailures = 10
+	emailPeriod   = 15 * time.Minute
+	maxKey        = 320 // longer keys are cut: an email is at most 254 bytes, an address far less
+)
+
+// NewLimiter is an empty limiter on the given clock (nil: time.Now).
+func NewLimiter(now func() time.Time) *Limiter {
+	if now == nil {
+		now = time.Now
+	}
+	return &Limiter{
+		now:    now,
+		ips:    window{limit: ipAttempts, period: ipPeriod, hits: map[string][]time.Time{}},
+		emails: window{limit: emailFailures, period: emailPeriod, hits: map[string][]time.Time{}},
+	}
+}
+
+// Allow is whether an attempt to sign in as email from ip may go ahead. An
+// allowed attempt counts against ip right away, and against email until
+// Succeeded clears it: counting it before the password is checked means a
+// burst of parallel guesses can't all slip in before the first one fails.
+// A refused attempt counts against nothing.
+func (l *Limiter) Allow(ip, email string) bool {
+	ip, email = client(ip), cut(email)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	l.sweep(now)
+	if l.ips.full(ip, now) || l.emails.full(email, now) {
+		return false
+	}
+	l.ips.add(ip, now)
+	l.emails.add(email, now)
+	return true
+}
+
+// Succeeded forgets email's attempts: its owner signed in.
+func (l *Limiter) Succeeded(email string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.emails.hits, cut(email))
+}
+
+// sweep drops keys whose attempts have all left their window, at most once a
+// minute, so the maps hold only what the last 15 minutes saw.
+func (l *Limiter) sweep(now time.Time) {
+	if now.Sub(l.lastSweep) < time.Minute {
+		return
+	}
+	l.lastSweep = now
+	l.ips.sweep(now)
+	l.emails.sweep(now)
+}
+
+// client is the key an address counts under. An IPv6 client is usually given
+// a whole /64, and can pick any address in it: it counts as one.
+func client(ip string) string {
+	if a, err := netip.ParseAddr(ip); err == nil && a.Is6() && !a.Is4In6() {
+		if p, err := a.Prefix(64); err == nil {
+			return p.String()
+		}
+	}
+	return cut(ip)
+}
+
+func cut(key string) string {
+	if len(key) > maxKey {
+		return key[:maxKey]
+	}
+	return key
+}
+
+// window counts hits per key over a sliding period; a key keeps at most limit
+// of them, the newest.
+type window struct {
+	limit  int
+	period time.Duration
+	hits   map[string][]time.Time
+}
+
+// recent is key's hits within the period, oldest first, and stores them back.
+func (w *window) recent(key string, now time.Time) []time.Time {
+	hits := w.hits[key]
+	i := 0
+	for i < len(hits) && now.Sub(hits[i]) >= w.period {
+		i++
+	}
+	if i > 0 {
+		hits = append([]time.Time(nil), hits[i:]...)
+		if len(hits) == 0 {
+			delete(w.hits, key)
+		} else {
+			w.hits[key] = hits
+		}
+	}
+	return hits
+}
+
+func (w *window) full(key string, now time.Time) bool {
+	return len(w.recent(key, now)) >= w.limit
+}
+
+func (w *window) add(key string, now time.Time) {
+	hits := append(w.recent(key, now), now)
+	if len(hits) > w.limit {
+		hits = hits[len(hits)-w.limit:]
+	}
+	w.hits[key] = hits
+}
+
+func (w *window) sweep(now time.Time) {
+	for key, hits := range w.hits {
+		if len(hits) == 0 || now.Sub(hits[len(hits)-1]) >= w.period {
+			delete(w.hits, key)
+		}
+	}
+}

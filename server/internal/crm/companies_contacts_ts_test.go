@@ -157,7 +157,7 @@ func TestCompaniesContactsMatchTS(t *testing.T) {
 			rec := recordedDB(t, sc.Seed)
 			sequentialUUIDs(t)
 			ctx := context.Background()
-			h := New(&App{})
+			h := replayAPI(&App{})
 
 			// Timestamps the seed wrote are compared; datetime('now') ones are not.
 			fixed := map[string]bool{}

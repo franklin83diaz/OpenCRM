@@ -32,11 +32,11 @@ const qs = (o) =>
     .join("&");
 const idOf = (res, key) => res.body?.[key]?.id ?? `missing-${key}`;
 
-const user = { "X-Clawnify-Caller": "user", "X-Clawnify-User-Id": "user-1", "X-Clawnify-User-Email": "ada@example.com" };
-const userNoEmail = { "X-Clawnify-Caller": "user", "X-Clawnify-User-Id": "user-2" };
-const agent = { "X-Clawnify-Caller": "agent" };
-const api = { "X-Clawnify-Caller": "api" };
-const pub = { "X-Clawnify-Caller": "public" };
+// Every call is made as one signed-in account (the runner signs Go calls with
+// an API token and tells TS the same account in its X-Clawnify-* headers), so
+// tasks and updates are written by the same person on both sides. Who may
+// write (unauthenticated → 401) and created_by for a token's owner are Go's
+// tests (server/internal/crm/routes_auth_test.go).
 
 // Computed once, so both backends are sent the same values. Times are in the
 // past (a touch a minute ahead would read as -1 days quiet on one side and 0
@@ -54,7 +54,7 @@ export default [
     name: "stages",
     run: async (call) => {
       await call("GET", "/api/stages");
-      await call("GET", "/api/stages?x=1", { headers: agent });
+      await call("GET", "/api/stages?x=1");
 
       const post = (body, headers) => call("POST", "/api/stages", { body, headers });
       const put = (key, body, headers) => call("PUT", `/api/stages/${key}`, { body, headers });
@@ -216,7 +216,7 @@ export default [
 
       // One contact and one company by id.
       await call("GET", "/api/contacts/contact-alex");
-      await call("GET", "/api/contacts/contact-jamie", { headers: pub });
+      await call("GET", "/api/contacts/contact-jamie");
       await call("GET", "/api/contacts/all");
       await call("GET", "/api/contacts/nope");
       await call("GET", "/api/companies/company-northline");
@@ -240,7 +240,7 @@ export default [
       await call("DELETE", "/api/deals/progress");
       await call("POST", "/api/deals/board", { body: {} });
       await call("GET", "/api/deals/deal-onboarding/updates");
-      await call("POST", "/api/deals/board/updates", { body: { kind: "note", summary: "x" }, headers: agent });
+      await call("POST", "/api/deals/board/updates", { body: { kind: "note", summary: "x" } });
       await call("PATCH", "/api/deals/deal-onboarding", { body: {} });
 
       // Records for chips and pickers.
@@ -379,20 +379,17 @@ export default [
       const noCo = idOf(await call("POST", "/api/deals", { body: { name: "Parity no company" } }), "deal");
 
       // Tasks: create.
-      const post = (body, headers = user) => call("POST", "/api/tasks", { body, headers });
-      await post({ title: "x" }, pub);
-      await post({ title: "x" }, {});
-      await post({ title: "x" }, { "X-Clawnify-Caller": "agent-browser" });
-      await post({ title: "" }, pub);
+      const post = (body, headers) => call("POST", "/api/tasks", { body, headers });
+      await post({ title: "" });
       const t1 = idOf(await post({ title: "  Send the proposal  ", deal_id: deal, due_date: lastWeek }), "task");
-      const t2 = idOf(await post({ title: "Their legal review", company_id: "company-cedar", owed_by: "them", due_date: nextWeek }, agent), "task");
-      const t3 = idOf(await post({ title: "Book the demo", company_id: "company-cedar", contact_id: "contact-sam", due_date: null }, userNoEmail), "task");
-      const t4 = idOf(await post({ title: "Other deal's task", deal_id: other, due_date: "2020-01-01" }, api), "task");
+      const t2 = idOf(await post({ title: "Their legal review", company_id: "company-cedar", owed_by: "them", due_date: nextWeek }), "task");
+      const t3 = idOf(await post({ title: "Book the demo", company_id: "company-cedar", contact_id: "contact-sam", due_date: null }), "task");
+      const t4 = idOf(await post({ title: "Other deal's task", deal_id: other, due_date: "2020-01-01" }), "task");
       const t5 = idOf(await post({ title: "x".repeat(299) + "😀😀", company_id: null, contact_id: null, deal_id: null, due_date: "" }), "task");
       // Tasks sort by due date, then by when they were created or closed, to
       // the second: each list below holds at most one undated open task and
       // one done task, so the clock can't order them differently on each side.
-      await call("PUT", `/api/tasks/${t5}`, { body: { due_date: "2030-01-01" }, headers: user });
+      await call("PUT", `/api/tasks/${t5}`, { body: { due_date: "2030-01-01" } });
       await post({ title: "   " });
       await post({ title: "x", due_date: "2026-02-30" });
       await post({ title: "x", due_date: "26-01-01" });
@@ -406,7 +403,7 @@ export default [
       await post({ title: "x", owed_by: null });
       await post("[]");
       await post("{");
-      await post(JSON.stringify({ title: "Text plain" }), { ...user, "Content-Type": "text/plain" });
+      await post(JSON.stringify({ title: "Text plain" }), { "Content-Type": "text/plain" });
 
       // Tasks: list.
       const list = (q = "") => call("GET", "/api/tasks" + q);
@@ -420,8 +417,7 @@ export default [
       await list("?company_id=a&company_id=b&limit=1&limit=2");
 
       // Tasks: update.
-      const put = (id, body, headers = user) => call("PUT", `/api/tasks/${id}`, { body, headers });
-      await put(t1, { title: "x" }, pub);
+      const put = (id, body) => call("PUT", `/api/tasks/${id}`, { body });
       await put("nope", { title: "x" });
       await put("nope", {});
       await put(t1, {});
@@ -430,8 +426,8 @@ export default [
       await put(t1, { title: " Send the revised proposal ", owed_by: "us" });
       await put(t1, { due_date: "2026-13-01" });
       await put(t1, { company_id: "nope", title: "" });
-      await put(t3, { company_id: "company-cedar" }, agent);
-      await put(t3, { company_id: "company-harbour" }, agent);
+      await put(t3, { company_id: "company-cedar" });
+      await put(t3, { company_id: "company-harbour" });
       await put(t3, { company_id: null, contact_id: null, deal_id: deal });
       await put(t3, { due_date: "" });
       await put(t3, { due_date: tomorrow, owed_by: "them" });
@@ -445,9 +441,8 @@ export default [
       await list("?status=all");
 
       // Deal updates: what happened, what it finished, the next step.
-      const upd = (id, body, headers = agent, q = "") => call("POST", `/api/deals/${id}/updates${q}`, { body, headers });
-      await upd(deal, { kind: "call", summary: "x" }, pub);
-      await upd(deal, { kind: "bad", summary: "x" }, pub);
+      const upd = (id, body, headers, q = "") => call("POST", `/api/deals/${id}/updates${q}`, { body, headers });
+      await upd(deal, { kind: "bad", summary: "x" });
       await upd("nope", { kind: "call", summary: "x" });
       await upd("nope", { kind: "call", summary: "   " });
       await upd(deal, { kind: "call", summary: "   " });
@@ -462,11 +457,11 @@ export default [
         kind: "call", summary: "  Talked through the proposal with Sam  ", at: twoHoursAgo,
         done_task_ids: [t1, t3, t1, t2, t4, "nope"], next_step: { title: "  Send the contract  ", due_date: nextWeek, owed_by: "them" }, close_date: "2026-12-24",
       });
-      await upd(deal, { kind: "note", summary: "A note is not contact", at: "2020-01-02" }, user);
-      await upd(deal, { kind: "email", summary: "Emailed from another inbox", at: today }, userNoEmail, "?tz=120");
-      await upd(deal, { kind: "message", summary: "WhatsApp", at: "" }, api);
+      await upd(deal, { kind: "note", summary: "A note is not contact", at: "2020-01-02" });
+      await upd(deal, { kind: "email", summary: "Emailed from another inbox", at: today }, undefined, "?tz=120");
+      await upd(deal, { kind: "message", summary: "WhatsApp", at: "" });
       await upd(noCo, { kind: "meeting", summary: "Met in person", at: "2026-10-01T10:00:00+02:00", next_step: { title: "Follow up", due_date: lastWeek } });
-      await upd(noCo, { kind: "call", summary: "Called", done_task_ids: [] }, agent, "?tz=-600");
+      await upd(noCo, { kind: "call", summary: "Called", done_task_ids: [] }, undefined, "?tz=-600");
       await upd(other, { kind: "call", summary: "Closed theirs", done_task_ids: [t4, t2] });
       // zod on the body.
       await upd(deal, {});
@@ -477,7 +472,7 @@ export default [
       await upd(deal, { kind: "call", summary: "a", next_step: null });
       await upd(deal, "null");
       await upd(deal, "{");
-      await upd(deal, JSON.stringify({ kind: "call", summary: "x" }), { ...agent, "Content-Type": "text/plain" });
+      await upd(deal, JSON.stringify({ kind: "call", summary: "x" }), { "Content-Type": "text/plain" });
       await list("?status=open");
       await list("?status=done&company_id=company-cedar");
       await list(`?deal_id=${deal}&status=done&owed_by=us`);
@@ -489,8 +484,7 @@ export default [
       await call("GET", "/api/deals/board" + qs({ filters: [{ field: "name", op: "contains", value: "Parity tasks" }] }));
 
       // Tasks: delete (no 404: deleting nothing is fine).
-      const del = (id, headers = user) => call("DELETE", `/api/tasks/${id}`, { headers });
-      await del(t1, pub);
+      const del = (id) => call("DELETE", `/api/tasks/${id}`);
       await del("nope");
       for (const t of [t1, t2, t3, t4, t5]) await del(t);
       const left = await list("?status=all&limit=200");

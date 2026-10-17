@@ -75,10 +75,10 @@ func errReadUndefined(key string) error {
 }
 
 // whoActs is `user(c)?.email ?? caller(c) ?? null`: the signed-in person's
-// address, else who is calling.
+// address (a token's user's, for an API token), else who is calling.
 func whoActs(r *http.Request) string {
-	if u := web.CurrentUser(r); u != nil && u.Email != nil {
-		return *u.Email
+	if u := web.CurrentUser(r); u != nil && u.Email != "" {
+		return u.Email
 	}
 	return web.Caller(r)
 }

@@ -127,7 +127,7 @@ func TestDealValue(t *testing.T) {
 func TestWonDealTellsNoOne(t *testing.T) {
 	ctx := dbtest.Setup(t)
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-	api := New(&App{Now: func() time.Time { return now }})
+	api := replayAPI(&App{Now: func() time.Time { return now }})
 	for _, sql := range []string{
 		"INSERT INTO companies (id, name) VALUES ('co-acme', 'Acme')",
 		"INSERT INTO deals (id, name, company_id, value, stage, close_date) VALUES ('d-1', 'Acme', 'co-acme', 1200, 'prospect', '2099-01-01')",

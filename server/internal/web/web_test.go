@@ -203,15 +203,36 @@ func TestRouterNotFound(t *testing.T) {
 
 func TestNotFoundListsEndpointsForSignedInCallers(t *testing.T) {
 	app := newApp(nil)
-	rec := serve(app, "GET", "/api/nope", map[string]string{"X-Clawnify-Caller": "user"})
-	body := rec.Body.String()
-	if rec.Code != 404 || !strings.HasSuffix(body, `]}`) ||
-		!strings.Contains(body, notFoundHint+`,"endpoints":[{"method":"GET","path":"/api/stats","summary":"Get dashboard statistics"},`) {
-		t.Errorf("GET /api/nope as user = %d %.400s", rec.Code, body)
+	as := func(caller string, header map[string]string) string {
+		r := httptest.NewRequest("GET", "/api/nope", nil)
+		for k, v := range header {
+			r.Header.Set(k, v)
+		}
+		if caller != "" {
+			r = web.WithIdentity(r, caller, &web.User{ID: "u1", Email: "ada@example.com"})
+		}
+		w := httptest.NewRecorder()
+		app.ServeHTTP(w, r)
+		if w.Code != 404 {
+			t.Errorf("GET /api/nope as %q = %d", caller, w.Code)
+		}
+		return w.Body.String()
 	}
-	rec = serve(app, "GET", "/api/nope", map[string]string{"X-Clawnify-Caller": "public"})
-	if strings.Contains(rec.Body.String(), "endpoints") {
-		t.Errorf("public caller sees endpoints: %.200s", rec.Body.String())
+	for _, caller := range []string{"user", "api"} {
+		body := as(caller, nil)
+		if !strings.HasSuffix(body, `]}`) ||
+			!strings.Contains(body, notFoundHint+`,"endpoints":[{"method":"GET","path":"/api/stats","summary":"Get dashboard statistics"},`) {
+			t.Errorf("GET /api/nope as %s = %.400s", caller, body)
+		}
+	}
+	// Nobody signed in, whatever the old Clawnify headers claim.
+	for name, body := range map[string]string{
+		"anonymous":         as("", nil),
+		"X-Clawnify-Caller": as("", map[string]string{"X-Clawnify-Caller": "user"}),
+	} {
+		if strings.Contains(body, "endpoints") {
+			t.Errorf("%s sees endpoints: %.200s", name, body)
+		}
 	}
 }
 
@@ -261,29 +282,40 @@ func TestRouterErrors(t *testing.T) {
 }
 
 func TestIdentity(t *testing.T) {
+	// The X-Clawnify-* headers Clawnify's proxy used to send name nobody now.
 	r := httptest.NewRequest("GET", "/api/stats", nil)
+	r.Header.Set("X-Clawnify-Caller", "user")
+	r.Header.Set("X-Clawnify-User-Id", "u1")
+	r.Header.Set("X-Clawnify-User-Email", "ada@example.com")
 	if got := web.Caller(r); got != "public" {
-		t.Errorf("Caller(no header) = %q", got)
+		t.Errorf("Caller(headers) = %q", got)
 	}
-	r.Header.Set("X-Clawnify-Caller", "agent")
-	if got := web.Caller(r); got != "agent" {
-		t.Errorf("Caller(agent) = %q", got)
-	}
-	r.Header.Set("X-Clawnify-Caller", "hacker")
-	if got := web.Caller(r); got != "public" {
-		t.Errorf("Caller(hacker) = %q", got)
+	if u := web.CurrentUser(r); u != nil {
+		t.Errorf("CurrentUser(headers) = %#v", u)
 	}
 
-	if u := web.CurrentUser(r); u != nil {
-		t.Errorf("CurrentUser(no id) = %#v", u)
+	// Who is calling is what the auth middleware put on the context.
+	u := &web.User{ID: "u1", Email: "ada@example.com", Name: "Ada", Role: "admin"}
+	signed := web.WithIdentity(r, "api", u)
+	if got := web.Caller(signed); got != "api" {
+		t.Errorf("Caller = %q", got)
 	}
-	r.Header.Set("X-Clawnify-User-Id", " u1 ")
-	r.Header.Set("X-Clawnify-User-Name", "Ana  María López")
-	r.Header.Set("X-Clawnify-User-Email", "   ")
-	u := web.CurrentUser(r)
-	if u == nil || u.ID != "u1" || u.Email != nil || u.AvatarURL != nil ||
-		*u.Name != "Ana  María López" || *u.FirstName != "Ana" || *u.LastName != "María López" {
-		t.Errorf("CurrentUser = %#v", u)
+	if got := web.CurrentUser(signed); got != u {
+		t.Errorf("CurrentUser = %#v", got)
+	}
+	if caller, got := web.IdentityFrom(signed.Context()); caller != "api" || got != u {
+		t.Errorf("IdentityFrom = %q, %#v", caller, got)
+	}
+	if caller, got := web.IdentityFrom(r.Context()); caller != "" || got != nil {
+		t.Errorf("IdentityFrom(no identity) = %q, %#v", caller, got)
+	}
+	if web.Caller(r) != "public" {
+		t.Error("WithIdentity changed the original request")
+	}
+	rec := httptest.NewRecorder()
+	web.JSON(rec, 200, u)
+	if rec.Body.String() != `{"id":"u1","email":"ada@example.com","name":"Ada","role":"admin"}` {
+		t.Errorf("User JSON = %s", rec.Body.String())
 	}
 }
 

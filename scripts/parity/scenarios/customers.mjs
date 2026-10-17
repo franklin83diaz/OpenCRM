@@ -18,7 +18,6 @@ export default [
     run: async (call) => {
       // The first read gives Northline its customer_since (its contact's won deal).
       await call("GET", "/api/customers");
-      await call("GET", "/api/customers", { headers: { "X-Clawnify-Caller": "agent" } });
       for (const tz of ["120", "-300", "90.5", "abc", "", "99999", "-99999", "Infinity", "-Infinity", "0x1F", "1e3", "%20120%20", "-0", "+60", "1_0"]) {
         await call("GET", `/api/customers?tz=${tz}`);
       }
@@ -62,7 +61,7 @@ export default [
       await get("?email=alex@northline.example&email=x");
       await get("?email=a&domain=b&domain=c");
       await get("?domain=a&domain=b&email=x&email=y");
-      await call("GET", "/api/lookup", { headers: { "X-Clawnify-Caller": "public" } });
+      await call("GET", "/api/lookup");
       await call("PUT", "/api/lookup", { body: {} });
       await call("GET", "/api/lookup/alex@northline.example");
     },
@@ -117,7 +116,7 @@ export default [
       await post(body, { "Content-Type": "multipart/form-data; boundary=x" });
       await post("nope", { "Content-Type": "text/plain" });
       await call("POST", "/api/lookup");
-      await call("POST", "/api/lookup", { headers: { "X-Clawnify-Caller": "public" }, body: { addresses: [{ email: "sam@cedar.example" }] } });
+      await call("POST", "/api/lookup", { body: { addresses: [{ email: "sam@cedar.example" }] } });
     },
   },
 ];

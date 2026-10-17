@@ -43,10 +43,14 @@ if [ "$(git -C "$REF" rev-parse HEAD)" != "$BASE" ]; then
 fi
 [ -e "$REF/node_modules" ] || ln -s "$ROOT/node_modules" "$REF/node_modules"
 
-# 2. Fresh, identically seeded databases.
+# 2. Fresh, identically seeded databases. Go's also gets the Go schema, all
+# CREATE … IF NOT EXISTS: the same tables, plus its accounts (users, sessions,
+# api_tokens), which the TS reference never had.
 for x in ts go; do
   rm -rf "$P/state-$x"
-  for f in "$REF/src/server/schema.sql" "$REF/demo/seed.sql"; do
+  files=("$REF/src/server/schema.sql" "$REF/demo/seed.sql")
+  if [ "$x" = go ]; then files+=("$ROOT/server/schema.sql"); fi
+  for f in "${files[@]}"; do
     (cd "$REF" && npx wrangler d1 execute open-crm-db --local --persist-to "$P/state-$x" --file="$f") >"$P/seed-$x.log" 2>&1 \
       || { cat "$P/seed-$x.log" >&2; echo "parity: seeding $x failed" >&2; exit 2; }
   done
@@ -62,17 +66,24 @@ if [ "${#sqlites[@]}" -ne 1 ]; then
   exit 2
 fi
 
+# The Go server wants an account for every /api call: a fresh API token for
+# this run, made an admin's at start by -bootstrap-token, signs its calls.
+# ADMIN_EMAIL/ADMIN_PASSWORD from the caller's shell would add an account the
+# run doesn't need, so the dev server doesn't see them.
+GO_TOKEN="crm_$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')"
+export PARITY_GO_TOKEN="$GO_TOKEN"
+
 cd "$REF"
 setsid npx wrangler dev --port $TS_PORT --inspector-port $INSPECTOR_PORT --persist-to "$P/state-ts" >"$P/ts.log" 2>&1 &
 TS_PID=$!
 cd "$ROOT"
-"$P/devserver" -sqlite "${sqlites[0]}" -addr ":$GO_PORT" >"$P/go.log" 2>&1 &
+env -u ADMIN_EMAIL -u ADMIN_PASSWORD "$P/devserver" -sqlite "${sqlites[0]}" -addr ":$GO_PORT" -bootstrap-token "$GO_TOKEN" >"$P/go.log" 2>&1 &
 GO_PID=$!
 
-# wait_for <port> <label> <logname> <path>
+# wait_for <port> <label> <logname> <path> [curl header]
 wait_for() {
   for _ in $(seq 1 120); do
-    if curl -fsS -o /dev/null "http://localhost:$1$4" 2>/dev/null; then return 0; fi
+    if curl -fsS -o /dev/null ${5:+-H "$5"} "http://localhost:$1$4" 2>/dev/null; then return 0; fi
     sleep 0.5
   done
   echo "parity: $2 did not answer GET $4; see $P/$3.log" >&2
@@ -82,7 +93,7 @@ wait_for() {
 # Both are probed on GET /api/stats, which also runs its backfill (a company
 # whose deal is won becomes a customer), so both start from the same data.
 wait_for $TS_PORT "TS server" ts /api/stats
-wait_for $GO_PORT "Go server" go /api/stats
+wait_for $GO_PORT "Go server" go /api/stats "Authorization: Bearer $GO_TOKEN"
 
 # 4. Run.
 set +e

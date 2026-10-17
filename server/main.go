@@ -1,6 +1,8 @@
 // The API server that runs in the Cloudflare Container. It reaches D1 through
 // the Worker (D1_URL, set by the Api container class), and stops gracefully
-// on SIGTERM, which is how the container is put to sleep.
+// on SIGTERM, which is how the container is put to sleep. The Worker also
+// passes the ADMIN_EMAIL and ADMIN_PASSWORD secrets, when set: the first
+// admin of a CRM that has no accounts yet.
 package main
 
 import (
@@ -31,7 +33,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           crm.New(&crm.App{}),
+		Handler:           crm.New(&crm.App{AdminEmail: os.Getenv("ADMIN_EMAIL"), AdminPassword: os.Getenv("ADMIN_PASSWORD")}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)

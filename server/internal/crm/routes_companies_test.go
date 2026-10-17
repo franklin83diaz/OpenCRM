@@ -27,7 +27,7 @@ func companiesRequest(t *testing.T, api http.Handler, method, path, body string)
 // not as & and friends.
 func TestCompaniesNameRoundTripsUnescaped(t *testing.T) {
 	recordedDB(t, nil)
-	api := New(&App{})
+	api := replayAPI(&App{})
 	status, raw := companiesRequest(t, api, "POST", "/api/companies", `{"name":"Cedar & Co <b>","notes":"Zoë's"}`)
 	if status != 201 || !strings.Contains(raw, `"name":"Cedar & Co <b>"`) || !strings.Contains(raw, `"notes":"Zoë's"`) {
 		t.Fatalf("create: %d %s", status, raw)
@@ -41,7 +41,7 @@ func TestCompaniesNameRoundTripsUnescaped(t *testing.T) {
 // Review Focus 1: a field sent as null is not a field left out.
 func TestCompaniesUpdateNullIsNotAbsent(t *testing.T) {
 	recordedDB(t, []string{`INSERT INTO companies (id, name, domain, customer_since) VALUES ('co-1', 'Acme', 'acme.example', '2025-01-01')`})
-	api := New(&App{})
+	api := replayAPI(&App{})
 	for _, c := range []struct {
 		body   string
 		status int
@@ -73,7 +73,7 @@ func TestCompaniesBulkDeleteChunks(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustRun(t, ctx, `INSERT INTO contacts (id, first_name, partner_id) VALUES ('ct-1', 'Ann', 'co-c'), ('ct-2', 'Bo', 'co-keep')`)
-	api := New(&App{})
+	api := replayAPI(&App{})
 
 	ids := make([]string, 150)
 	for i := range ids {

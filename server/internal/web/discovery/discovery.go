@@ -1,8 +1,13 @@
 // Package discovery serves what @clawnify/routes' mountDiscovery did: the
 // OpenAPI document, the llms.txt index, and a not-found answer that points
-// callers at both. The three files are snapshots of the TS app's own output —
-// its OpenAPI document was generated from the zod route schemas, which Go
-// doesn't have — so a route change means re-capturing them.
+// callers at both. The three files began as captures of the TS app's output
+// (its OpenAPI document was generated from the zod route schemas, which Go
+// doesn't have); now they are maintained by hand beside the Go routes, and
+// crm's TestDiscoveryListsExactlyTheRoutes is the judge: llms.txt and
+// endpoints.json must list exactly the routes the router serves, and the
+// OpenAPI document (which covers only the routes TS described with zod
+// schemas) only routes that exist. Adding or removing a route means editing
+// them until that test passes.
 package discovery
 
 import (
@@ -54,8 +59,9 @@ type notFoundBody struct {
 }
 
 // notFound answers API paths in JSON a client or agent can act on, and
-// everything else with plain text. Only a signed-in caller (any caller header
-// but "public") gets the endpoint list; anonymous callers get the hint.
+// everything else with plain text. Only a signed-in caller gets the endpoint
+// list. Behind the auth middleware an anonymous /api request is answered 401
+// before it gets here, so nobody probes the API's shape without an account.
 func notFound(w http.ResponseWriter, r *http.Request) error {
 	if !strings.HasPrefix(r.URL.Path, "/api") {
 		return web.Text(w, http.StatusNotFound, "text/plain; charset=UTF-8", "404 Not Found")
@@ -65,7 +71,7 @@ func notFound(w http.ResponseWriter, r *http.Request) error {
 		Message: "No route for " + r.Method + " " + r.URL.Path + " on this app.",
 		Hint:    "GET /llms.txt lists every endpoint; GET /api/openapi.json has full request/response schemas.",
 	}
-	if c := r.Header.Get("X-Clawnify-Caller"); c != "" && c != "public" {
+	if web.Caller(r) != "public" {
 		body.Endpoints = endpoints
 	}
 	return web.JSON(w, http.StatusNotFound, body)

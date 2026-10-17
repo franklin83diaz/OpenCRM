@@ -1,14 +1,33 @@
 // Runs every scenario against two backends and diffs the normalized responses.
-// Usage: node runner.mjs <ts-base-url> <go-base-url> [scenario-name ...]
+// Usage: PARITY_GO_TOKEN=crm_… node runner.mjs <ts-base-url> <go-base-url> [scenario-name ...]
+//
+// Every call is made as one signed-in account. The Go server needs an
+// account for every /api call: its calls carry the API token run.sh gave the
+// dev server (-bootstrap-token). The TS reference learned who was calling from
+// Clawnify's X-Clawnify-* headers: its calls name the token's account there,
+// so both sides write tasks and updates as the same person.
 import { readdir } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const [tsBase, goBase, ...names] = process.argv.slice(2);
 if (!tsBase || !goBase) {
-  console.error("usage: runner.mjs <ts-base-url> <go-base-url> [scenario-name ...]");
+  console.error("usage: PARITY_GO_TOKEN=crm_… runner.mjs <ts-base-url> <go-base-url> [scenario-name ...]");
   process.exit(2);
 }
+const goToken = process.env.PARITY_GO_TOKEN;
+if (!goToken) {
+  console.error("parity: PARITY_GO_TOKEN is not set (run.sh passes the Go dev server's -bootstrap-token)");
+  process.exit(2);
+}
+const goAuth = { Authorization: `Bearer ${goToken}` };
+const meRes = await fetch(goBase + "/api/auth/me", { headers: goAuth });
+const me = meRes.ok ? (await meRes.json()).user : null;
+if (!me?.email) {
+  console.error(`parity: GET /api/auth/me with the token answered ${meRes.status}`);
+  process.exit(2);
+}
+const tsAuth = { "X-Clawnify-Caller": "user", "X-Clawnify-User-Id": me.id, "X-Clawnify-User-Email": me.email };
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 const TS = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z?/g;
@@ -37,10 +56,12 @@ function makeNormalizer() {
 
 // A call's opts.compare, when given, picks what of its parsed body is compared
 // (status and content type always are): for a body the Go server is meant to
-// answer differently, such as the discovery documents of a CRM with fewer routes.
-function makeCaller(base, record) {
+// answer differently, such as the discovery documents of a CRM with other
+// routes. A not-found's endpoint list is compared only for being there, for
+// the same reason. auth is the backend's credentials, sent with every call.
+function makeCaller(base, record, auth) {
   return async (method, p, opts = {}) => {
-    const headers = { ...(opts.headers || {}) };
+    const headers = { ...auth, ...(opts.headers || {}) };
     let body;
     if (opts.body !== undefined) {
       body = typeof opts.body === "string" ? opts.body : JSON.stringify(opts.body);
@@ -57,7 +78,10 @@ function makeCaller(base, record) {
       isJson = true;
     } catch {}
     const contentType = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    const compared = opts.compare ? opts.compare(parsed) : parsed;
+    let compared = opts.compare ? opts.compare(parsed) : parsed;
+    if (!opts.compare && isJson && compared?.error === "not_found" && Array.isArray(compared.endpoints)) {
+      compared = { ...compared, endpoints: "(a list: not compared, the Go CRM has other routes)" };
+    }
     record.push({ method, path: p, status: res.status, contentType, isJson, body: compared, raw: text });
     return { status: res.status, body: parsed };
   };
@@ -113,9 +137,9 @@ for (const file of selected) {
     scenarios++;
     const rec = { ts: [], go: [] };
     const errs = {};
-    for (const [who, base] of [["ts", tsBase], ["go", goBase]]) {
+    for (const [who, base, auth] of [["ts", tsBase, tsAuth], ["go", goBase, goAuth]]) {
       try {
-        await sc.run(makeCaller(base, rec[who]));
+        await sc.run(makeCaller(base, rec[who], auth));
       } catch (e) {
         errs[who] = e;
       }

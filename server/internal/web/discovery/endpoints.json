@@ -232,5 +232,60 @@
  {
   "method": "DELETE",
   "path": "/api/views/:id"
+ },
+ {
+  "method": "POST",
+  "path": "/api/auth/login",
+  "summary": "Sign in with {email, password}: the account, and a session cookie"
+ },
+ {
+  "method": "POST",
+  "path": "/api/auth/logout",
+  "summary": "Sign out: end this session and drop its cookie"
+ },
+ {
+  "method": "GET",
+  "path": "/api/auth/me",
+  "summary": "The signed-in account"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/auth/password",
+  "summary": "Change your password: {current_password, new_password}; signs you out everywhere else"
+ },
+ {
+  "method": "GET",
+  "path": "/api/users",
+  "summary": "List the accounts (admins only)"
+ },
+ {
+  "method": "POST",
+  "path": "/api/users",
+  "summary": "Create an account: {email, name?, password, role?} (admins only)"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/users/{id}",
+  "summary": "Change an account's name, role or password, or disable it (admins only)"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/users/{id}",
+  "summary": "Delete an account, with its sessions and API tokens (admins only)"
+ },
+ {
+  "method": "GET",
+  "path": "/api/tokens",
+  "summary": "List your API tokens"
+ },
+ {
+  "method": "POST",
+  "path": "/api/tokens",
+  "summary": "Create an API token: {name}; its secret is in this answer only"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/tokens/{id}",
+  "summary": "Delete one of your API tokens"
  }
 ]

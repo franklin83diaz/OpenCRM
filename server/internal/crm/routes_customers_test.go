@@ -44,7 +44,7 @@ type customersFixture struct {
 func newCustomersFixture(t *testing.T) *customersFixture {
 	ctx := dbtest.Setup(t)
 	mustRun(t, ctx, customersSeed)
-	return &customersFixture{t: t, api: New(&App{})}
+	return &customersFixture{t: t, api: replayAPI(&App{})}
 }
 
 func (f *customersFixture) want(method, path, contentType, body string, status int, raw string) {

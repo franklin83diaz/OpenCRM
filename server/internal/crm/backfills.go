@@ -19,6 +19,7 @@ type doneOnce struct {
 	stagesSeeded            atomic.Bool
 	dealCompaniesBackfilled atomic.Bool
 	customersBackfilled     atomic.Bool
+	adminChecked            atomic.Bool // the first admin exists, or can't be made from the secrets
 }
 
 // defaultStages is the default sales pipeline: key, label, color, position, is_won, is_lost.

@@ -58,7 +58,7 @@ func TestSettingsMatchTS(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			h := New(&App{Now: func() time.Time { return now }})
+			h := replayAPI(&App{Now: func() time.Time { return now }})
 
 			// The scenarios' times are all before now + a day; a later stamp is
 			// SQLite's datetime('now') at the run (the generator's or this one's).

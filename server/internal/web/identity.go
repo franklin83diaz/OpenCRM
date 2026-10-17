@@ -1,70 +1,56 @@
 package web
 
 import (
+	"context"
 	"net/http"
-	"strings"
 )
 
-// Clawnify's proxy tells the app who is calling in X-Clawnify-* headers; these
-// read them as @clawnify/app's caller() and user() did.
+// Who is calling. The auth middleware (internal/auth) signs a request in with
+// a session cookie or an API token and puts the account on its context; the
+// routes read it back here. Nothing in the request itself says who is calling:
+// the X-Clawnify-* headers Clawnify's proxy used to send are ignored.
 
-var callers = map[string]bool{
-	"user": true, "api": true, "agent": true, "agent-browser": true,
-	"public": true, "bypass": true, "system": true, "app": true,
+// User is the signed-in account behind a request.
+type User struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	Role  string `json:"role"` // "admin" | "user"
 }
 
-// header is the trimmed header value, "" when absent or blank.
-func header(r *http.Request, name string) string {
-	return strings.TrimSpace(strings.Join(r.Header.Values(name), ", "))
+type identityKey struct{}
+
+type identity struct {
+	caller string
+	user   *User
 }
 
-// Caller is who is calling: one of user, api, agent, agent-browser, public,
-// bypass, system, app. Anything else, or nothing, is "public".
+// WithIdentity is r with caller ("user" for a session, "api" for a token)
+// and user on its context.
+func WithIdentity(r *http.Request, caller string, user *User) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), identityKey{}, identity{caller, user}))
+}
+
+// IdentityFrom is what WithIdentity put on ctx: the caller, "" when nothing
+// did, and the user.
+func IdentityFrom(ctx context.Context) (caller string, user *User) {
+	id, _ := ctx.Value(identityKey{}).(identity)
+	return id.caller, id.user
+}
+
+// Caller is who is calling: "user" for a signed-in session, "api" for an API
+// token, "public" when nobody signed the request in.
 func Caller(r *http.Request) string {
-	if v := header(r, "X-Clawnify-Caller"); callers[v] {
-		return v
+	if caller, _ := IdentityFrom(r.Context()); caller != "" {
+		return caller
 	}
 	return "public"
 }
 
-// User is the signed-in person behind a request. Absent fields are nil (null).
-type User struct {
-	ID        string  `json:"id"`
-	Email     *string `json:"email"`
-	Name      *string `json:"name"`
-	AvatarURL *string `json:"avatarUrl"`
-	FirstName *string `json:"firstName"`
-	LastName  *string `json:"lastName"`
-}
-
-// CurrentUser is the signed-in user, or nil when the request names none.
+// CurrentUser is the signed-in account, or nil. An API token acts as its user,
+// so a token request has one too.
 func CurrentUser(r *http.Request) *User {
-	id := header(r, "X-Clawnify-User-Id")
-	if id == "" {
-		return nil
-	}
-	opt := func(name string) *string {
-		if v := header(r, name); v != "" {
-			return &v
-		}
-		return nil
-	}
-	u := &User{
-		ID:        id,
-		Email:     opt("X-Clawnify-User-Email"),
-		Name:      opt("X-Clawnify-User-Name"),
-		AvatarURL: opt("X-Clawnify-User-Avatar"),
-	}
-	// First word is the first name, the rest the last name.
-	if u.Name != nil {
-		if parts := strings.Fields(*u.Name); len(parts) > 0 {
-			u.FirstName = &parts[0]
-			if len(parts) > 1 {
-				last := strings.Join(parts[1:], " ")
-				u.LastName = &last
-			}
-		}
-	}
+	_, u := IdentityFrom(r.Context())
 	return u
 }
 

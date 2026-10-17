@@ -2,6 +2,9 @@
 
 > A CRM with companies, contacts, and deal pipeline management.
 
+## Authentication
+Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` needs an account; without one it answers 401. Agents and scripts send a personal API token as `Authorization: Bearer crm_…` (its owner makes it in the CRM, or with `POST /api/tokens`); a token acts as its owner. People sign in with `POST /api/auth/login`, which sets a session cookie.
+
 ## API
 - `GET /api/stats` — Get dashboard statistics
 - `GET /api/widgets` — Dashboard widgets: a bounded summary of this app for the current caller
@@ -54,5 +57,16 @@
 - `POST /api/views`
 - `PATCH /api/views/:id`
 - `DELETE /api/views/:id`
+- `POST /api/auth/login` — Sign in with {email, password}: the account, and a session cookie
+- `POST /api/auth/logout` — Sign out: end this session and drop its cookie
+- `GET /api/auth/me` — The signed-in account
+- `PUT /api/auth/password` — Change your password: {current_password, new_password}; signs you out everywhere else
+- `GET /api/users` — List the accounts (admins only)
+- `POST /api/users` — Create an account: {email, name?, password, role?} (admins only)
+- `PATCH /api/users/{id}` — Change an account's name, role or password, or disable it (admins only)
+- `DELETE /api/users/{id}` — Delete an account, with its sessions and API tokens (admins only)
+- `GET /api/tokens` — List your API tokens
+- `POST /api/tokens` — Create an API token: {name}; its secret is in this answer only
+- `DELETE /api/tokens/{id}` — Delete one of your API tokens
 
 Full machine-readable spec: [/api/openapi.json](/api/openapi.json)

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"opencrm/internal/auth"
 	"opencrm/internal/db/dbtest"
-	"opencrm/internal/web"
 )
 
 // The routes that existed only for Clawnify, the integrations (Gmail,
@@ -59,9 +59,21 @@ func routeKey(method, path string) string {
 	return strings.ToUpper(method) + " " + pathParam.ReplaceAllString(path, "{}")
 }
 
+// signedInAPI is the CRM behind its auth middleware, and the header of an
+// admin's API token to call it with.
+func signedInAPI(t *testing.T) (http.Handler, map[string]string) {
+	t.Helper()
+	ctx := dbtest.Setup(t)
+	app := &App{}
+	tok, _ := auth.NewSecret(auth.TokenPrefix)
+	if err := app.BootstrapToken(ctx, tok); err != nil {
+		t.Fatal(err)
+	}
+	return New(app), map[string]string{"Authorization": "Bearer " + tok}
+}
+
 func TestRemovedRoutesAreGone(t *testing.T) {
-	dbtest.Setup(t)
-	api := New(&App{})
+	api, signedIn := signedInAPI(t)
 	ids := strings.NewReplacer("{id}", "x1", "{mailbox}", "inbox", "{entity}", "contact", "{key}", "score")
 	for _, route := range removedRoutes {
 		method, path, _ := strings.Cut(route, " ")
@@ -72,11 +84,14 @@ func TestRemovedRoutesAreGone(t *testing.T) {
 		}
 		r := httptest.NewRequest(method, path, strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
+		for k, v := range signedIn {
+			r.Header.Set(k, v)
+		}
 		w := httptest.NewRecorder()
 		api.ServeHTTP(w, r)
 		want := `{"error":"not_found","message":"No route for ` + method + " " + path + ` on this app.",` +
-			`"hint":"GET /llms.txt lists every endpoint; GET /api/openapi.json has full request/response schemas."}`
-		if w.Code != http.StatusNotFound || w.Body.String() != want {
+			`"hint":"GET /llms.txt lists every endpoint; GET /api/openapi.json has full request/response schemas.","endpoints":[`
+		if w.Code != http.StatusNotFound || !strings.HasPrefix(w.Body.String(), want) {
 			t.Errorf("%s %s = %d %.200s; want 404 not_found", method, path, w.Code, w.Body.String())
 		}
 	}
@@ -86,11 +101,12 @@ func TestRemovedRoutesAreGone(t *testing.T) {
 // router: llms.txt and the not-found endpoint list name every registered
 // route and nothing else; the OpenAPI document (which covers only the routes
 // TS declared with zod schemas) names only registered ones. None mentions a
-// removed route.
+// removed route. The documents are public; the endpoint list comes with a
+// signed-in caller's 404.
 func TestDiscoveryListsExactlyTheRoutes(t *testing.T) {
-	api := New(&App{})
+	api, signedIn := signedInAPI(t)
 	registered := map[string]bool{}
-	for _, p := range api.(*web.Router).Patterns() {
+	for _, p := range (&App{}).router().Patterns() {
 		method, path, _ := strings.Cut(p, " ")
 		if path == "/api/openapi.json" || path == "/llms.txt" {
 			continue // discovery's own routes, which the documents don't list
@@ -115,7 +131,10 @@ func TestDiscoveryListsExactlyTheRoutes(t *testing.T) {
 	}
 	llms := get("/llms.txt", nil)
 	openapi := get("/api/openapi.json", nil)
-	notFound := get("/api/nope", map[string]string{"X-Clawnify-Caller": "user"})
+	notFound := get("/api/nope", signedIn)
+	if !strings.Contains(llms, "`Authorization: Bearer crm_…`") {
+		t.Error("llms.txt doesn't say how to authenticate")
+	}
 
 	for name, doc := range map[string]string{"llms.txt": llms, "openapi.json": openapi, "the endpoint list": notFound} {
 		for _, p := range removedPrefixes {
