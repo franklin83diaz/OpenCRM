@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"opencrm/internal/auth"
 	"opencrm/internal/db"
 	"opencrm/internal/db/dbtest"
@@ -31,16 +33,16 @@ const (
 	badPassword      = `{"error":"A password needs 8 to 72 characters"}`
 )
 
-// testPassword is every seeded account's password; its hash is made once,
-// bcrypt at cost 12 being slow on purpose.
+// testPassword is every seeded account's password; its hash is made once, at
+// bcrypt's lowest cost, the one these tests run at (auth.SetCostForTests).
 const testPassword = "password-1"
 
 var testPasswordHash = sync.OnceValue(func() string {
-	h, err := auth.HashPassword(context.Background(), testPassword)
+	h, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.MinCost)
 	if err != nil {
 		panic(err)
 	}
-	return h
+	return string(h)
 })
 
 type authAPI struct {
@@ -51,7 +53,10 @@ type authAPI struct {
 	n   int // requests made, for a fresh client address each
 }
 
+// newAuthAPI is app behind its auth middleware on a fresh database, with
+// bcrypt at its lowest cost: production's 12 is slow on purpose.
 func newAuthAPI(t *testing.T, app *App) *authAPI {
+	auth.SetCostForTests(t, bcrypt.MinCost)
 	ctx := dbtest.Setup(t)
 	return &authAPI{t: t, ctx: ctx, app: app, h: New(app)}
 }
@@ -272,7 +277,8 @@ func TestAuthBootstrapCreatesTheAdminOnce(t *testing.T) {
 	if n := a.count("users"); n != 1 {
 		t.Fatalf("%d users after two logins", n)
 	}
-	if n := a.count("users WHERE email = 'ada@example.com' AND role = 'admin' AND disabled = 0 AND password_hash LIKE '$2a$12$%'"); n != 1 {
+	// A bcrypt hash at the tests' cost (production's 12 is auth's TestPasswords).
+	if n := a.count("users WHERE email = 'ada@example.com' AND role = 'admin' AND disabled = 0 AND password_hash LIKE '$2a$04$%'"); n != 1 {
 		t.Error("the bootstrap admin is not an active admin with a bcrypt hash")
 	}
 

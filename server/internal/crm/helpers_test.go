@@ -113,7 +113,8 @@ func recordedDB(t *testing.T, seed []string) *recorder {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	for _, s := range append([]string{string(schema)}, seed...) {
+	// The schema in one transaction: one write to disk, not one per statement.
+	for _, s := range append([]string{"BEGIN;\n" + string(schema) + "\nCOMMIT;"}, seed...) {
 		if _, err := d.Run(ctx, s, nil); err != nil {
 			t.Fatalf("seed %q: %v", s, err)
 		}

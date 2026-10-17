@@ -1,11 +1,11 @@
 package crm
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"opencrm/internal/db/dbtest"
 )
@@ -73,9 +73,12 @@ const (
 func TestCustomersRoutes(t *testing.T) {
 	f := newCustomersFixture(t)
 	// The first read gives Northline its customer_since: the day its won deal
-	// (through its contact) was last changed, which is today.
-	today := time.Now().UTC().Format("2006-01-02")
-	northline := `{"customers":[{"id":"company-northline","name":"Northline Studio","domain":"","customer_since":"` + today + `","renewal_date":null,"status":"unknown","reasons":["Calls aren't synced, email isn't synced"],"last_touch_at":null,"days_quiet":null,"last_meeting_at":null,"next_meeting_at":null,"last_summary":null,"last_sentiment":null,"ours_open":0,"ours_overdue":0,"theirs_open":0,"ideas":0,"expansion":0,"risks":0}],"focus":[],"upcoming":[],"counts":{"red":0,"yellow":0,"unknown":1,"green":0},"sight":{"calls":"off","emails":"off"}}`
+	// (through its contact) was last changed. The seed leaves that at SQLite's
+	// datetime('now') (today, in the parity run); pinned here, so the day can't
+	// change between the seed and a Go clock read across midnight UTC.
+	mustRun(t, context.Background(), "UPDATE deals SET updated_at = '2026-10-14 23:59:59' WHERE id = 'deal-support'")
+	const since = "2026-10-14"
+	northline := `{"customers":[{"id":"company-northline","name":"Northline Studio","domain":"","customer_since":"` + since + `","renewal_date":null,"status":"unknown","reasons":["Calls aren't synced, email isn't synced"],"last_touch_at":null,"days_quiet":null,"last_meeting_at":null,"next_meeting_at":null,"last_summary":null,"last_sentiment":null,"ours_open":0,"ours_overdue":0,"theirs_open":0,"ideas":0,"expansion":0,"risks":0}],"focus":[],"upcoming":[],"counts":{"red":0,"yellow":0,"unknown":1,"green":0},"sight":{"calls":"off","emails":"off"}}`
 	for _, q := range []string{"", "?tz=120", "?tz=90.5", "?tz=abc", "?tz=", "?tz=99999", "?tz=-Infinity", "?tz=0x1F", "?tz", "?TZ=5&other=1"} {
 		f.want("GET", "/api/customers"+q, "", "", 200, northline)
 	}
@@ -83,7 +86,7 @@ func TestCustomersRoutes(t *testing.T) {
 	f.want("GET", "/api/customers?tz=1&tz=2", "", "", 400, tzTwice)
 	f.want("GET", "/api/customers?tz=1&tz=", "", "", 400, tzTwice)
 
-	alex := strings.Replace(alexLookup, "%s", today, 1)
+	alex := strings.Replace(alexLookup, "%s", since, 1)
 	f.want("GET", "/api/lookup?email=alex@northline.example", "", "", 200, alex)
 	f.want("GET", "/api/lookup?email=%20ALEX@Northline.EXAMPLE%20", "", "", 200, alex)
 	f.want("GET", "/api/lookup?email=+alex@northline.example+&domain=harbour.example", "", "", 200, alex)

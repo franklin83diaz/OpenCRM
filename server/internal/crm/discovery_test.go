@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"opencrm/internal/auth"
 	"opencrm/internal/db/dbtest"
 )
@@ -65,6 +67,7 @@ func routeKey(method, path string) string {
 // admin's API token to call it with.
 func signedInAPI(t *testing.T) (http.Handler, map[string]string) {
 	t.Helper()
+	auth.SetCostForTests(t, bcrypt.MinCost) // BootstrapToken hashes a password
 	ctx := dbtest.Setup(t)
 	app := &App{}
 	tok, _ := auth.NewSecret(auth.TokenPrefix)

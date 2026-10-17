@@ -3,9 +3,12 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // With every bcrypt slot taken, HashPassword and CheckPassword wait a while
@@ -76,5 +79,34 @@ func TestBcryptSlots(t *testing.T) {
 	}
 	if len(bcryptSlots) != 0 {
 		t.Errorf("%d slots still held", len(bcryptSlots))
+	}
+}
+
+// SetCostForTests lowers bcrypt's cost for one test, and the dummy hash an
+// unknown email is checked against with it, so both take as long as each
+// other still; then puts back cost 12, which production never leaves.
+func TestSetCostForTests(t *testing.T) {
+	ctx := context.Background()
+	t.Run("lowered", func(t *testing.T) {
+		SetCostForTests(t, bcrypt.MinCost)
+		h, err := HashPassword(ctx, "password-1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(h, "$2a$04$") || !strings.HasPrefix(dummyHash, "$2a$04$") {
+			t.Errorf("hash %q, dummy hash %q: want cost 4", h, dummyHash)
+		}
+		if ok, err := CheckPassword(ctx, h, "password-1"); !ok || err != nil {
+			t.Errorf("CheckPassword at cost 4 = %v, %v", ok, err)
+		}
+		if ok, err := CheckPassword(ctx, "", "password-1"); ok || err != nil {
+			t.Errorf("CheckPassword with no account = %v, %v", ok, err)
+		}
+	})
+	if cost != 12 || dummyHash != productionDummyHash {
+		t.Errorf("after the test: cost %d, dummy hash %q", cost, dummyHash)
+	}
+	if c, err := bcrypt.Cost([]byte(dummyHash)); err != nil || c != 12 {
+		t.Errorf("the dummy hash's cost = %d, %v", c, err)
 	}
 }

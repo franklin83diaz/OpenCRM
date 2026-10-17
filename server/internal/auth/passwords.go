@@ -14,8 +14,9 @@ import (
 )
 
 // cost is bcrypt's work factor: about a quarter of a second per hash or check
-// on a server core, which is what makes a stolen hash slow to guess.
-const cost = 12
+// on a server core, which is what makes a stolen hash slow to guess. Only
+// SetCostForTests changes it, for one test.
+var cost = 12
 
 // bcryptSlots bounds the bcrypt work running at once, across the process.
 // The container is a quarter of a CPU: without a bound, a handful of
@@ -75,7 +76,29 @@ var ErrPasswordLength = errors.New("A password needs 8 to 72 characters")
 // dummyHash is a bcrypt hash (at cost) of a random secret nobody kept. A login
 // for an email with no account checks the password against it, so it takes as
 // long as one with an account: the time it takes doesn't say who has one.
-const dummyHash = "$2a$12$pIsZNI/12T6JDFpffK/li.6kBhRMZ7wV13uRo/gzuuTXmegeJsMLO"
+var dummyHash = productionDummyHash
+
+const productionDummyHash = "$2a$12$pIsZNI/12T6JDFpffK/li.6kBhRMZ7wV13uRo/gzuuTXmegeJsMLO"
+
+// SetCostForTests makes bcrypt run at cost c for the rest of test t, hashes
+// and the dummy hash alike, so a test that signs in again and again doesn't
+// spend a quarter of a second on each; t.Cleanup puts back cost 12. Tests
+// that use it must not run in parallel. (t is a *testing.T; the interface
+// keeps package testing out of the production binary.)
+func SetCostForTests(t interface {
+	Helper()
+	Cleanup(func())
+	Fatal(args ...any)
+}, c int) {
+	t.Helper()
+	h, err := bcrypt.GenerateFromPassword([]byte("a secret nobody kept"), c)
+	if err != nil {
+		t.Fatal(err) // c is out of bcrypt's range
+	}
+	oldCost, oldDummy := cost, dummyHash
+	cost, dummyHash = c, string(h)
+	t.Cleanup(func() { cost, dummyHash = oldCost, oldDummy })
+}
 
 // ValidPassword is whether pw is 8 to 72 bytes long.
 func ValidPassword(pw string) bool {

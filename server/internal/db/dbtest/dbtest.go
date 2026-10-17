@@ -32,8 +32,9 @@ func Setup(t *testing.T) context.Context {
 		}
 	})
 	ctx := context.Background()
-	// Without params SQLite runs every statement in the script.
-	if _, err := d.Run(ctx, string(schema), nil); err != nil {
+	// Without params SQLite runs every statement in the script; in one
+	// transaction, the schema is one write to disk, not one per statement.
+	if _, err := d.Run(ctx, "BEGIN;\n"+string(schema)+"\nCOMMIT;", nil); err != nil {
 		t.Fatalf("applying schema.sql: %v", err)
 	}
 	db.Use(d)
