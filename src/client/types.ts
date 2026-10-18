@@ -1,7 +1,7 @@
 import type { FilterNode } from "./lib/filters";
 
-export type View = "contacts" | "companies" | "deals" | "partners" | "customer-users";
-export type EntityType = "contact" | "company" | "deal" | "partner" | "customer_user";
+export type View = "contacts" | "companies" | "deals" | "partners" | "customer-users" | "tickets";
+export type EntityType = "contact" | "company" | "deal" | "partner" | "customer_user" | "ticket";
 
 /** Base storage type for a custom property. Widget flavours ride on top. */
 export type AttributeType =
@@ -61,6 +61,10 @@ export interface Company {
   customer_since?: string | null;
   /** The next renewal (YYYY-MM-DD); null = none to watch. */
   renewal_date?: string | null;
+  /** Its main contact, one of its contacts; null = none chosen. */
+  main_contact_id?: string | null;
+  /** The main contact as a record (single-company reads); null when none, or they moved to another company. */
+  main_contact?: RelationRecord | null;
   contact_count?: number;
   custom?: Record<string, unknown>; // write payload; on reads, values are flat columns
   relations?: Record<string, RelationValue>; // reads only, keyed by relation field
@@ -96,6 +100,37 @@ export interface CustomerUser {
   notes: string;
   company_name?: string | null;
   company_domain?: string | null;
+  custom?: Record<string, unknown>; // write payload; on reads, values are flat columns
+  relations?: Record<string, RelationValue>; // reads only, keyed by relation field
+  created_at: string;
+  updated_at: string;
+}
+
+/** open | in_progress | waiting | resolved | closed: the last two are done. */
+export type TicketStatus = "open" | "in_progress" | "waiting" | "resolved" | "closed";
+/** low | medium | high | urgent */
+export type TicketPriority = "low" | "medium" | "high" | "urgent";
+
+/** A customer's request or problem: for a customer, maybe reported by one of its customer users. */
+export interface Ticket {
+  id: string;
+  subject: string;
+  description: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  /** The customer it is for (a company with customer_since). */
+  company_id: string | null;
+  /** Who reported it, one of the customer's users; null = nobody named. */
+  customer_user_id: string | null;
+  /** The account it is assigned to; null = nobody's yet. */
+  owner_id: string | null;
+  owner?: TeamMember | null;
+  /** When it should be done by (YYYY-MM-DD); null = no date. */
+  due_date: string | null;
+  company_name?: string | null;
+  company_domain?: string | null;
+  customer_user_name?: string | null;
+  customer_user_email?: string | null;
   custom?: Record<string, unknown>; // write payload; on reads, values are flat columns
   relations?: Record<string, RelationValue>; // reads only, keyed by relation field
   created_at: string;
@@ -190,6 +225,9 @@ export interface Stats {
   customers: number;
   partners: number;
   customerUsers: number;
+  tickets: number;
+  /** Tickets neither resolved nor closed. */
+  openTickets: number;
 }
 
 export interface PaginatedState {

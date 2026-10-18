@@ -29,11 +29,14 @@ type statsBody struct {
 	Partners  any `json:"partners"`
 	// CustomerUsers: the people who use the product at customers.
 	CustomerUsers any `json:"customerUsers"`
+	// Tickets, and the ones not done yet (neither resolved nor closed).
+	Tickets     any `json:"tickets"`
+	OpenTickets any `json:"openTickets"`
 }
 
 // stats is the dashboard's statistics: how many contacts, companies, deals,
-// customers, partners and customer users, and the value of the deals not
-// lost, once and each month.
+// customers, partners, customer users and tickets (and open tickets), and
+// the value of the deals not lost, once and each month.
 func (app *App) stats(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	return tryJSON(w, func() (int, any, error) {
@@ -65,6 +68,10 @@ func (app *App) stats(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return 0, nil, err
 		}
+		tickets, err := db.Get(ctx, "SELECT COUNT(*) as count, COALESCE(SUM(CASE WHEN status IN ('resolved', 'closed') THEN 0 ELSE 1 END), 0) as open FROM tickets")
+		if err != nil {
+			return 0, nil, err
+		}
 		recurring, err := db.Get(ctx, "SELECT COALESCE(SUM(recurring_value), 0) as total FROM deals WHERE stage NOT IN (SELECT key FROM stages WHERE is_lost = 1)")
 		if err != nil {
 			return 0, nil, err
@@ -78,6 +85,8 @@ func (app *App) stats(w http.ResponseWriter, r *http.Request) error {
 			Partners:           orZero(partners, "count"),
 			DealRecurringValue: orZero(recurring, "total"),
 			CustomerUsers:      orZero(customerUsers, "count"),
+			Tickets:            orZero(tickets, "count"),
+			OpenTickets:        orZero(tickets, "open"),
 		}, nil
 	})
 }

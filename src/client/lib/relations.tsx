@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
-import { Ban, Handshake, Pencil, Plus, X } from "lucide-react";
+import { Ban, Handshake, LifeBuoy, Pencil, Plus, X } from "lucide-react";
 import { Avatar, EntityIcon } from "@/components/shared";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -56,19 +56,19 @@ async function fetchNames(entity: EntityType, ids: string[]) {
   }
 }
 
-/** Records of `entity` matching `search` by name, remembered for later chips. */
-export async function searchRecords(entity: EntityType, search: string): Promise<RelationRecord[]> {
-  const { records } = await api<{ records: RelationRecord[] }>("GET", `/api/records?entity=${entity}&search=${encodeURIComponent(search)}`);
+/** Records of `entity` matching `search` by name, remembered for later chips. `customers`: only companies that are customers. */
+export async function searchRecords(entity: EntityType, search: string, customers = false): Promise<RelationRecord[]> {
+  const { records } = await api<{ records: RelationRecord[] }>("GET", `/api/records?entity=${entity}&search=${encodeURIComponent(search)}${customers ? "&customers=1" : ""}`);
   remember(entity, records);
   return records;
 }
 
-const CREATE_PATH: Record<EntityType, string> = { contact: "contacts", company: "companies", deal: "deals", partner: "partners", customer_user: "customer-users" };
+const CREATE_PATH: Record<EntityType, string> = { contact: "contacts", company: "companies", deal: "deals", partner: "partners", customer_user: "customer-users", ticket: "tickets" };
 
 /** A new record of `entity` from just a name, as a picker's "+ Add" makes it. */
 export async function createRecord(entity: EntityType, name: string): Promise<RelationRecord> {
   const [first, ...rest] = name.trim().split(/\s+/);
-  const body = entity === "contact" ? { first_name: first, last_name: rest.join(" ") } : { name: name.trim() };
+  const body = entity === "contact" ? { first_name: first, last_name: rest.join(" ") } : entity === "ticket" ? { subject: name.trim() } : { name: name.trim() };
   const data = await api<Record<string, { id: string; domain?: string }>>("POST", `/api/${CREATE_PATH[entity]}`, body);
   const created = Object.values(data)[0];
   const record = { id: created.id, label: name.trim(), domain: created.domain ?? null };
@@ -95,7 +95,7 @@ export function useRecordNames(wanted: Array<{ entity: EntityType; id: string }>
 
 // ── Chips ─────────────────────────────────────────────────────────────
 
-const RECORD_PATH: Partial<Record<EntityType, string>> = { contact: "/contacts", company: "/companies", deal: "/deals", partner: "/partners", customer_user: "/customer-users" };
+const RECORD_PATH: Partial<Record<EntityType, string>> = { contact: "/contacts", company: "/companies", deal: "/deals", partner: "/partners", customer_user: "/customer-users", ticket: "/tickets" };
 
 /** Where a link to a record opens it: its own page, which shows that record
  *  alone. (A list opens its own rows in the side panel beside it.) */
@@ -112,6 +112,7 @@ export function RecordIcon({ entity, record }: { entity: EntityType; record: Rel
     const [first, ...rest] = record.label.split(" ");
     return <Avatar firstName={first} lastName={rest.join(" ")} className="size-4 text-[0.4375rem]" />;
   }
+  if (entity === "ticket") return <LifeBuoy className="size-3.5 shrink-0 text-muted-foreground" />;
   return <Handshake className="size-3.5 shrink-0 text-muted-foreground" />;
 }
 
@@ -190,7 +191,7 @@ export function relationColumn<T>(def: CustomFieldDef): RecordColumn<T> {
  * is how it's removed. With `onClear`, a first row ("No company") empties a
  * single value, highlighted while nothing is picked.
  */
-export function RecordPicker({ entity, selected, onPick, onClear, emptyLabel, placeholder, creatable = false }: {
+export function RecordPicker({ entity, selected, onPick, onClear, emptyLabel, placeholder, creatable = false, customers = false }: {
   entity: EntityType;
   selected: string[];
   onPick: (record: RelationRecord) => void;
@@ -199,7 +200,10 @@ export function RecordPicker({ entity, selected, onPick, onClear, emptyLabel, pl
   placeholder?: string;
   /** Offers "+ Add "<search>"", which creates the record and picks it. */
   creatable?: boolean;
+  /** Companies that are customers only (customer_since set); nothing to add, a new company isn't one. */
+  customers?: boolean;
 }) {
+  const canCreate = creatable && !customers && entity !== "ticket";
   const { setError } = useCrm();
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -220,10 +224,10 @@ export function RecordPicker({ entity, selected, onPick, onClear, emptyLabel, pl
   useEffect(() => {
     let alive = true;
     const t = setTimeout(() => {
-      searchRecords(entity, search).then((r) => { if (alive) setResults(r); }, () => { if (alive) setResults([]); });
+      searchRecords(entity, search, customers).then((r) => { if (alive) setResults(r); }, () => { if (alive) setResults([]); });
     }, search ? 200 : 0);
     return () => { alive = false; clearTimeout(t); };
-  }, [entity, search]);
+  }, [entity, search, customers]);
 
   const chosen = search ? [] : selected.map((id) => name(entity, id)).filter((r): r is RelationRecord => !!r);
   // While the next search is on its way, the last results narrow to what's typed,
@@ -234,11 +238,11 @@ export function RecordPicker({ entity, selected, onPick, onClear, emptyLabel, pl
 
   return (
     <Command shouldFilter={false}>
-      <CommandInput autoFocus value={search} onValueChange={setSearch} placeholder={placeholder ?? "Search…"} />
+      <CommandInput autoFocus value={search} onValueChange={setSearch} placeholder={placeholder ?? (customers ? "Search customers…" : "Search…")} />
       <CommandList>
         {results === null
           ? <div className="py-4 text-center text-[13px] text-muted-foreground">Loading…</div>
-          : !(creatable && search.trim()) && <CommandEmpty>No match.</CommandEmpty>}
+          : !(canCreate && search.trim()) && <CommandEmpty>{customers ? (search ? "No customer matches." : "No customers yet.") : "No match."}</CommandEmpty>}
         <CommandGroup>
           {onClear && !search && (
             <CommandItem value="__none" onSelect={onClear} aria-selected={!selected.length} className={cn(!selected.length && "bg-secondary font-medium")}>
@@ -256,7 +260,7 @@ export function RecordPicker({ entity, selected, onPick, onClear, emptyLabel, pl
             );
           })}
         </CommandGroup>
-        {creatable && search.trim() && (
+        {canCreate && search.trim() && (
           <CommandGroup forceMount className="border-t border-border">
             <CommandItem forceMount value="__create" disabled={creating} onSelect={() => void create()}>
               <Plus className="size-3.5 shrink-0 text-muted-foreground" />
@@ -276,7 +280,7 @@ export function RecordPicker({ entity, selected, onPick, onClear, emptyLabel, pl
  * placeholder), which opens the picker. `emptyLabel` ("No company") is the
  * picker's row for clearing it. `known` names the current value without a fetch.
  */
-export function RelationInput({ entity, value, onChange, placeholder = "Select…", emptyLabel, known, className, link = false, label, suffix }: {
+export function RelationInput({ entity, value, onChange, placeholder = "Select…", emptyLabel, known, className, link = false, label, suffix, customers = false }: {
   entity: EntityType;
   value: string | null;
   onChange: (id: string | null) => void;
@@ -290,6 +294,8 @@ export function RelationInput({ entity, value, onChange, placeholder = "Select�
   label?: string;
   /** On a record page, shown right after the linked record (a contact's company). */
   suffix?: ReactNode;
+  /** Picks among the companies that are customers only. */
+  customers?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const name = useRecordNames(value && known?.id !== value ? [{ entity, id: value }] : []);
@@ -300,6 +306,7 @@ export function RelationInput({ entity, value, onChange, placeholder = "Select�
         entity={entity}
         selected={value ? [value] : []}
         creatable
+        customers={customers}
         emptyLabel={emptyLabel}
         onClear={() => { setOpen(false); onChange(null); }}
         onPick={(r) => { setOpen(false); onChange(r.id === value ? null : r.id); }}

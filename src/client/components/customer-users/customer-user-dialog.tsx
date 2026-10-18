@@ -76,7 +76,7 @@ export function CustomerUserDialog({ open, onOpenChange, companyId }: { open: bo
           <div className="flex flex-col gap-1.5">
             <Label>Company</Label>
             <div className="rounded-sm bg-card shadow-edge">
-              <RelationInput entity="company" value={form.company_id} placeholder="The customer they use the product at…" emptyLabel="No company"
+              <RelationInput customers entity="company" value={form.company_id} placeholder="The customer they use the product at…" emptyLabel="No company"
                 onChange={(id) => set("company_id", id)} />
             </div>
           </div>

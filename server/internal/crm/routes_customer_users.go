@@ -190,10 +190,29 @@ var updateCustomerUserFields = []stringField{
 	{key: "notes", optional: true},
 }
 
+// customerCompany is the company id names when it is a customer (it has a
+// customer_since): its id, name and customer_since. Otherwise problem is the
+// 400 answer, `key` naming the field: no such company, or not a customer.
+func customerCompany(ctx context.Context, key, id string) (company db.Row, problem string, err error) {
+	found, err := db.Get(ctx, "SELECT id, name, customer_since FROM companies WHERE id = ?", id)
+	if err != nil {
+		return nil, "", err
+	}
+	if found == nil {
+		return nil, fmt.Sprintf(`%s: no company with id "%s".`, key, id), nil
+	}
+	if js.Trim(colText(found["customer_since"])) == "" {
+		return found, fmt.Sprintf(`%s: %s is not a customer (no customer_since).`, key, colText(found["name"])), nil
+	}
+	return found, "", nil
+}
+
 // customerUserCompany reads a write's company_id: the company, or nil for
 // none; sent is false when the write leaves it alone. problem is the 400
-// answer for an id that names no company.
-func customerUserCompany(ctx context.Context, body map[string]any) (company any, sent bool, problem string, err error) {
+// answer for an id that names no company, or a company that isn't a customer
+// (no customer_since). userID, on an update, is the customer user written:
+// the company they already have stays theirs if it stopped being a customer.
+func customerUserCompany(ctx context.Context, body map[string]any, userID string) (company any, sent bool, problem string, err error) {
 	v, sent := body["company_id"]
 	if !sent {
 		return nil, false, "", nil
@@ -202,14 +221,17 @@ func customerUserCompany(ctx context.Context, body map[string]any) (company any,
 	if id = js.Trim(id); id == "" {
 		return nil, true, "", nil
 	}
-	found, err := db.Get(ctx, "SELECT id FROM companies WHERE id = ?", id)
-	if err != nil || found == nil {
-		if err == nil {
-			problem = fmt.Sprintf(`company_id: no company with id "%s".`, id)
-		}
-		return nil, true, problem, err
+	found, problem, err := customerCompany(ctx, "company_id", id)
+	if err != nil || problem == "" {
+		return id, true, "", err
 	}
-	return id, true, "", nil
+	if found != nil {
+		kept, err := db.Get(ctx, "SELECT id FROM customer_users WHERE id = ? AND company_id = ?", userID, id)
+		if err != nil || kept != nil {
+			return id, true, "", err
+		}
+	}
+	return nil, true, problem, nil
 }
 
 // createCustomerUser creates a customer user. Custom fields may be sent flat
@@ -233,7 +255,7 @@ func (app *App) createCustomerUser(w http.ResponseWriter, r *http.Request) error
 		if name == "" {
 			return fail(400, "Name is required")
 		}
-		company, _, problem, err := customerUserCompany(ctx, body)
+		company, _, problem, err := customerUserCompany(ctx, body, "")
 		if err != nil {
 			return 0, nil, err
 		}
@@ -282,7 +304,7 @@ func (app *App) updateCustomerUser(w http.ResponseWriter, r *http.Request) error
 				params = append(params, js.Trim(s))
 			}
 		}
-		company, companySent, problem, err := customerUserCompany(ctx, body)
+		company, companySent, problem, err := customerUserCompany(ctx, body, id)
 		if err != nil {
 			return 0, nil, err
 		}

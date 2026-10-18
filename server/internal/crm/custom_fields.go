@@ -25,7 +25,7 @@ import (
 	"opencrm/internal/js"
 )
 
-// EntityType is "contact", "company", "deal", "partner" or "customer_user".
+// EntityType is "contact", "company", "deal", "partner", "customer_user" or "ticket".
 type EntityType string
 
 const (
@@ -35,6 +35,8 @@ const (
 	Partner EntityType = "partner"
 	// CustomerUser is a person who uses the product at a customer.
 	CustomerUser EntityType = "customer_user"
+	// Ticket is a customer's request or problem.
+	Ticket EntityType = "ticket"
 )
 
 // A relation's side: many_to_one holds the linked id in its own column;
@@ -51,11 +53,12 @@ var EntityTables = map[EntityType]string{
 	Deal:         "deals",
 	Partner:      "partners",
 	CustomerUser: "customer_users",
+	Ticket:       "tickets",
 }
 
 // IsEntityType reports whether v names an entity type.
 func IsEntityType(v string) bool {
-	return v == "contact" || v == "company" || v == "deal" || v == "partner" || v == "customer_user"
+	return v == "contact" || v == "company" || v == "deal" || v == "partner" || v == "customer_user" || v == "ticket"
 }
 
 // FieldError is an error TS threw with a message meant for the caller (an
@@ -122,11 +125,12 @@ func (d CustomFieldDef) targetEntity() EntityType {
 // platform column. A deal's partner_ids is no column (it writes deal_partners)
 // but is a base field all the same.
 var builtinColumns = map[EntityType][]string{
-	Company:      {"id", "name", "domain", "industry", "phone", "email", "notes", "customer_since", "renewal_date", "created_at", "updated_at"},
+	Company:      {"id", "name", "domain", "industry", "phone", "email", "notes", "customer_since", "renewal_date", "main_contact_id", "created_at", "updated_at"},
 	Contact:      {"id", "first_name", "last_name", "email", "phone", "company_id", "title", "status", "last_contacted_at", "created_at", "updated_at"},
 	Deal:         {"id", "name", "contact_id", "company_id", "value", "recurring_value", "stage", "close_date", "notes", "owner_id", "created_at", "updated_at", "partner_ids"},
 	Partner:      {"id", "name", "industry", "status", "phone", "email", "notes", "created_at", "updated_at"},
 	CustomerUser: {"id", "name", "email", "phone", "company_id", "notes", "created_at", "updated_at"},
+	Ticket:       {"id", "subject", "description", "status", "priority", "company_id", "customer_user_id", "owner_id", "due_date", "created_at", "updated_at"},
 }
 
 func isBuiltin(entity EntityType, key string) bool {
@@ -140,13 +144,15 @@ func isBuiltin(entity EntityType, key string) bool {
 
 // reservedKeys are keys a record answers with that are no field of its own —
 // a deal's partners and owner, a partner's deals and deal_count, a customer
-// user's company name and domain, a company's customer users — so no custom
-// field may take them either.
+// user's company name and domain, a company's customer users and main contact, the tickets of
+// a company or customer user, a ticket's names of its company, customer user
+// and owner — so no custom field may take them either.
 var reservedKeys = map[EntityType][]string{
-	Company:      {"customer_users"},
-	CustomerUser: {"company_name", "company_domain"},
+	Company:      {"customer_users", "tickets", "main_contact"},
+	CustomerUser: {"company_name", "company_domain", "tickets"},
 	Deal:         {"partners", "owner"},
 	Partner:      {"deals", "deal_count"},
+	Ticket:       {"company_name", "company_domain", "customer_user_name", "customer_user_email", "owner"},
 }
 
 var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)

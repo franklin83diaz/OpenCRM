@@ -180,7 +180,40 @@ func readCompany(ctx context.Context, id string) (companyBody, error) {
 		return companyBody{}, err
 	}
 	row, err = WithRelationsOne(ctx, Company, row)
-	return companyBody{row}, err
+	if err != nil {
+		return companyBody{}, err
+	}
+	return companyBody{row}, withMainContact(ctx, row)
+}
+
+// withMainContact sets a company row's `main_contact`: its main contact as a
+// record ({id, label}), or null when it has none, or the contact has since
+// moved to another company. No query when it has none.
+func withMainContact(ctx context.Context, row db.Row) error {
+	if row == nil {
+		return nil
+	}
+	row["main_contact"] = nil
+	id := colText(row["main_contact_id"])
+	if id == "" {
+		return nil
+	}
+	found, err := db.Get(ctx, "SELECT "+recordColumns(Contact, "t")+" FROM contacts t WHERE t.id = ? AND t.company_id = ?", id, row["id"])
+	if err != nil || found == nil {
+		return err
+	}
+	row["main_contact"] = toRecord(found)
+	return nil
+}
+
+// mainContactProblem is the 400 answer for a main_contact_id that isn't one
+// of the company's contacts; "" when it is.
+func mainContactProblem(ctx context.Context, companyID, contactID string) (string, error) {
+	found, err := db.Get(ctx, "SELECT id FROM contacts WHERE id = ? AND company_id = ?", contactID, companyID)
+	if err != nil || found != nil {
+		return "", err
+	}
+	return fmt.Sprintf(`main_contact_id: "%s" is not one of this company's contacts.`, contactID), nil
 }
 
 // createCompany creates a company. Custom fields may be sent flat or in
@@ -204,6 +237,9 @@ func (app *App) createCompany(w http.ResponseWriter, r *http.Request) error {
 		name := trimmedText(body, "name")
 		if name == "" {
 			return fail(400, "Name is required")
+		}
+		if trimmedText(body, "main_contact_id") != "" {
+			return fail(400, "main_contact_id: a new company has no contacts yet. Set it once it has one")
 		}
 
 		id := js.UUID()
@@ -234,11 +270,13 @@ var updateCompanyFields = []stringField{
 	// The next renewal as YYYY-MM-DD; null or "" clears it. Move it on after
 	// each renewal.
 	{key: "renewal_date", optional: true, nullable: true},
+	// One of the company's contacts; null or "" clears it.
+	{key: "main_contact_id", optional: true, nullable: true},
 }
 
 // updateCompany updates the fields sent. A field sent as null is not a field
 // left out: null is a zod error for the text fields, and clears
-// customer_since and renewal_date.
+// customer_since, renewal_date and main_contact_id.
 func (app *App) updateCompany(w http.ResponseWriter, r *http.Request) error {
 	v, ok := openapiJSON(r)
 	if !ok {
@@ -285,6 +323,13 @@ func (app *App) updateCompany(w http.ResponseWriter, r *http.Request) error {
 			fields = append(fields, "renewal_date = ?")
 			params = append(params, orNull(day))
 		}
+		mainContact, mainSent := body["main_contact_id"]
+		mainContactID, _ := mainContact.(string)
+		mainContactID = js.Trim(mainContactID)
+		if mainSent {
+			fields = append(fields, "main_contact_id = ?")
+			params = append(params, orNull(mainContactID))
+		}
 
 		if len(fields) == 0 && len(custom.values) == 0 {
 			return fail(400, "No fields to update")
@@ -296,6 +341,15 @@ func (app *App) updateCompany(w http.ResponseWriter, r *http.Request) error {
 		}
 		if exists == nil {
 			return fail(404, "Company not found")
+		}
+		if mainContactID != "" {
+			problem, err := mainContactProblem(ctx, id, mainContactID)
+			if err != nil {
+				return 0, nil, err
+			}
+			if problem != "" {
+				return fail(400, problem)
+			}
 		}
 
 		if len(fields) > 0 {

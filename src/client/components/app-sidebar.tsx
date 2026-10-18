@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent } from "react";
-import { Activity, BookUser, Building2, ChevronRight, CircleUserRound, DollarSign, IdCard, KeyRound, Layers, LogOut, Network, PanelLeft, Settings, User, UsersRound, type LucideIcon } from "lucide-react";
+import { Activity, BookUser, LifeBuoy, Building2, ChevronRight, CircleUserRound, DollarSign, IdCard, KeyRound, Layers, LogOut, Network, PanelLeft, Settings, User, UsersRound, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/auth";
 import { useCrm } from "@/context";
 import { UserAvatar } from "@/components/shared";
@@ -41,6 +41,7 @@ const RECORDS: NavItem[] = [
   { id: "deals", label: "Deals", href: "/deals", icon: DollarSign, color: "green" },
   { id: "customers", label: "Customers", href: "/customers", icon: Activity, color: "orange" },
   { id: "customer-users", label: "Customer users", href: "/customer-users", icon: IdCard, color: "amber" },
+  { id: "tickets", label: "Tickets", href: "/tickets", icon: LifeBuoy, color: "red" },
 ];
 
 const SETTINGS: NavItem[] = [
@@ -56,6 +57,7 @@ function activeFor(route: Route): string {
   if (route.name === "company") return "companies";
   if (route.name === "partner") return "partners";
   if (route.name === "customer-user") return "customer-users";
+  if (route.name === "ticket") return "tickets";
   if (route.name === "deal") return "deals";
   return route.name;
 }
@@ -107,7 +109,7 @@ export function AppSidebar({ route, navigate }: { route: Route; navigate: (to: s
   const [collapsed, setCollapsed] = useState(false);
   const rail = collapsed || !wide;
   const active = activeFor(route);
-  const counts: Record<string, number> = { contacts: stats.contacts, partners: stats.partners, companies: stats.companies, deals: stats.deals, customers: stats.customers, "customer-users": stats.customerUsers };
+  const counts: Record<string, number> = { contacts: stats.contacts, partners: stats.partners, companies: stats.companies, deals: stats.deals, customers: stats.customers, "customer-users": stats.customerUsers, tickets: stats.openTickets };
   const settings = SETTINGS.filter((item) => !item.adminOnly || user.role === "admin");
   // Settings folds away like an accordion; it is open while one of its pages is.
   const [settingsOpen, setSettingsOpen] = useState(readSettingsOpen);

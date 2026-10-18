@@ -286,7 +286,7 @@ func TestCustomClassifyWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkJSON(t, "422", errBody, `{"error":"Unknown field(s) for company: bogus, zeta. Send a base field or a registered custom field, or define it first via POST /api/custom-fields.","unknown_fields":["bogus","zeta"],"valid_fields":["name","domain","industry","phone","email","notes","customer_since","renewal_date","tier"]}`)
+	checkJSON(t, "422", errBody, `{"error":"Unknown field(s) for company: bogus, zeta. Send a base field or a registered custom field, or define it first via POST /api/custom-fields.","unknown_fields":["bogus","zeta"],"valid_fields":["name","domain","industry","phone","email","notes","customer_since","renewal_date","main_contact_id","tier"]}`)
 	if clean, err := UnknownFieldsError(ctx, Company, nil); clean != nil || err != nil {
 		t.Errorf("clean write: %v %v", clean, err)
 	}

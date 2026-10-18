@@ -91,7 +91,7 @@ func (app *App) getDeal(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-// getCompany is one company, with its contact_count and relations.
+// getCompany is one company, with its contact_count, relations and main contact.
 func (app *App) getCompany(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	id := r.PathValue("id")
@@ -108,7 +108,10 @@ func (app *App) getCompany(w http.ResponseWriter, r *http.Request) error {
 			return fail(404, "Company not found")
 		}
 		company, err = WithRelationsOne(ctx, Company, company)
-		return 200, companyBody{company}, err
+		if err != nil {
+			return 0, nil, err
+		}
+		return 200, companyBody{company}, withMainContact(ctx, company)
 	})
 }
 
@@ -118,14 +121,15 @@ type recordsBody struct {
 
 // records names records for relation chips and pickers: `search` matches the
 // record's name; `ids` (comma-separated, at most 60) returns those records
-// instead, to name ids a filter or form already holds.
+// instead, to name ids a filter or form already holds. `customers=1`, with
+// entity=company, searches only the companies that are customers.
 func (app *App) records(w http.ResponseWriter, r *http.Request) error {
 	q := firstQueryValues(r)
 	ctx := r.Context()
 	return tryJSON(w, func() (int, any, error) {
 		entity := textAt(q, "entity")
 		if !IsEntityType(entity) {
-			return fail(400, "entity must be contact, company, deal, partner or customer_user")
+			return fail(400, "entity must be contact, company, deal, partner, customer_user or ticket")
 		}
 		ids := []string{}
 		for _, s := range strings.Split(textAt(q, "ids"), ",") {
@@ -135,6 +139,16 @@ func (app *App) records(w http.ResponseWriter, r *http.Request) error {
 		}
 		if len(ids) > 60 {
 			return fail(400, "At most 60 ids")
+		}
+		customers := textAt(q, "customers")
+		if customers == "1" || customers == "true" {
+			if EntityType(entity) != Company {
+				return fail(400, "customers is only for entity=company")
+			}
+			if len(ids) == 0 {
+				records, err := SearchCustomers(ctx, textAt(q, "search"))
+				return 200, recordsBody{records}, err
+			}
 		}
 		records, err := SearchRecords(ctx, EntityType(entity), textAt(q, "search"), ids)
 		return 200, recordsBody{records}, err
@@ -153,7 +167,7 @@ func (app *App) values(w http.ResponseWriter, r *http.Request) error {
 	return tryJSON(w, func() (int, any, error) {
 		entity := textAt(q, "entity")
 		if !IsEntityType(entity) {
-			return fail(400, "entity must be contact, company, deal, partner or customer_user")
+			return fail(400, "entity must be contact, company, deal, partner, customer_user or ticket")
 		}
 		table := EntityTables[EntityType(entity)]
 		field := textAt(q, "field")

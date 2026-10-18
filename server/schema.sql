@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS companies (
   -- The next renewal (YYYY-MM-DD), set by hand; NULL = none to watch. Within 30
   -- days, or past, it shows on the Customers page.
   renewal_date TEXT,
+  -- The company's main contact, one of its contacts; NULL = none chosen.
+  main_contact_id TEXT REFERENCES contacts(id) ON DELETE SET NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -87,6 +89,31 @@ CREATE TABLE IF NOT EXISTS customer_users (
 );
 CREATE INDEX IF NOT EXISTS idx_customer_users_company ON customer_users(company_id);
 
+-- Tickets: a customer's requests and problems. Each is for a customer (a
+-- company with customer_since), may name the customer user who reported it,
+-- and is assigned to an account or to nobody (owner_id NULL). Status:
+-- 'open', 'in_progress', 'waiting' (on the customer), 'resolved', 'closed';
+-- priority: 'low', 'medium', 'high', 'urgent'. Deleting the company or the
+-- customer user leaves the ticket, without them.
+CREATE TABLE IF NOT EXISTS tickets (
+  id TEXT PRIMARY KEY,
+  subject TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open',
+  priority TEXT NOT NULL DEFAULT 'medium',
+  company_id TEXT REFERENCES companies(id) ON DELETE SET NULL,
+  customer_user_id TEXT REFERENCES customer_users(id) ON DELETE SET NULL,
+  owner_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  -- When it should be done by (YYYY-MM-DD); NULL = no date.
+  due_date TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_company ON tickets(company_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_customer_user ON tickets(customer_user_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_owner ON tickets(owner_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
+
 -- The partners taking part in a deal: any number per deal, and per partner,
 -- each with its share of the deal, once and each month. Deleting either side
 -- drops the link.
@@ -120,11 +147,11 @@ CREATE TABLE IF NOT EXISTS stages (
 );
 
 -- Activity timeline: one row per interaction logged against a contact, company,
--- deal or partner. The substrate every integration writes into (email sent, meeting
+-- deal, partner, customer user or ticket. The substrate every integration writes into (email sent, meeting
 -- scheduled, Slack notification) plus manual notes.
 CREATE TABLE IF NOT EXISTS activities (
   id TEXT PRIMARY KEY,
-  entity_type TEXT NOT NULL,               -- 'contact' | 'company' | 'deal' | 'partner' | 'customer_user'
+  entity_type TEXT NOT NULL,               -- 'contact' | 'company' | 'deal' | 'partner' | 'customer_user' | 'ticket'
   entity_id TEXT NOT NULL,
   type TEXT NOT NULL DEFAULT 'note',        -- 'note' | 'email' | 'meeting' | 'slack' | 'stage_change'
   body TEXT DEFAULT '',

@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { View, Contact, Company, Deal, Partner, CustomerUser, TeamMember, Stats, PaginatedState, StageDef, Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult } from "./types";
+import type { View, Contact, Company, Deal, Partner, CustomerUser, Ticket, TeamMember, Stats, PaginatedState, StageDef, Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult } from "./types";
 import type { FilterNode } from "./lib/filters";
 
 export interface CrmContextValue {
@@ -57,6 +57,19 @@ export interface CrmContextValue {
   fetchCustomerUser: (id: string) => Promise<CustomerUser | null>;
   updateCustomerUser: (id: string, data: Partial<CustomerUser>) => Promise<void>;
   deleteCustomerUsers: (ids: string[]) => Promise<void>;
+
+  // Tickets
+  tickets: Ticket[];
+  ticketsPag: PaginatedState;
+  setTicketsPage: (page: number) => void;
+  setTicketsSort: (col: string) => void;
+  setTicketsSearch: (search: string) => void;
+  setTicketsFilters: (filters: PaginatedState["filters"]) => void;
+  setTicketsView: (v: { filters: PaginatedState["filters"]; sort: string; order: "asc" | "desc" }) => void;
+  addTicket: (data: Partial<Ticket>) => Promise<Ticket>;
+  fetchTicket: (id: string) => Promise<Ticket | null>;
+  updateTicket: (id: string, data: Partial<Ticket>) => Promise<void>;
+  deleteTickets: (ids: string[]) => Promise<void>;
 
   // Deals
   deals: Deal[];

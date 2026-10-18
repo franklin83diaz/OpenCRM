@@ -53,11 +53,11 @@ func (app *App) listTeam(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-// dealOwnerID reads a write's owner_id (validated as a string or null): the
-// account to assign the deal to, or nil for nobody; sent is false when the
+// ownerID reads a write's owner_id (validated as a string or null): the
+// account to assign the deal or ticket to, or nil for nobody; sent is false when the
 // write leaves it alone. problem is the 400 answer for an id that names no
 // active account.
-func dealOwnerID(ctx context.Context, body map[string]any) (owner any, sent bool, problem string, err error) {
+func ownerID(ctx context.Context, body map[string]any) (owner any, sent bool, problem string, err error) {
 	v, sent := body["owner_id"]
 	if !sent {
 		return nil, false, "", nil
@@ -76,9 +76,9 @@ func dealOwnerID(ctx context.Context, body map[string]any) (owner any, sent bool
 	return id, true, "", nil
 }
 
-// withDealOwners sets each deal row's `owner`: the account it is assigned to
-// ({id, name, email}), or null. No query when no deal has one.
-func withDealOwners(ctx context.Context, rows []db.Row) error {
+// withOwners sets each row's `owner` (a deal's, a ticket's): the account it
+// is assigned to ({id, name, email}), or null. No query when no row has one.
+func withOwners(ctx context.Context, rows []db.Row) error {
 	seen := map[string]bool{}
 	ids := []string{}
 	for _, r := range rows {
@@ -121,5 +121,5 @@ func withDealLinks(ctx context.Context, rows []db.Row) error {
 	if err := withDealPartners(ctx, rows); err != nil {
 		return err
 	}
-	return withDealOwners(ctx, rows)
+	return withOwners(ctx, rows)
 }

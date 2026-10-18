@@ -2,7 +2,7 @@
 
 # OpenCRM: The Open-Source HubSpot Alternative for SaaS
 
-A lightweight CRM with contacts, companies, partners, customer users and deals — built for SaaS teams and AI agents. It runs on your own Cloudflare account: a Go API in a Cloudflare Container, with its data in D1.
+A lightweight CRM with contacts, companies, partners, customer users, tickets and deals — built for SaaS teams and AI agents. It runs on your own Cloudflare account: a Go API in a Cloudflare Container, with its data in D1.
 
 Built with **React + Tailwind + shadcn/ui** on **Go + Cloudflare Containers + D1**. Path-based routing, UUID keys, its own accounts and API tokens, and a dual-mode UI: one for humans and one for AI agents (larger targets, always-visible actions).
 
@@ -14,7 +14,7 @@ Unlike HubSpot or Salesforce, it runs on your own Cloudflare account, with no AP
 
 ## Features
 
-- **Five entities** — contacts, companies, partners, customer users and deals with foreign-key relationships (UUID keys, not enumerable ids). Partners are the firms that work deals with you (resellers, referrers), kept apart from the companies you sell to; a deal has any number of them. Customer users are the people who use your product at each customer, kept apart from contacts
+- **Six entities** — contacts, companies, partners, customer users, tickets and deals with foreign-key relationships (UUID keys, not enumerable ids). Partners are the firms that work deals with you (resellers, referrers), kept apart from the companies you sell to; a deal has any number of them. Customer users are the people who use your product at each customer, kept apart from contacts. Tickets are a customer's requests and problems: each is for a customer, may name the customer user who reported it, and has a status (open, in progress, waiting, resolved, closed), a priority, an owner and a due date. A company can name one of its contacts as its main contact
 - **Accounts and API tokens** — people sign in with an email and a password; an admin adds them in Settings → Users, and everyone can make personal API tokens for agents and scripts in Settings → API tokens (see [Accounts and API tokens](#accounts-and-api-tokens))
 - **Activity timeline** — every contact/company/deal has a feed; notes, deal updates (a call, a message, an email, a meeting), and deals won or lost all log to it
 - **CSV / XLSX import** — upload a spreadsheet, map columns to fields (exact-match auto-mapping), preview, import; company names resolve to existing companies or are created
@@ -134,7 +134,7 @@ pnpm db:migrate:remote   # server/schema.sql, on the production database
 pnpm run deploy
 ```
 
-`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts, without which signing in fails; and `partners`, `deal_partners` and `customer_users`, without which every read of deals fails. Columns a version adds to a table you already have (a deal's `recurring_value` and `owner_id`, a partner's share of a deal, a partner's `industry` and `status`) can't come from `server/schema.sql`: the API adds them itself, before the first request it serves. A deal attribute made before Partners with the key `partners` or `partner_ids` is hidden by them: deal reads answer `partners` with the deal's partners, and writes take `partner_ids` as them. Copy its values out and delete it before you upgrade. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
+`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts, without which signing in fails; `partners`, `deal_partners` and `customer_users`, without which every read of deals fails; and `tickets`, without which the dashboard's stats fail. Columns a version adds to a table you already have (a deal's `recurring_value` and `owner_id`, a partner's share of a deal, a partner's `industry` and `status`, a company's `main_contact_id`) can't come from `server/schema.sql`: the API adds them itself, before the first request it serves. A deal attribute made before Partners with the key `partners` or `partner_ids` is hidden by them: deal reads answer `partners` with the deal's partners, and writes take `partner_ids` as them. Copy its values out and delete it before you upgrade. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
 
 ## Tech Stack
 
@@ -182,7 +182,7 @@ wrangler.toml         — the Worker, the container, D1
 
 ### Data Model
 
-Five entities with foreign key relationships:
+Six entities with foreign key relationships:
 
 ```mermaid
 erDiagram
@@ -191,6 +191,9 @@ erDiagram
     companies ||--o{ deals    : "has"
     deals     }o--o{ partners : "deal_partners"
     companies ||--o{ customer_users : "has"
+    companies ||--o{ tickets  : "has"
+    customer_users ||--o{ tickets : "reports"
+    companies |o--o| contacts : "main contact"
 
     companies {
         text id PK
@@ -200,6 +203,7 @@ erDiagram
         text phone
         text email
         text notes
+        text main_contact_id FK "→ contacts · ON DELETE SET NULL"
         text created_at
         text updated_at
     }
@@ -240,18 +244,34 @@ erDiagram
         text created_at
         text updated_at
     }
+    tickets {
+        text id PK
+        text subject
+        text description
+        text status
+        text priority
+        text company_id FK "→ companies · ON DELETE SET NULL"
+        text customer_user_id FK "→ customer_users · ON DELETE SET NULL"
+        text owner_id FK "→ users · ON DELETE SET NULL"
+        text due_date
+        text created_at
+        text updated_at
+    }
 ```
 
 ```sql
-companies (id, name, domain, industry, phone, email, notes, customer_since, renewal_date)
+companies (id, name, domain, industry, phone, email, notes, customer_since, renewal_date, main_contact_id → contacts)
 contacts  (id, first_name, last_name, email, phone, company_id → companies, title, status)
 deals     (id, name, contact_id → contacts, company_id → companies, value, recurring_value, stage, close_date, notes, owner_id → users)
 partners  (id, name, industry, status, phone, email, notes)
 customer_users (id, name, email, phone, company_id → companies, notes)
+tickets   (id, subject, description, status, priority, company_id → companies, customer_user_id → customer_users, owner_id → users, due_date)
 deal_partners (deal_id → deals, partner_id → partners, one_time_value, recurring_value)
 ```
 
-Contacts belong to companies. A deal has its own company and its own contact, both optional: a deal can name a company before it has a person. Setting a contact on a deal with no company gives the deal that contact's company. Deleting a company sets `company_id` to NULL on its contacts and deals. Deleting a contact sets `contact_id` to NULL on its deals. A deal is worth `value` once and `recurring_value` each month while they stay a customer, and is assigned to one account (`owner_id`) or to nobody yet. A deal has any number of partners (`deal_partners`), each with its share of the deal, once and each month; deleting a deal or a partner drops their links.
+Contacts belong to companies. A deal has its own company and its own contact, both optional: a deal can name a company before it has a person. Setting a contact on a deal with no company gives the deal that contact's company. Deleting a company sets `company_id` to NULL on its contacts and deals. Deleting a contact sets `contact_id` to NULL on its deals. A deal is worth `value` once and `recurring_value` each month while they stay a customer, and is assigned to one account (`owner_id`) or to nobody yet. A deal has any number of partners (`deal_partners`), each with its share of the deal, once and each month; deleting a deal or a partner drops their links. A company's main contact (`main_contact_id`) is one of its own contacts, or none.
+
+A ticket is for a customer (`company_id`, a company with `customer_since`) and may name the customer user who reported it, one of that customer's. Its `status` is `open`, `in_progress`, `waiting` (on the customer), `resolved` or `closed` (the last two are done), its `priority` `low`, `medium`, `high` or `urgent`; it is assigned to one account (`owner_id`) or to nobody, and may have a `due_date`. Deleting the company or the customer user leaves the ticket, without them.
 
 Tasks (`tasks`: `owed_by` us or them, each with an optional company, contact and deal) are typed by hand or added as a deal update's next step. A company with `customer_since` set is a customer: the close date of its first won deal, unless someone set it by hand.
 
@@ -265,11 +285,11 @@ Every endpoint below needs a signed-in person or `Authorization: Bearer crm_…`
 
 Reads carry each relation under `relations[key]`: the linked record `{ id, label, domain }` (or null), or for a many side `{ items, total }`. Write the single side by id (`PUT /api/contacts/:id { "partner_company_id": "<company id>" }`, null to clear); the many side is written from the records it lists.
 
-List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}` and groups `{logic: "and"|"or", rules: [...]}` (groups nest one level). A relation's many side (a custom one_to_many key, or `contacts` on companies, `deals` on contacts, `partners` on deals, `deals` on partners) takes `is` / `is_not` (linked record ids), `is_empty`, `is_not_empty`; `count:<key>` (e.g. `count:contacts`) compares how many it links with `is` / `is_not` / `gt` / `gte` / `lt` / `lte` (a number) or `is_empty` (none), and is also a `sort`. Operators: `contains`, `does_not_contain`, `is` / `is_not` (a value or a list, case-insensitive), `is_empty`, `is_not_empty`, `gt` / `gte` / `lt` / `lte`, and for dates `on`, `before`, `after` (on or after), `today`, `in_past`, `in_future`, `relative` (`PAST_7_DAY`, `NEXT_2_WEEK`, `THIS_1_MONTH`). Pass `tz` (minutes east of UTC) to put date rules on the viewer's local day.
+List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}` and groups `{logic: "and"|"or", rules: [...]}` (groups nest one level). A relation's many side (a custom one_to_many key, or `contacts`, `customer_users` and `tickets` on companies, `deals` on contacts, `tickets` on customer users, `partners` on deals, `deals` on partners) takes `is` / `is_not` (linked record ids), `is_empty`, `is_not_empty`; `count:<key>` (e.g. `count:contacts`) compares how many it links with `is` / `is_not` / `gt` / `gte` / `lt` / `lte` (a number) or `is_empty` (none), and is also a `sort`. Operators: `contains`, `does_not_contain`, `is` / `is_not` (a value or a list, case-insensitive), `is_empty`, `is_not_empty`, `gt` / `gte` / `lt` / `lte`, and for dates `on`, `before`, `after` (on or after), `today`, `in_past`, `in_future`, `relative` (`PAST_7_DAY`, `NEXT_2_WEEK`, `THIS_1_MONTH`). Pass `tz` (minutes east of UTC) to put date rules on the viewer's local day.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/stats` | Aggregate counts and total deal value |
+| GET | `/api/stats` | Aggregate counts (among them `tickets`, and `openTickets`: the ones neither resolved nor closed) and total deal value |
 | GET | `/api/contacts` | List contacts (paginated, sortable, searchable) |
 | GET | `/api/contacts/:id` | Get a single contact |
 | POST | `/api/contacts` | Create a contact |
@@ -278,9 +298,9 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | POST | `/api/contacts/bulk-delete` | Delete several contacts (`{ ids }`) |
 | POST | `/api/contacts/import` | Import contacts (`{ contacts: [...] }`); company names resolve to existing companies or are created |
 | GET | `/api/companies` | List companies (paginated, sortable, searchable) |
-| GET | `/api/companies/:id` | Get a single company |
+| GET | `/api/companies/:id` | Get a single company, with its `main_contact` (`{ id, label }` or null) |
 | POST | `/api/companies` | Create a company |
-| PUT | `/api/companies/:id` | Update a company |
+| PUT | `/api/companies/:id` | Update a company (`main_contact_id`: one of its contacts, null to clear) |
 | DELETE | `/api/companies/:id` | Delete a company |
 | POST | `/api/companies/bulk-delete` | Delete several companies (`{ ids }`) |
 | POST | `/api/companies/import` | Import companies (`{ companies: [...] }`); a name that already exists is skipped |
@@ -292,10 +312,16 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | POST | `/api/partners/bulk-delete` | Delete several partners (`{ ids }`) |
 | GET | `/api/customer-users` | List customer users (paginated, sortable, searchable; `company_id` for one customer's) |
 | GET | `/api/customer-users/:id` | Get a single customer user |
-| POST | `/api/customer-users` | Create a customer user (`{ name, email?, phone?, company_id?, notes? }`) |
+| POST | `/api/customer-users` | Create a customer user (`{ name, email?, phone?, company_id?, notes? }`; the company must be a customer) |
 | PUT | `/api/customer-users/:id` | Update a customer user |
 | DELETE | `/api/customer-users/:id` | Delete a customer user |
 | POST | `/api/customer-users/bulk-delete` | Delete several customer users (`{ ids }`) |
+| GET | `/api/tickets` | List tickets (paginated, sortable, searchable; `company_id`, `customer_user_id`, `owner_id`, `status`). `sort=status` and `sort=priority` follow the workflow and the urgency, `owner_id` the owner's name; undated tickets sort last by `due_date` |
+| GET | `/api/tickets/:id` | Get a single ticket |
+| POST | `/api/tickets` | Create a ticket (`{ subject, company_id, description?, status?, priority?, customer_user_id?, owner_id?, due_date? }`; the company must be a customer, and is the customer user's when left out; open and medium unless sent) |
+| PUT | `/api/tickets/:id` | Update a ticket (moving it to another customer drops a customer user who isn't theirs) |
+| DELETE | `/api/tickets/:id` | Delete a ticket |
+| POST | `/api/tickets/bulk-delete` | Delete several tickets (`{ ids }`) |
 | GET | `/api/deals` | List deals (paginated, sortable, searchable; `partner_id` for a partner's deals) |
 | GET | `/api/deals/board` | Every deal for the pipeline board, optionally filtered |
 | GET | `/api/deals/progress` | Open deals worst first: each one's next step and the reasons to look at it |
@@ -304,7 +330,7 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | PUT | `/api/deals/:id` | Update a deal (`partner_ids` replaces its partners, keeping the shares of the ones it keeps) |
 | PUT | `/api/deals/:id/partners/:partner_id` | Put a partner on a deal and set its share (`{ one_time_value?, recurring_value? }`) |
 | DELETE | `/api/deals/:id/partners/:partner_id` | Take a partner off a deal |
-| GET | `/api/team` | The accounts deals can be assigned to |
+| GET | `/api/team` | The accounts deals and tickets can be assigned to |
 | DELETE | `/api/deals/:id` | Delete a deal |
 | POST | `/api/deals/:id/updates` | Log what happened on a deal, the tasks it finished and its next step |
 | GET / POST | `/api/stages` | The pipeline stages in order; add one |
@@ -318,13 +344,13 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | DELETE | `/api/views/:id` | Delete a view (not the default) |
 | GET | `/api/views/:id/fields` | A view's column layout (visibility, widths, footer calculations) |
 | PUT | `/api/views/:id/fields/:key` | Show/hide, resize or set the footer calculation of one column (`{ visible?, size?, aggregate? }`) |
-| GET | `/api/custom-fields` | The attributes (`entity=contact\|company\|deal\|partner\|customer_user` for one record type's) |
+| GET | `/api/custom-fields` | The attributes (`entity=contact\|company\|deal\|partner\|customer_user\|ticket` for one record type's) |
 | POST | `/api/custom-fields` | Add an attribute. A relation: `{ entity_type, key, label, field_type: "relation", relation_type: "many_to_one" \| "one_to_many", target_entity, inverse_key, inverse_label }` makes both sides |
 | PUT | `/api/custom-fields/:id` | Change an attribute's label, options, widget or position (its key and type stay) |
 | DELETE | `/api/custom-fields/:id` | Delete an attribute (a relation goes from both sides, with its links) |
-| GET | `/api/records?entity=&search=` | Records by name for a relation picker (or `ids=a,b` to name given ids) |
+| GET | `/api/records?entity=&search=` | Records by name for a relation picker (or `ids=a,b` to name given ids; `customers=1` with `entity=company` for customers only) |
 | GET | `/api/values?entity=&field=` | The values a column already holds (case-insensitive, up to 200), for a picker that offers them |
-| GET | `/api/contacts/aggregates`, `/api/companies/aggregates`, `/api/partners/aggregates`, `/api/customer-users/aggregates` | Column totals over the filtered list (`ops=[{key, op}]` plus the list's `search`/`filters`) |
+| GET | `/api/contacts/aggregates`, `/api/companies/aggregates`, `/api/partners/aggregates`, `/api/customer-users/aggregates`, `/api/tickets/aggregates` | Column totals over the filtered list (`ops=[{key, op}]` plus the list's `search`/`filters`) |
 | GET | `/api/customers` | Every customer worst first with its reasons, and what to do first |
 | GET | `/api/lookup` | What the CRM knows about an address (`email`, `domain`): contact, company, customer since, deals |
 | POST | `/api/lookup` | The same for up to 100 addresses at once (`{ addresses: [{ email, domain }] }`), in order |

@@ -213,4 +213,12 @@ func TestColumnsAddedToAnOlderDatabase(t *testing.T) {
 	if err := addColumns(ctx); err != nil {
 		t.Fatal(err)
 	}
+	// A company's main contact can't be dropped to begin with (a foreign key):
+	// its declaration is tried on a table of its own.
+	mustRun(t, ctx, `CREATE TABLE older_companies (id TEXT PRIMARY KEY)`)
+	for _, c := range addedColumns {
+		if c.table == "companies" {
+			mustRun(t, ctx, "ALTER TABLE older_companies ADD COLUMN "+c.column+" "+c.decl)
+		}
+	}
 }

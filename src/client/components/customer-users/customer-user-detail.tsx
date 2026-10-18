@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mail, LayoutGrid, Activity as ActivityIcon, Phone, AtSign, Building2, StickyNote, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Mail, LayoutGrid, Activity as ActivityIcon, Phone, AtSign, Building2, StickyNote, Calendar, Clock, LifeBuoy } from "lucide-react";
 import { useCrm } from "@/context";
 import { Avatar } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/componen
 import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RelationInput } from "@/lib/relations";
+import { RecordTickets, useOpenTicketCount } from "@/components/tickets/record-tickets";
 import { cn } from "@/lib/utils";
 import type { Activity, CustomerUser, RelationRecord } from "@/types";
 
@@ -24,6 +25,7 @@ export function CustomerUserDetail({ id, navigate, panel = false }: { id: string
   const [tab, setTab] = useState("overview");
   const [noteOpen, setNoteOpen] = useState(false);
   const shows = (key: string) => panel || tab === key;
+  const openTickets = useOpenTicketCount({ customerUserId: id });
 
   const saveField = async (patch: Partial<CustomerUser>) => {
     if (!user) return;
@@ -94,7 +96,7 @@ export function CustomerUserDetail({ id, navigate, panel = false }: { id: string
           <DetailsSection title="Record details">
             <dl className="flex flex-col">
               <Attr icon={Building2} label="Company">
-                <RelationInput link entity="company" value={user.company_id} known={company} placeholder="Set company…" emptyLabel="No company"
+                <RelationInput link customers entity="company" value={user.company_id} known={company} placeholder="Set company…" emptyLabel="No company"
                   onChange={(v) => void saveField({ company_id: v })} />
               </Attr>
               <Attr icon={AtSign} label="Email">
@@ -126,6 +128,7 @@ export function CustomerUserDetail({ id, navigate, panel = false }: { id: string
             { key: "overview", label: "Overview", icon: LayoutGrid },
             { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
             { key: "notes", label: "Notes", icon: StickyNote, count: activities.filter((a) => a.type === "note").length },
+            { key: "tickets", label: "Tickets", icon: LifeBuoy, count: openTickets ?? 0 },
           ]} />}
 
           <div className={cn("flex flex-col gap-8", panel ? "p-4" : "p-6")}>
@@ -139,6 +142,8 @@ export function CustomerUserDetail({ id, navigate, panel = false }: { id: string
                 </div>
               </section>
             )}
+
+            {shows("tickets") && <RecordTickets companyId={user.company_id} customerUserId={user.id} />}
 
             {shows("activity") && <ActivityFeed activities={activities} />}
 

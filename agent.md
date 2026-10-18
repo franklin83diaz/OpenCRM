@@ -1,7 +1,7 @@
 # OpenCRM — agent guide
 
-A CRM with **companies**, **contacts**, **partners**, **customer users** and a
-**deals** pipeline, plus tasks and an activity timeline. React + Go + D1: the API is a Go server in a Cloudflare
+A CRM with **companies**, **contacts**, **partners**, **customer users**,
+**tickets** and a **deals** pipeline, plus tasks and an activity timeline. React + Go + D1: the API is a Go server in a Cloudflare
 Container. `GET /llms.txt` lists every endpoint; `GET /api/openapi.json` is the
 spec.
 
@@ -29,10 +29,32 @@ Authorization: Bearer crm_…
 
 ## Core entities
 
-- `GET/POST/PUT/DELETE /api/contacts` · `/api/companies` · `/api/partners` · `/api/customer-users` · `/api/deals`
+- `GET/POST/PUT/DELETE /api/contacts` · `/api/companies` · `/api/partners` · `/api/customer-users` · `/api/tickets` · `/api/deals`
 - Customer users are the people who use the product at a customer: `{ name,
   email, phone, company_id, notes }`, kept apart from contacts (the people we
-  deal with). `GET /api/customer-users?company_id=` lists one customer's.
+  deal with). `GET /api/customer-users?company_id=` lists one customer's. The
+  company must be a customer (it has a `customer_since`): any other is a 400.
+  `GET /api/records?entity=company&customers=1&search=` finds them by name.
+- Tickets are a customer's requests and problems: `{ subject, description,
+  status, priority, company_id, customer_user_id, owner_id, due_date }`.
+  `status`: `open` (the default), `in_progress`, `waiting` (on the customer),
+  `resolved`, `closed`; the last two are done. `priority`: `low`, `medium`
+  (the default), `high`, `urgent`. Both take any case, with spaces ("In
+  progress"). `company_id` is required, never `null`, and must be a customer
+  (400 otherwise; one that stops being a customer stays the ticket's); send
+  only `customer_user_id` and the ticket takes that user's company.
+  `customer_user_id` (optional) must be one of that customer's;
+  moving a ticket to another customer drops one who isn't theirs. `owner_id`
+  is an account (`GET /api/team`) or `null`; `due_date` is `YYYY-MM-DD` or
+  `null`. Reads carry `company_name`, `customer_user_name`, `customer_user_email`
+  and `owner`. `GET /api/tickets?company_id=&customer_user_id=&owner_id=&status=`
+  filters; `sort=status`/`priority` follow the workflow/urgency, `sort=due_date`
+  puts undated ones last. Company and customer user filters take
+  `count:tickets`.
+- A company may have a main contact: `PUT /api/companies/{id}`
+  `{ main_contact_id }`, one of its own contacts (400 otherwise; `null`
+  clears it). `GET /api/companies/{id}` carries `main_contact` (`{ id, label }`
+  or `null`).
 - Contacts belong to companies. A deal has its own `company_id` and `contact_id`,
   both optional. Setting a contact on a deal with no company gives it the
   contact's company; send `company_id` to set or clear it yourself.
@@ -52,7 +74,8 @@ Authorization: Bearer crm_…
   write's `partner_ids` (a list of partner ids) replaces the whole list,
   keeping the shares of the ones it keeps. `GET /api/deals?partner_id=` lists
   a partner's deals; deal filters take `partners` and `count:partners`.
-- `GET /api/stats` — counts + total pipeline value (excludes lost deals).
+- `GET /api/stats` — counts (`tickets`, and `openTickets`: not resolved or
+  closed) + total pipeline value (excludes lost deals).
 
 ## Pipeline stages (data, not code)
 
@@ -79,8 +102,8 @@ stays lenient and does not enforce required.
 
 ## Activity timeline
 
-Every contact/company/deal has a timeline. Notes, deal updates, and deals won or
-lost write to it.
+Every contact/company/deal (and partner, customer user, ticket) has a timeline.
+Notes, deal updates, and deals won or lost write to it.
 
 - `GET /api/activities?entity_type=contact&entity_id=<id>` — newest first.
 - `POST /api/activities` `{ entity_type, entity_id, type, body }` — log a note.

@@ -18,6 +18,8 @@ export type Route =
   | { name: "customers" }
   | { name: "customer-users"; record?: string; view?: string; filters?: string }
   | { name: "customer-user"; id: string }
+  | { name: "tickets"; record?: string; view?: string; filters?: string; board?: boolean }
+  | { name: "ticket"; id: string }
   | { name: "properties" }
   | { name: "account" }
   | { name: "tokens" }
@@ -45,6 +47,11 @@ function parse(pathname: string, search: string): Route {
   if (pathname === "/customer-users") return { name: "customer-users", record, view, filters };
   const um = pathname.match(/^\/customer-users\/([^/]+)$/);
   if (um) return { name: "customer-user", id: decodeURIComponent(um[1]) };
+  // The tickets list and its board share their filters; /tickets/board is the board.
+  if (pathname === "/tickets") return { name: "tickets", record, view, filters };
+  if (pathname === "/tickets/board") return { name: "tickets", record, view, filters, board: true };
+  const tm = pathname.match(/^\/tickets\/([^/]+)$/);
+  if (tm) return { name: "ticket", id: decodeURIComponent(tm[1]) };
   if (pathname === "/settings/properties") return { name: "properties" };
   if (pathname === "/settings/account") return { name: "account" };
   if (pathname === "/settings/tokens") return { name: "tokens" };

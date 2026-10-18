@@ -87,21 +87,30 @@ function makeCaller(base, record, auth) {
   };
 }
 
-// Partners, a deal's recurring value and a deal's owner came after the port:
-// TS never answered with them, so the Go side's answers are compared without
-// them — on a deal, in the stats, and among a deal's valid fields.
+// Partners, a deal's recurring value and a deal's owner, customer users,
+// tickets and a company's main contact came after the port: TS never answered
+// with them, so the Go side's answers are compared without them — on a deal,
+// in the stats, on a company (anywhere), and among a deal's or a company's
+// valid fields.
 const POST_PORT_DEAL_KEYS = ["partners", "recurring_value", "owner_id", "owner"];
-const POST_PORT_STATS_KEYS = ["partners", "dealRecurringValue"];
+const POST_PORT_STATS_KEYS = ["partners", "dealRecurringValue", "customerUsers", "tickets", "openTickets"];
+const POST_PORT_KEYS = ["main_contact_id", "main_contact"]; // a company's
 const POST_PORT_DEAL_FIELDS = ["partner_ids", "recurring_value", "owner_id"];
+const POST_PORT_COMPANY_FIELDS = ["main_contact_id"];
 function withoutPartners(v) {
   if (Array.isArray(v)) return v.map(withoutPartners);
   if (!v || typeof v !== "object") return v;
-  const dropped = "stage" in v ? POST_PORT_DEAL_KEYS : "dealValue" in v ? POST_PORT_STATS_KEYS : [];
-  const dealFields = typeof v.error === "string" && v.error.startsWith("Unknown field(s) for deal:");
+  const dropped = [...POST_PORT_KEYS, ...("stage" in v ? POST_PORT_DEAL_KEYS : "dealValue" in v ? POST_PORT_STATS_KEYS : [])];
+  const unknown = typeof v.error === "string" ? v.error : "";
+  const postPortFields = unknown.startsWith("Unknown field(s) for deal:")
+    ? POST_PORT_DEAL_FIELDS
+    : unknown.startsWith("Unknown field(s) for company:")
+      ? POST_PORT_COMPANY_FIELDS
+      : null;
   const o = {};
   for (const [k, x] of Object.entries(v)) {
     if (dropped.includes(k)) continue;
-    o[k] = k === "valid_fields" && dealFields && Array.isArray(x) ? x.filter((f) => !POST_PORT_DEAL_FIELDS.includes(f)) : withoutPartners(x);
+    o[k] = k === "valid_fields" && postPortFields && Array.isArray(x) ? x.filter((f) => !postPortFields.includes(f)) : withoutPartners(x);
   }
   return o;
 }

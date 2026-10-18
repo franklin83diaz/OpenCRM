@@ -438,7 +438,7 @@ func (app *App) createDeal(w http.ResponseWriter, r *http.Request) error {
 		if problem != "" {
 			return fail(400, problem)
 		}
-		owner, ownerSent, problem, err := dealOwnerID(ctx, body)
+		owner, ownerSent, problem, err := ownerID(ctx, body)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -583,7 +583,7 @@ func (app *App) updateDeal(w http.ResponseWriter, r *http.Request) error {
 		if problem != "" {
 			return fail(400, problem)
 		}
-		owner, ownerSent, problem, err := dealOwnerID(ctx, body)
+		owner, ownerSent, problem, err := ownerID(ctx, body)
 		if err != nil {
 			return 0, nil, err
 		}

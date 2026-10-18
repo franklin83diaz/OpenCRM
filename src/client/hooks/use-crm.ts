@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, type Dispatch, type SetStateAction } from "react";
 import { api } from "../api";
 import type {
-  Contact, Company, Deal, Partner, CustomerUser, Stats, PaginatedState, StageDef, TeamMember,
+  Contact, Company, Deal, Partner, CustomerUser, Ticket, Stats, PaginatedState, StageDef, TeamMember,
   Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult,
 } from "../types";
 import { sanitize, type FilterNode } from "@/lib/filters";
@@ -24,7 +24,7 @@ function pagParams(pag: PaginatedState): URLSearchParams {
 }
 
 export function useCrmState(isAgent: boolean): CrmContextValue {
-  const [stats, setStats] = useState<Stats>({ contacts: 0, companies: 0, deals: 0, dealValue: 0, dealRecurringValue: 0, customers: 0, partners: 0, customerUsers: 0 });
+  const [stats, setStats] = useState<Stats>({ contacts: 0, companies: 0, deals: 0, dealValue: 0, dealRecurringValue: 0, customers: 0, partners: 0, customerUsers: 0, tickets: 0, openTickets: 0 });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,6 +39,9 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
 
   const [customerUsers, setCustomerUsers] = useState<CustomerUser[]>([]);
   const [customerUsersPag, setCustomerUsersPag] = useState<PaginatedState>(defaultPag("created_at"));
+
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketsPag, setTicketsPag] = useState<PaginatedState>(defaultPag("created_at"));
 
   const [deals, setDeals] = useState<Deal[]>([]);
   const [dealsPag, setDealsPag] = useState<PaginatedState>(defaultPag("created_at"));
@@ -83,6 +86,12 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     setCustomerUsersPag((prev) => ({ ...prev, total: data.total }));
   }, []);
 
+  const fetchTickets = useCallback(async (pag: PaginatedState) => {
+    const data = await api<{ tickets: Ticket[]; total: number }>("GET", `/api/tickets?${pagParams(pag)}`);
+    setTickets(data.tickets);
+    setTicketsPag((prev) => ({ ...prev, total: data.total }));
+  }, []);
+
   const fetchDeals = useCallback(async (pag: PaginatedState) => {
     const data = await api<{ deals: Deal[]; total: number; totalValue: number }>("GET", `/api/deals?${pagParams(pag)}`);
     setDeals(data.deals);
@@ -122,7 +131,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
       setLoading(true);
       try {
         await Promise.all([
-          fetchStats(), fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag), fetchCustomerUsers(customerUsersPag),
+          fetchStats(), fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag), fetchCustomerUsers(customerUsersPag), fetchTickets(ticketsPag),
           fetchDeals(dealsPag), fetchBoardDeals(),
           refetchCustomFields(), refetchStages(), refetchTeam(),
         ]);
@@ -149,6 +158,9 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
   useEffect(() => { fetchCustomerUsers(customerUsersPag).catch((e) => setError((e as Error).message)); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [customerUsersPag.page, customerUsersPag.sort, customerUsersPag.order, customerUsersPag.search, JSON.stringify(customerUsersPag.filters)]);
+  useEffect(() => { fetchTickets(ticketsPag).catch((e) => setError((e as Error).message)); },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ticketsPag.page, ticketsPag.sort, ticketsPag.order, ticketsPag.search, JSON.stringify(ticketsPag.filters)]);
   useEffect(() => { fetchBoardDeals().catch((e) => setError((e as Error).message)); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(sanitize(boardFilters))]);
@@ -171,6 +183,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
   const coSet = makeSetters(setCompaniesPag);
   const pSet = makeSetters(setPartnersPag);
   const uSet = makeSetters(setCustomerUsersPag);
+  const tSet = makeSetters(setTicketsPag);
   const dSet = makeSetters(setDealsPag);
 
   // ── Contacts CRUD ──
@@ -184,8 +197,8 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
   // sides), so both lists refetch and any open record page re-reads.
   const recordsChanged = useCallback(async () => {
     setChanges((n) => n + 1);
-    await Promise.all([fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag), fetchCustomerUsers(customerUsersPag), fetchBoardDeals(), fetchStats()]);
-  }, [contactsPag, companiesPag, partnersPag, customerUsersPag, fetchContacts, fetchCompanies, fetchPartners, fetchCustomerUsers, fetchBoardDeals, fetchStats]);
+    await Promise.all([fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag), fetchCustomerUsers(customerUsersPag), fetchTickets(ticketsPag), fetchBoardDeals(), fetchStats()]);
+  }, [contactsPag, companiesPag, partnersPag, customerUsersPag, ticketsPag, fetchContacts, fetchCompanies, fetchPartners, fetchCustomerUsers, fetchTickets, fetchBoardDeals, fetchStats]);
 
   const updateContact = useCallback(async (id: string, data: Partial<Contact>) => {
     await api("PUT", `/api/contacts/${id}`, data);
@@ -285,6 +298,33 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     await Promise.all([fetchCustomerUsers(customerUsersPag), fetchStats()]);
   }, [customerUsersPag, fetchCustomerUsers, fetchStats]);
 
+  // ── Tickets CRUD ──
+
+  const addTicket = useCallback(async (data: Partial<Ticket>) => {
+    const { ticket } = await api<{ ticket: Ticket }>("POST", "/api/tickets", data);
+    await recordsChanged();
+    return ticket;
+  }, [recordsChanged]);
+
+  const fetchTicket = useCallback(async (id: string): Promise<Ticket | null> => {
+    try {
+      const data = await api<{ ticket: Ticket }>("GET", `/api/tickets/${encodeURIComponent(id)}`);
+      return data.ticket;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const updateTicket = useCallback(async (id: string, data: Partial<Ticket>) => {
+    await api("PUT", `/api/tickets/${encodeURIComponent(id)}`, data);
+    await recordsChanged();
+  }, [recordsChanged]);
+
+  const deleteTickets = useCallback(async (ids: string[]) => {
+    await api("POST", "/api/tickets/bulk-delete", { ids });
+    await recordsChanged();
+  }, [recordsChanged]);
+
   // ── Deals CRUD ──
 
   // A deal's partners count it among their deals, so they refetch too.
@@ -361,6 +401,8 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     addPartner, fetchPartner, updatePartner, deletePartners,
     customerUsers, customerUsersPag, setCustomerUsersPage: uSet.setPage, setCustomerUsersSort: uSet.setSort, setCustomerUsersSearch: uSet.setSearch, setCustomerUsersFilters: uSet.setFilters, setCustomerUsersView: uSet.setView,
     addCustomerUser, fetchCustomerUser, updateCustomerUser, deleteCustomerUsers,
+    tickets, ticketsPag, setTicketsPage: tSet.setPage, setTicketsSort: tSet.setSort, setTicketsSearch: tSet.setSearch, setTicketsFilters: tSet.setFilters, setTicketsView: tSet.setView,
+    addTicket, fetchTicket, updateTicket, deleteTickets,
     deals, dealsPag, dealsTotalValue, setDealsPage: dSet.setPage, setDealsSort: dSet.setSort, setDealsSearch: dSet.setSearch,
     addDeal, fetchDeal, updateDeal, deleteDeal, boardDeals, boardFilters, setBoardFilters,
     fetchActivities, addNote, importEntity,

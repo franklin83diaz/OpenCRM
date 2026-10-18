@@ -38,6 +38,9 @@ func recordLabel(entity EntityType, a string) string {
 	if entity == Contact {
 		return fmt.Sprintf("TRIM(COALESCE(%s.first_name, '') || ' ' || COALESCE(%s.last_name, ''))", a, a)
 	}
+	if entity == Ticket {
+		return a + ".subject"
+	}
 	return a + ".name"
 }
 
@@ -97,6 +100,21 @@ func relationDefs(ctx context.Context, entity EntityType) ([]CustomFieldDef, err
 // SearchRecords returns records of entity for a picker: by name (search), or
 // the given ids.
 func SearchRecords(ctx context.Context, entity EntityType, search string, ids []string) ([]RelationRecord, error) {
+	return searchRecords(ctx, entity, search, ids, "")
+}
+
+// customerSQL is a company that is a customer (customer_since set), over alias t.
+const customerSQL = "t.customer_since IS NOT NULL AND TRIM(t.customer_since) != ''"
+
+// SearchCustomers is SearchRecords' search over companies that are customers
+// only, for a picker that takes nothing else (a customer user's company).
+func SearchCustomers(ctx context.Context, search string) ([]RelationRecord, error) {
+	return searchRecords(ctx, Company, search, nil, customerSQL)
+}
+
+// searchRecords is SearchRecords; `only`, when set, narrows the search (not
+// the ids) to the rows it matches, over alias t.
+func searchRecords(ctx context.Context, entity EntityType, search string, ids []string, only string) ([]RelationRecord, error) {
 	table := EntityTables[entity]
 	if len(ids) > 0 {
 		rows, err := db.Query(ctx, fmt.Sprintf("SELECT %s FROM %s t WHERE t.id IN (%s)", recordColumns(entity, "t"), table, marks(len(ids))), stringParams(ids)...)
@@ -106,11 +124,18 @@ func SearchRecords(ctx context.Context, entity EntityType, search string, ids []
 		return toRecords(rows), nil
 	}
 	s := js.Trim(search)
-	where := ""
+	conds := []string{}
 	var params []any
 	if s != "" {
-		where = fmt.Sprintf(" WHERE %s LIKE ?", recordLabel(entity, "t"))
+		conds = append(conds, recordLabel(entity, "t")+" LIKE ?")
 		params = []any{"%" + s + "%"}
+	}
+	if only != "" {
+		conds = append(conds, only)
+	}
+	where := ""
+	if len(conds) > 0 {
+		where = " WHERE " + strings.Join(conds, " AND ")
 	}
 	rows, err := db.Query(ctx, fmt.Sprintf("SELECT %s FROM %s t%s ORDER BY label COLLATE NOCASE LIMIT 20", recordColumns(entity, "t"), table, where), params...)
 	if err != nil {
@@ -307,13 +332,15 @@ func CountOf(field string) (string, bool) {
 	return "", false
 }
 
-// builtinMany are the built-in one_to_many sides: a company's contacts, deals
-// and customer users, a contact's deals, and both ends of deal_partners.
+// builtinMany are the built-in one_to_many sides: a company's contacts, deals,
+// customer users and tickets, a contact's deals, a customer user's tickets,
+// and both ends of deal_partners.
 var builtinMany = map[EntityType]map[string]ManyLink{
-	Company: {"contacts": {Table: "contacts", FK: "company_id"}, "deals": {Table: "deals", FK: "company_id"}, "customer_users": {Table: "customer_users", FK: "company_id"}},
-	Contact: {"deals": {Table: "deals", FK: "contact_id"}},
-	Deal:    {"partners": {Table: "deal_partners", FK: "deal_id", ID: "partner_id"}},
-	Partner: {"deals": {Table: "deal_partners", FK: "partner_id", ID: "deal_id"}},
+	Company:      {"contacts": {Table: "contacts", FK: "company_id"}, "deals": {Table: "deals", FK: "company_id"}, "customer_users": {Table: "customer_users", FK: "company_id"}, "tickets": {Table: "tickets", FK: "company_id"}},
+	Contact:      {"deals": {Table: "deals", FK: "contact_id"}},
+	CustomerUser: {"tickets": {Table: "tickets", FK: "customer_user_id"}},
+	Deal:         {"partners": {Table: "deal_partners", FK: "deal_id", ID: "partner_id"}},
+	Partner:      {"deals": {Table: "deal_partners", FK: "partner_id", ID: "deal_id"}},
 }
 
 // ManyLinks returns the one_to_many sides of entity, built-in and custom, by
@@ -345,9 +372,11 @@ func ManyLinks(ctx context.Context, entity EntityType) (map[string]ManyLink, err
 // builtinLinks are the built-in links, which predate relation defs: column →
 // the entity it holds.
 var builtinLinks = map[EntityType]map[string]EntityType{
+	Company:      {"main_contact_id": Contact},
 	Contact:      {"company_id": Company},
 	CustomerUser: {"company_id": Company},
 	Deal:         {"contact_id": Contact, "company_id": Company},
+	Ticket:       {"company_id": Company, "customer_user_id": CustomerUser},
 }
 
 // RelationSortSQL is the ORDER BY for a column holding a linked record's id (a

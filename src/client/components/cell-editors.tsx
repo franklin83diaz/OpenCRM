@@ -148,7 +148,7 @@ export function optionEdit<T>(key: string, options: { value: string; label: stri
 }
 
 /** A cell edit that links one record (a company, a many_to_one relation), or none. */
-export function recordEdit<T>(key: string, entity: NonNullable<CustomFieldDef["target_entity"]>, label: string, save: Save<T>): CellEdit<T> {
+export function recordEdit<T>(key: string, entity: NonNullable<CustomFieldDef["target_entity"]>, label: string, save: Save<T>, customers = false): CellEdit<T> {
   return {
     type: "menu",
     render: (row, close) => {
@@ -158,6 +158,7 @@ export function recordEdit<T>(key: string, entity: NonNullable<CustomFieldDef["t
           entity={entity}
           selected={typeof id === "string" && id ? [id] : []}
           creatable
+          customers={customers}
           emptyLabel={`No ${label.toLowerCase()}`}
           onClear={() => { close(); void save(row, { [key]: null }); }}
           onPick={(r) => { close(); void save(row, { [key]: r.id }); }}

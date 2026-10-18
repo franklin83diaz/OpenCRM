@@ -91,6 +91,36 @@
  },
  {
   "method": "GET",
+  "path": "/api/tickets",
+  "summary": "List tickets with pagination, search, and filtering"
+ },
+ {
+  "method": "GET",
+  "path": "/api/tickets/{id}",
+  "summary": "Get one ticket"
+ },
+ {
+  "method": "POST",
+  "path": "/api/tickets",
+  "summary": "Create a ticket"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/tickets/{id}",
+  "summary": "Update a ticket"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/tickets/{id}",
+  "summary": "Delete a ticket"
+ },
+ {
+  "method": "POST",
+  "path": "/api/tickets/bulk-delete",
+  "summary": "Delete several tickets"
+ },
+ {
+  "method": "GET",
   "path": "/api/contacts",
   "summary": "List contacts with pagination, search, and filtering"
  },
@@ -234,6 +264,10 @@
  {
   "method": "GET",
   "path": "/api/customer-users/aggregates"
+ },
+ {
+  "method": "GET",
+  "path": "/api/tickets/aggregates"
  },
  {
   "method": "GET",

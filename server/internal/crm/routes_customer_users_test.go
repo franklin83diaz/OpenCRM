@@ -20,7 +20,7 @@ type customerUserJSON struct {
 
 func TestCustomerUsers(t *testing.T) {
 	recordedDB(t, []string{
-		`INSERT INTO companies (id, name, domain, customer_since) VALUES ('co-a', 'Acme', 'acme.example', '2025-01-01'), ('co-b', 'Beta', '', NULL)`,
+		`INSERT INTO companies (id, name, domain, customer_since) VALUES ('co-a', 'Acme', 'acme.example', '2025-01-01'), ('co-b', 'Beta', '', '2025-02-01'), ('co-c', 'Gamma', '', NULL)`,
 	})
 	api := replayAPI(&App{})
 
@@ -35,7 +35,12 @@ func TestCustomerUsers(t *testing.T) {
 		t.Fatalf("created: %+v", u)
 	}
 	ann := made.CustomerUser.ID
-	partnersCall(t, api, "POST", "/api/customer-users", `{"name":"Bo","company_id":"co-b"}`, 201, nil)
+	// Only a customer's: a company with no customer_since is refused.
+	if raw := partnersCall(t, api, "POST", "/api/customer-users", `{"name":"Bo","company_id":"co-c"}`, 400, nil); !strings.Contains(raw, "Gamma is not a customer") {
+		t.Fatalf("not a customer: %s", raw)
+	}
+	partnersCall(t, api, "POST", "/api/customer-users", `{"name":"Bo","company_id":"co-b"}`, 201, &made)
+	bo := made.CustomerUser.ID
 	partnersCall(t, api, "POST", "/api/customer-users", `{"name":"Cy"}`, 201, nil)
 
 	var page struct {
@@ -87,6 +92,22 @@ func TestCustomerUsers(t *testing.T) {
 		t.Fatalf("no company: %+v", u)
 	}
 	partnersCall(t, api, "PUT", "/api/customer-users/"+ann, `{"company_id":"co-a"}`, 200, &one)
+
+	// A company that stops being a customer stays its users' own, and takes no others.
+	mustRun(t, context.Background(), `UPDATE companies SET customer_since = NULL WHERE id = 'co-b'`)
+	partnersCall(t, api, "PUT", "/api/customer-users/"+bo, `{"name":"Bo Ray","company_id":"co-b"}`, 200, nil)
+	partnersCall(t, api, "PUT", "/api/customer-users/"+ann, `{"company_id":"co-b"}`, 400, nil)
+	mustRun(t, context.Background(), `UPDATE companies SET customer_since = '2025-02-01' WHERE id = 'co-b'`)
+
+	// The company picker's search: customers only, by name; ids name any company.
+	var found recordsBody
+	partnersCall(t, api, "GET", "/api/records?entity=company&customers=1", "", 200, &found)
+	checkJSON(t, "customers", found.Records, `[{"id":"co-a","label":"Acme","domain":"acme.example"},{"id":"co-b","label":"Beta","domain":""}]`)
+	partnersCall(t, api, "GET", "/api/records?entity=company&customers=true&search=bet", "", 200, &found)
+	checkJSON(t, "customers by name", found.Records, `[{"id":"co-b","label":"Beta","domain":""}]`)
+	partnersCall(t, api, "GET", "/api/records?entity=company&customers=1&ids=co-c", "", 200, &found)
+	checkJSON(t, "by id", found.Records, `[{"id":"co-c","label":"Gamma","domain":""}]`)
+	partnersCall(t, api, "GET", "/api/records?entity=contact&customers=1", "", 400, nil)
 
 	var stats statsBody
 	partnersCall(t, api, "GET", "/api/stats", "", 200, &stats)

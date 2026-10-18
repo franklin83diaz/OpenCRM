@@ -100,7 +100,8 @@ export function RecordTabs({ tabs, active, onChange }: {
   onChange: (key: string) => void;
 }) {
   return (
-    <div role="tablist" aria-label="Record" className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-3">
+    // More tabs than the width scroll here, not the page under them.
+    <div role="tablist" aria-label="Record" className="flex h-12 shrink-0 items-center overflow-x-auto border-b border-border px-3 [scrollbar-width:none]">
       {tabs.map((t) => {
         const on = t.key === active;
         return (
@@ -111,9 +112,9 @@ export function RecordTabs({ tabs, active, onChange }: {
             aria-selected={on}
             onClick={() => onChange(t.key)}
             className={cn(
-              "relative inline-flex h-12 items-center gap-1.5 px-3 text-sm",
+              "relative inline-flex h-12 shrink-0 items-center gap-1.5 whitespace-nowrap px-2 text-sm",
               on
-                ? "font-medium text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-foreground"
+                ? "font-medium text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-foreground"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >

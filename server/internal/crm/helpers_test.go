@@ -129,9 +129,9 @@ func recordedDB(t *testing.T, seed []string) *recorder {
 // so TS never answered with them: a replay compares what TS did with them left
 // out — a deal's `partners`, `recurring_value`, `owner_id` and `owner`, the
 // same among a deal's valid fields (partner_ids for partners), the stats'
-// count of partners and customer users and recurring value, and the
-// statements on the partners, deal_partners and customer_users tables or the
-// recurring value (no statement TS ran names any of them).
+// count of partners, customer users and tickets and recurring value, and the
+// statements on the partners, deal_partners, customer_users and tickets
+// tables or the recurring value (no statement TS ran names any of them).
 
 // postPortDealKeys are a deal's keys TS never had.
 var postPortDealKeys = []string{"partners", "recurring_value", "owner_id", "owner"}
@@ -156,12 +156,25 @@ func withoutPartners(text string) string {
 				delete(v, "partners")
 				delete(v, "dealRecurringValue")
 				delete(v, "customerUsers")
+				delete(v, "tickets")
+				delete(v, "openTickets")
 			}
+			delete(v, "main_contact_id") // a company's
+			delete(v, "main_contact")
 			// A deal's valid fields: a company has an owner_id of its own in the replays.
 			if valid, ok := v["valid_fields"].([]any); ok && strings.HasPrefix(fmt.Sprint(v["error"]), "Unknown field(s) for deal:") {
 				kept := []any{}
 				for _, k := range valid {
 					if k != "partner_ids" && k != "recurring_value" && k != "owner_id" {
+						kept = append(kept, k)
+					}
+				}
+				v["valid_fields"] = kept
+			}
+			if valid, ok := v["valid_fields"].([]any); ok && strings.HasPrefix(fmt.Sprint(v["error"]), "Unknown field(s) for company:") {
+				kept := []any{}
+				for _, k := range valid {
+					if k != "main_contact_id" {
 						kept = append(kept, k)
 					}
 				}
@@ -181,7 +194,7 @@ func withoutPartners(text string) string {
 	return string(b)
 }
 
-var partnerTables = regexp.MustCompile(`\b(partners|deal_partners|recurring_value|customer_users)\b`)
+var partnerTables = regexp.MustCompile(`\b(partners|deal_partners|recurring_value|customer_users|tickets|main_contact_id)\b`)
 
 // withoutPartnerStatements is log without the statements that came after the
 // port.

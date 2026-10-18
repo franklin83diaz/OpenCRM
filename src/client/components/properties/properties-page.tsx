@@ -29,6 +29,7 @@ const ENTITIES: { key: EntityType; label: string }[] = [
   { key: "company", label: "Companies" },
   { key: "deal", label: "Deals" },
   { key: "customer_user", label: "Customer users" },
+  { key: "ticket", label: "Tickets" },
 ];
 
 // A record of each entity, one and many: "Each contact has one company".
@@ -38,6 +39,7 @@ const NOUN: Record<EntityType, { one: string; many: string }> = {
   deal: { one: "deal", many: "deals" },
   partner: { one: "partner", many: "partners" },
   customer_user: { one: "customer user", many: "customer users" },
+  ticket: { one: "ticket", many: "tickets" },
 };
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -84,6 +86,7 @@ const BUILTINS: Record<EntityType, BuiltinAttr[]> = {
     { label: "Industry", key: "industry", type: "Text", icon: TypeIcon },
     { label: "Phone", key: "phone", type: "Text", icon: TypeIcon },
     { label: "Email", key: "email", type: "Text", icon: TypeIcon },
+    { label: "Main contact", key: "main_contact_id", type: "Record", icon: User },
     { label: "Notes", key: "notes", type: "Long text", icon: List },
     { label: "Created at", key: "created_at", type: "Timestamp", icon: Calendar },
   ],
@@ -105,6 +108,17 @@ const BUILTINS: Record<EntityType, BuiltinAttr[]> = {
     { label: "Phone", key: "phone", type: "Text", icon: TypeIcon },
     { label: "Company", key: "company_id", type: "Record", icon: Link2 },
     { label: "Notes", key: "notes", type: "Long text", icon: List },
+    { label: "Created at", key: "created_at", type: "Timestamp", icon: Calendar },
+  ],
+  ticket: [
+    { label: "Subject", key: "subject", type: "Text", icon: TypeIcon, constraints: "Required" },
+    { label: "Description", key: "description", type: "Long text", icon: List },
+    { label: "Status", key: "status", type: "Status", icon: CircleDot, constraints: "Required" },
+    { label: "Priority", key: "priority", type: "Status", icon: CircleDot, constraints: "Required" },
+    { label: "Company", key: "company_id", type: "Record", icon: Link2, constraints: "Required" },
+    { label: "Customer user", key: "customer_user_id", type: "Record", icon: User },
+    { label: "Assignee", key: "owner_id", type: "Account", icon: User },
+    { label: "Due date", key: "due_date", type: "Date", icon: Calendar },
     { label: "Created at", key: "created_at", type: "Timestamp", icon: Calendar },
   ],
   partner: [

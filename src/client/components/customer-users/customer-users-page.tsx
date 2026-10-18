@@ -79,7 +79,7 @@ export function CustomerUsersPage({ navigate, openId, viewParam, filtersParam }:
     },
     { key: "phone", label: "Phone", sort: "phone", text: (u) => u.phone, edit: textEdit("phone", saveCell, { input: "tel" }), copy: (u) => u.phone, render: (u) => u.phone ? <span className="tabular">{u.phone}</span> : dash },
     {
-      key: "company", label: "Company", sort: "company_id", text: (u) => u.company_name ?? "", edit: recordEdit("company_id", "company", "Company", saveCell),
+      key: "company", label: "Company", sort: "company_id", text: (u) => u.company_name ?? "", edit: recordEdit("company_id", "company", "Company", saveCell, true),
       render: (u) => u.company_name
         ? <span className="flex min-w-0 items-center gap-2"><EntityIcon name={u.company_name} domain={u.company_domain} className="size-5" /><span className="truncate">{u.company_name}</span></span>
         : dash,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Building2, Handshake, IdCard, Network, Users } from "lucide-react";
+import { Building2, Handshake, IdCard, LifeBuoy, Network, Users } from "lucide-react";
 import { api, ApiError, onUnauthorized } from "./api";
 import { AuthContext, useAuth, type AuthValue } from "./auth";
 import { useCrmState } from "./hooks/use-crm";
@@ -18,6 +18,8 @@ import { PartnersPage } from "./components/partners/partners-page";
 import { PartnerDetail } from "./components/partners/partner-detail";
 import { CustomerUsersPage } from "./components/customer-users/customer-users-page";
 import { CustomerUserDetail } from "./components/customer-users/customer-user-detail";
+import { TicketsPage } from "./components/tickets/tickets-page";
+import { TicketDetail } from "./components/tickets/ticket-detail";
 import { DealsBoard } from "./components/deals/deals-board";
 import { DealsProgressPage } from "./components/deals/deals-progress-page";
 import { DealDetail } from "./components/deals/deal-detail";
@@ -106,7 +108,7 @@ function Crm() {
   const { route, navigate } = useRouter();
   const { user } = useAuth();
   // A list opens its records in a side panel; the record's own path is the full page.
-  const openRecord = route.name === "contacts" || route.name === "companies" || route.name === "partners" || route.name === "customer-users" || route.name === "deals" ? route.record : undefined;
+  const openRecord = route.name === "contacts" || route.name === "companies" || route.name === "partners" || route.name === "customer-users" || route.name === "tickets" || route.name === "deals" ? route.record : undefined;
 
   return (
     <CrmContext.Provider value={state}>
@@ -181,6 +183,18 @@ function Crm() {
                 </div>
               )}
               {route.name === "customer-user" && <CustomerUserDetail id={route.id} navigate={navigate} />}
+              {route.name === "tickets" && (
+                <div className="flex min-h-0 flex-1">
+                  <TicketsPage navigate={navigate} openId={openRecord} viewParam={route.view} filtersParam={route.filters} board={route.board} />
+                  {openRecord && (
+                    <RecordPanel label="Ticket">
+                      <RecordPanelHeader icon={LifeBuoy} label="Ticket" onExpand={() => navigate(`/tickets/${encodeURIComponent(openRecord)}`)} onClose={() => navigate(withQuery({ record: null }))} />
+                      <TicketDetail key={openRecord} id={openRecord} navigate={navigate} panel />
+                    </RecordPanel>
+                  )}
+                </div>
+              )}
+              {route.name === "ticket" && <TicketDetail id={route.id} navigate={navigate} />}
               {route.name === "properties" && <PropertiesPage />}
               {route.name === "account" && <AccountPage navigate={navigate} />}
               {route.name === "tokens" && <TokensPage />}

@@ -23,7 +23,7 @@ func init() {
 }
 
 // activityEntityTypes is ENTITY_TYPES: what a timeline hangs on.
-var activityEntityTypes = []string{"contact", "company", "deal", "partner", "customer_user"}
+var activityEntityTypes = []string{"contact", "company", "deal", "partner", "customer_user", "ticket"}
 
 type activitiesBody struct {
 	Activities []db.Row `json:"activities"`

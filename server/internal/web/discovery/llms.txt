@@ -1,6 +1,6 @@
 # OpenCRM
 
-> A CRM with companies, partners, contacts, customer users, and deal pipeline management.
+> A CRM with companies, partners, contacts, customer users, tickets, and deal pipeline management.
 
 ## Authentication
 Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` needs an account; without one it answers 401. Agents and scripts send a personal API token as `Authorization: Bearer crm_…`, which its owner makes in the CRM's settings; a token acts as its owner on the CRM's data. Tokens, accounts and passwords are managed only from a browser session: with a token, `/api/tokens`, `/api/users` and `PUT /api/auth/password` answer 403. People sign in with `POST /api/auth/login`, which sets a session cookie.
@@ -9,7 +9,7 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 - `GET /api/stats` — Get dashboard statistics
 - `GET /api/companies` — List companies with pagination, search, and filtering
 - `POST /api/companies` — Create a new company
-- `PUT /api/companies/{id}` — Update a company
+- `PUT /api/companies/{id}` — Update a company; main_contact_id is one of its contacts (null for none)
 - `DELETE /api/companies/{id}` — Delete a company
 - `POST /api/companies/bulk-delete` — Delete several companies
 - `GET /api/partners` — List partners with pagination, search, and filtering
@@ -24,6 +24,12 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 - `PUT /api/customer-users/{id}` — Update a customer user
 - `DELETE /api/customer-users/{id}` — Delete a customer user
 - `POST /api/customer-users/bulk-delete` — Delete several customer users
+- `GET /api/tickets` — List tickets (a customer's requests and problems) with pagination, search, and filtering (company_id, customer_user_id, owner_id, status)
+- `GET /api/tickets/{id}` — Get one ticket
+- `POST /api/tickets` — Create a ticket: {subject, company_id, description?, status?, priority?, customer_user_id?, owner_id?, due_date?}; company_id is a customer (left out, the customer user's)
+- `PUT /api/tickets/{id}` — Update a ticket
+- `DELETE /api/tickets/{id}` — Delete a ticket
+- `POST /api/tickets/bulk-delete` — Delete several tickets
 - `GET /api/contacts` — List contacts with pagination, search, and filtering
 - `POST /api/contacts` — Create a new contact
 - `PUT /api/contacts/{id}` — Update a contact
@@ -54,6 +60,7 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 - `GET /api/contacts/aggregates`
 - `GET /api/partners/aggregates`
 - `GET /api/customer-users/aggregates`
+- `GET /api/tickets/aggregates`
 - `GET /api/activities`
 - `POST /api/activities`
 - `POST /api/contacts/import`

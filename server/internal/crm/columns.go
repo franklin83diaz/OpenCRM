@@ -23,6 +23,7 @@ var addedColumns = []struct{ table, column, decl string }{
 	{"deal_partners", "recurring_value", "REAL DEFAULT 0"},
 	{"partners", "industry", "TEXT DEFAULT ''"},
 	{"partners", "status", "TEXT NOT NULL DEFAULT 'prospect'"},
+	{"companies", "main_contact_id", "TEXT REFERENCES contacts(id) ON DELETE SET NULL"},
 }
 
 // addedIndexes go with them: made once their column is there.
