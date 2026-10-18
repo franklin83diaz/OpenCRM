@@ -28,6 +28,7 @@ const ENTITIES: { key: EntityType; label: string }[] = [
   { key: "partner", label: "Partners" },
   { key: "company", label: "Companies" },
   { key: "deal", label: "Deals" },
+  { key: "customer_user", label: "Customer users" },
 ];
 
 // A record of each entity, one and many: "Each contact has one company".
@@ -36,6 +37,7 @@ const NOUN: Record<EntityType, { one: string; many: string }> = {
   company: { one: "company", many: "companies" },
   deal: { one: "deal", many: "deals" },
   partner: { one: "partner", many: "partners" },
+  customer_user: { one: "customer user", many: "customer users" },
 };
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -94,6 +96,14 @@ const BUILTINS: Record<EntityType, BuiltinAttr[]> = {
     { label: "Stage", key: "stage", type: "Status", icon: CircleDot, constraints: "Required" },
     { label: "Close date", key: "close_date", type: "Date", icon: Calendar },
     { label: "Partners", key: "partner_ids", type: "Records", icon: Link2 },
+    { label: "Notes", key: "notes", type: "Long text", icon: List },
+    { label: "Created at", key: "created_at", type: "Timestamp", icon: Calendar },
+  ],
+  customer_user: [
+    { label: "Name", key: "name", type: "Text", icon: TypeIcon, constraints: "Required" },
+    { label: "Email", key: "email", type: "Text", icon: TypeIcon },
+    { label: "Phone", key: "phone", type: "Text", icon: TypeIcon },
+    { label: "Company", key: "company_id", type: "Record", icon: Link2 },
     { label: "Notes", key: "notes", type: "Long text", icon: List },
     { label: "Created at", key: "created_at", type: "Timestamp", icon: Calendar },
   ],

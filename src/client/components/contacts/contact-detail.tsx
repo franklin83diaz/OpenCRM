@@ -1,60 +1,30 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mail, Calendar, StickyNote, MessageSquare, Trophy, Star, LayoutGrid, Activity as ActivityIcon, Phone, Building2, Briefcase, AtSign, User, Clock, CheckSquare } from "lucide-react";
+import { ArrowLeft, Mail, Calendar, StickyNote, Star, LayoutGrid, Activity as ActivityIcon, Phone, Building2, Briefcase, AtSign, User, Clock } from "lucide-react";
 import { useCrm } from "@/context";
 import { Avatar, CategoryBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { InlineField } from "@/components/ui/inline-field";
-import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection } from "@/components/record-page";
+import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
+import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RelationInput } from "@/lib/relations";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Contact, Activity, RelationRecord } from "@/types";
 
-// Activities the CRM no longer makes (emails, meetings, Slack) keep their look
-// on records that have them.
-const ACTIVITY_STYLE: Record<string, { icon: typeof Mail; className: string }> = {
-  email: { icon: Mail, className: "bg-primary/10 text-primary" },
-  meeting: { icon: Calendar, className: "bg-cat-4-tint text-cat-4-text" },
-  note: { icon: StickyNote, className: "bg-secondary text-muted-foreground" },
-  slack: { icon: MessageSquare, className: "bg-cat-1-tint text-cat-1-text" },
-  stage_change: { icon: Trophy, className: "bg-success-tint text-success" },
-};
-
-function parseMeta(meta: string): Record<string, unknown> {
-  try {
-    const v = JSON.parse(meta);
-    return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function metaLine(meta: Record<string, unknown>): string | null {
-  if (typeof meta.to === "string" && meta.to) return `to ${meta.to}`;
-  if (typeof meta.channel === "string" && meta.channel) return `#${meta.channel}`;
-  return null;
-}
-
-function formatTimestamp(createdAt: string): string {
-  const d = new Date(createdAt.replace(" ", "T") + "Z");
-  return Number.isNaN(d.getTime()) ? createdAt : d.toLocaleString();
-}
-
 // `panel` is the same record in the side panel beside the contacts list: one
 // column, no tab strip, and no highlight tiles repeating the details above them.
 export function ContactDetail({ id, navigate, panel = false }: { id: string; navigate: (to: string) => void; panel?: boolean }) {
-  const { fetchContact, fetchActivities, updateContact, addNote, setError, customFields, changes } = useCrm();
+  const { fetchContact, fetchActivities, updateContact, setError, customFields, changes } = useCrm();
   const relationDefs = customFields.filter((d) => d.entity_type === "contact" && d.field_type === "relation");
 
   const [contact, setContact] = useState<Contact | null | undefined>(undefined);
   const [activities, setActivities] = useState<Activity[]>([]);
 
+  // The full page shows one tab at a time; the panel, everything in one column.
+  const [tab, setTab] = useState("overview");
   const [noteOpen, setNoteOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [noteBody, setNoteBody] = useState("");
+  const shows = (key: string) => panel || tab === key;
 
   // Click-to-edit saves one field, then re-reads the record so derived columns
   // (company name, custom flat fields) stay consistent with the server.
@@ -118,23 +88,10 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
     : undefined;
   const fullName = `${contact.first_name} ${contact.last_name}`.trim() || "Contact";
 
-  const toggleNote = () => {
-    if (!noteOpen) setNoteBody("");
-    setNoteOpen(!noteOpen);
-  };
-
-  const submitNote = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await addNote("contact", contact.id, noteBody);
-      setNoteOpen(false);
-      await reloadActivities();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save note");
-    } finally {
-      setBusy(false);
-    }
+  // "Add note" beside the email button: the Notes tab, with the box open.
+  const startNote = () => {
+    setTab("notes");
+    setNoteOpen(true);
   };
 
   const noteCount = activities.filter((a) => a.type === "note").length;
@@ -144,7 +101,6 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
     { key: "overview", label: "Overview", icon: LayoutGrid },
     { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
     { key: "notes", label: "Notes", icon: StickyNote, count: noteCount },
-    { key: "tasks", label: "Tasks", icon: CheckSquare, count: 0 },
   ];
 
   return (
@@ -168,17 +124,10 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
             <Button variant="outline" size="sm" disabled={!contact.email} asChild={!!contact.email}>
               {contact.email ? <a href={`mailto:${contact.email}`}><Mail className="size-4" /> Compose email</a> : <><Mail className="size-4" /> Compose email</>}
             </Button>
-            <Button variant="outline" size="icon" onClick={toggleNote} aria-label="Add note" title="Add note">
+            <Button variant="outline" size="icon" onClick={startNote} aria-label="Add note" title="Add note">
               <StickyNote className="size-4" />
             </Button>
           </div>
-
-          {noteOpen && (
-            <form onSubmit={submitNote} className="mx-4 mb-4 flex flex-col gap-3 rounded-md p-4 shadow-edge">
-              <div className="flex flex-col gap-1.5"><Label htmlFor="note-body">Note</Label><Textarea id="note-body" required value={noteBody} onChange={(e) => setNoteBody(e.target.value)} /></div>
-              <div className="flex justify-end"><Button type="submit" size="sm" disabled={busy}>{busy ? "Saving…" : "Add note"}</Button></div>
-            </form>
-          )}
 
           <DetailsSection title="Record details">
             <dl className="flex flex-col">
@@ -213,10 +162,10 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
 
         {/* Main column: tabs, highlights, activity, and the sections that will grow. */}
         <main className={cn("flex min-w-0 flex-col", panel ? "shrink-0 border-t border-border" : "flex-1 overflow-y-auto")}>
-          {!panel && <RecordTabs tabs={tabs} />}
+          {!panel && <RecordTabs active={tab} onChange={setTab} tabs={tabs} />}
 
           <div className={cn("flex flex-col gap-8", panel ? "p-4" : "p-6")}>
-            {!panel && (
+            {!panel && tab === "overview" && (
               <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-medium">Highlights</h2>
                 <div className="grid grid-cols-3 gap-3">
@@ -230,36 +179,11 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
               </section>
             )}
 
-            <section className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium">Activity</h2>
-                <button type="button" className="text-[0.8125rem] text-muted-foreground hover:text-foreground">View all</button>
-              </div>
-              {recent.length === 0 ? (
-                <p className="text-sm text-faint">No activity yet. Add a note to start the timeline.</p>
-              ) : (
-                <ul className="flex flex-col rounded-md bg-card shadow-edge">
-                  {recent.slice(0, 6).map((a) => {
-                    const style = ACTIVITY_STYLE[a.type] ?? ACTIVITY_STYLE.note;
-                    const Icon = style.icon;
-                    const meta = metaLine(parseMeta(a.meta));
-                    return (
-                      <li key={a.id} className="flex items-start gap-3 px-3.5 py-2.5 [&+li]:border-t [&+li]:border-border">
-                        <span className={cn("mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full", style.className)}><Icon className="size-3" /></span>
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          {a.body && <p className="whitespace-pre-wrap text-sm">{a.body}</p>}
-                          {meta && <p className="text-xs text-muted-foreground">{meta}</p>}
-                        </div>
-                        <span className="shrink-0 tabular text-xs text-muted-foreground">{formatTimestamp(a.created_at)}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
+            {shows("activity") && <ActivityFeed activities={activities} empty="No activity yet. Add a note to start the timeline." />}
 
-            <FutureSection label="Notes" count={noteCount} onAdd={toggleNote} />
-            <FutureSection label="Tasks" count={0} />
+            {shows("notes") && (
+              <NotesSection entity="contact" recordId={contact.id} activities={activities} open={noteOpen} onOpenChange={setNoteOpen} onAdded={reloadActivities} />
+            )}
           </div>
         </main>
       </div>

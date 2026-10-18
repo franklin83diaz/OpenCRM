@@ -1,7 +1,7 @@
 import type { FilterNode } from "./lib/filters";
 
-export type View = "contacts" | "companies" | "deals" | "partners";
-export type EntityType = "contact" | "company" | "deal" | "partner";
+export type View = "contacts" | "companies" | "deals" | "partners" | "customer-users";
+export type EntityType = "contact" | "company" | "deal" | "partner" | "customer_user";
 
 /** Base storage type for a custom property. Widget flavours ride on top. */
 export type AttributeType =
@@ -80,6 +80,22 @@ export interface Partner {
   notes: string;
   /** How many deals it takes part in (reads only). */
   deal_count?: number;
+  custom?: Record<string, unknown>; // write payload; on reads, values are flat columns
+  relations?: Record<string, RelationValue>; // reads only, keyed by relation field
+  created_at: string;
+  updated_at: string;
+}
+
+/** A person who uses the product at a customer (a company with customer_since), kept apart from contacts. */
+export interface CustomerUser {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company_id: string | null;
+  notes: string;
+  company_name?: string | null;
+  company_domain?: string | null;
   custom?: Record<string, unknown>; // write payload; on reads, values are flat columns
   relations?: Record<string, RelationValue>; // reads only, keyed by relation field
   created_at: string;
@@ -173,6 +189,7 @@ export interface Stats {
   dealRecurringValue: number;
   customers: number;
   partners: number;
+  customerUsers: number;
 }
 
 export interface PaginatedState {

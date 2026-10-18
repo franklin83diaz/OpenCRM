@@ -95,7 +95,7 @@ func TestRelationReadsAndWrites(t *testing.T) {
 	}
 
 	for entity, want := range map[EntityType]string{
-		Company: `{"contacts":{"table":"contacts","fk":"company_id"},"deals":{"table":"deals","fk":"company_id"},"partner_contacts":{"table":"contacts","fk":"partner_company_id"}}`,
+		Company: `{"contacts":{"table":"contacts","fk":"company_id"},"customer_users":{"table":"customer_users","fk":"company_id"},"deals":{"table":"deals","fk":"company_id"},"partner_contacts":{"table":"contacts","fk":"partner_company_id"}}`,
 		Contact: `{"deals":{"table":"deals","fk":"contact_id"}}`,
 		Deal:    `{"partners":{"table":"deal_partners","fk":"deal_id","id":"partner_id"}}`,
 		Partner: `{"deals":{"table":"deal_partners","fk":"partner_id","id":"deal_id"}}`,

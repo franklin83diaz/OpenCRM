@@ -314,9 +314,10 @@ func TestCustomClassifyWrite(t *testing.T) {
 		t.Errorf("update null: %v", got)
 	}
 	for entity, want := range map[EntityType]string{
-		Contact: `["first_name","last_name","email","phone","company_id","title","status","last_contacted_at"]`,
-		Deal:    `["name","contact_id","company_id","value","recurring_value","stage","close_date","notes","owner_id","partner_ids"]`,
-		Partner: `["name","industry","status","phone","email","notes"]`,
+		Contact:      `["first_name","last_name","email","phone","company_id","title","status","last_contacted_at"]`,
+		Deal:         `["name","contact_id","company_id","value","recurring_value","stage","close_date","notes","owner_id","partner_ids"]`,
+		Partner:      `["name","industry","status","phone","email","notes"]`,
+		CustomerUser: `["name","email","phone","company_id","notes"]`,
 	} {
 		keys, err := WritableFieldKeys(ctx, entity)
 		if err != nil {

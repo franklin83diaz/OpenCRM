@@ -61,6 +61,36 @@
  },
  {
   "method": "GET",
+  "path": "/api/customer-users",
+  "summary": "List customer users with pagination, search, and filtering"
+ },
+ {
+  "method": "GET",
+  "path": "/api/customer-users/{id}",
+  "summary": "Get one customer user"
+ },
+ {
+  "method": "POST",
+  "path": "/api/customer-users",
+  "summary": "Create a customer user"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/customer-users/{id}",
+  "summary": "Update a customer user"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/customer-users/{id}",
+  "summary": "Delete a customer user"
+ },
+ {
+  "method": "POST",
+  "path": "/api/customer-users/bulk-delete",
+  "summary": "Delete several customer users"
+ },
+ {
+  "method": "GET",
   "path": "/api/contacts",
   "summary": "List contacts with pagination, search, and filtering"
  },
@@ -200,6 +230,10 @@
  {
   "method": "GET",
   "path": "/api/partners/aggregates"
+ },
+ {
+  "method": "GET",
+  "path": "/api/customer-users/aggregates"
  },
  {
   "method": "GET",

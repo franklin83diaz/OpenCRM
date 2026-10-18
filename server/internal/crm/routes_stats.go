@@ -27,11 +27,13 @@ type statsBody struct {
 	// Customers: companies that are customers (customer_since set).
 	Customers any `json:"customers"`
 	Partners  any `json:"partners"`
+	// CustomerUsers: the people who use the product at customers.
+	CustomerUsers any `json:"customerUsers"`
 }
 
 // stats is the dashboard's statistics: how many contacts, companies, deals,
-// customers and partners, and the value of the deals not lost, once and
-// each month.
+// customers, partners and customer users, and the value of the deals not
+// lost, once and each month.
 func (app *App) stats(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	return tryJSON(w, func() (int, any, error) {
@@ -59,6 +61,10 @@ func (app *App) stats(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return 0, nil, err
 		}
+		customerUsers, err := db.Get(ctx, "SELECT COUNT(*) as count FROM customer_users")
+		if err != nil {
+			return 0, nil, err
+		}
 		recurring, err := db.Get(ctx, "SELECT COALESCE(SUM(recurring_value), 0) as total FROM deals WHERE stage NOT IN (SELECT key FROM stages WHERE is_lost = 1)")
 		if err != nil {
 			return 0, nil, err
@@ -71,6 +77,7 @@ func (app *App) stats(w http.ResponseWriter, r *http.Request) error {
 			Customers:          orZero(customers, "count"),
 			Partners:           orZero(partners, "count"),
 			DealRecurringValue: orZero(recurring, "total"),
+			CustomerUsers:      orZero(customerUsers, "count"),
 		}, nil
 	})
 }

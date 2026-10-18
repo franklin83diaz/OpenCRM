@@ -63,7 +63,7 @@ export async function searchRecords(entity: EntityType, search: string): Promise
   return records;
 }
 
-const CREATE_PATH: Record<EntityType, string> = { contact: "contacts", company: "companies", deal: "deals", partner: "partners" };
+const CREATE_PATH: Record<EntityType, string> = { contact: "contacts", company: "companies", deal: "deals", partner: "partners", customer_user: "customer-users" };
 
 /** A new record of `entity` from just a name, as a picker's "+ Add" makes it. */
 export async function createRecord(entity: EntityType, name: string): Promise<RelationRecord> {
@@ -95,7 +95,7 @@ export function useRecordNames(wanted: Array<{ entity: EntityType; id: string }>
 
 // ── Chips ─────────────────────────────────────────────────────────────
 
-const RECORD_PATH: Partial<Record<EntityType, string>> = { contact: "/contacts", company: "/companies", deal: "/deals", partner: "/partners" };
+const RECORD_PATH: Partial<Record<EntityType, string>> = { contact: "/contacts", company: "/companies", deal: "/deals", partner: "/partners", customer_user: "/customer-users" };
 
 /** Where a link to a record opens it: its own page, which shows that record
  *  alone. (A list opens its own rows in the side panel beside it.) */
@@ -108,7 +108,7 @@ const plainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey
 
 export function RecordIcon({ entity, record }: { entity: EntityType; record: RelationRecord }) {
   if (entity === "company" || entity === "partner") return <EntityIcon name={record.label} domain={record.domain} className="size-4 rounded-xs text-[0.5rem]" />;
-  if (entity === "contact") {
+  if (entity === "contact" || entity === "customer_user") {
     const [first, ...rest] = record.label.split(" ");
     return <Avatar firstName={first} lastName={rest.join(" ")} className="size-4 text-[0.4375rem]" />;
   }

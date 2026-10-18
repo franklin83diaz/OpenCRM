@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, type Dispatch, type SetStateAction } from "react";
 import { api } from "../api";
 import type {
-  Contact, Company, Deal, Partner, Stats, PaginatedState, StageDef, TeamMember,
+  Contact, Company, Deal, Partner, CustomerUser, Stats, PaginatedState, StageDef, TeamMember,
   Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult,
 } from "../types";
 import { sanitize, type FilterNode } from "@/lib/filters";
@@ -24,7 +24,7 @@ function pagParams(pag: PaginatedState): URLSearchParams {
 }
 
 export function useCrmState(isAgent: boolean): CrmContextValue {
-  const [stats, setStats] = useState<Stats>({ contacts: 0, companies: 0, deals: 0, dealValue: 0, dealRecurringValue: 0, customers: 0, partners: 0 });
+  const [stats, setStats] = useState<Stats>({ contacts: 0, companies: 0, deals: 0, dealValue: 0, dealRecurringValue: 0, customers: 0, partners: 0, customerUsers: 0 });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,6 +36,9 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
 
   const [partners, setPartners] = useState<Partner[]>([]);
   const [partnersPag, setPartnersPag] = useState<PaginatedState>(defaultPag("created_at"));
+
+  const [customerUsers, setCustomerUsers] = useState<CustomerUser[]>([]);
+  const [customerUsersPag, setCustomerUsersPag] = useState<PaginatedState>(defaultPag("created_at"));
 
   const [deals, setDeals] = useState<Deal[]>([]);
   const [dealsPag, setDealsPag] = useState<PaginatedState>(defaultPag("created_at"));
@@ -72,6 +75,12 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     const data = await api<{ partners: Partner[]; total: number }>("GET", `/api/partners?${pagParams(pag)}`);
     setPartners(data.partners);
     setPartnersPag((prev) => ({ ...prev, total: data.total }));
+  }, []);
+
+  const fetchCustomerUsers = useCallback(async (pag: PaginatedState) => {
+    const data = await api<{ customer_users: CustomerUser[]; total: number }>("GET", `/api/customer-users?${pagParams(pag)}`);
+    setCustomerUsers(data.customer_users);
+    setCustomerUsersPag((prev) => ({ ...prev, total: data.total }));
   }, []);
 
   const fetchDeals = useCallback(async (pag: PaginatedState) => {
@@ -113,7 +122,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
       setLoading(true);
       try {
         await Promise.all([
-          fetchStats(), fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag),
+          fetchStats(), fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag), fetchCustomerUsers(customerUsersPag),
           fetchDeals(dealsPag), fetchBoardDeals(),
           refetchCustomFields(), refetchStages(), refetchTeam(),
         ]);
@@ -137,6 +146,9 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
   useEffect(() => { fetchPartners(partnersPag).catch((e) => setError((e as Error).message)); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [partnersPag.page, partnersPag.sort, partnersPag.order, partnersPag.search, JSON.stringify(partnersPag.filters)]);
+  useEffect(() => { fetchCustomerUsers(customerUsersPag).catch((e) => setError((e as Error).message)); },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [customerUsersPag.page, customerUsersPag.sort, customerUsersPag.order, customerUsersPag.search, JSON.stringify(customerUsersPag.filters)]);
   useEffect(() => { fetchBoardDeals().catch((e) => setError((e as Error).message)); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(sanitize(boardFilters))]);
@@ -158,6 +170,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
   const cSet = makeSetters(setContactsPag);
   const coSet = makeSetters(setCompaniesPag);
   const pSet = makeSetters(setPartnersPag);
+  const uSet = makeSetters(setCustomerUsersPag);
   const dSet = makeSetters(setDealsPag);
 
   // ── Contacts CRUD ──
@@ -171,8 +184,8 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
   // sides), so both lists refetch and any open record page re-reads.
   const recordsChanged = useCallback(async () => {
     setChanges((n) => n + 1);
-    await Promise.all([fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag), fetchBoardDeals(), fetchStats()]);
-  }, [contactsPag, companiesPag, partnersPag, fetchContacts, fetchCompanies, fetchPartners, fetchBoardDeals, fetchStats]);
+    await Promise.all([fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag), fetchCustomerUsers(customerUsersPag), fetchBoardDeals(), fetchStats()]);
+  }, [contactsPag, companiesPag, partnersPag, customerUsersPag, fetchContacts, fetchCompanies, fetchPartners, fetchCustomerUsers, fetchBoardDeals, fetchStats]);
 
   const updateContact = useCallback(async (id: string, data: Partial<Contact>) => {
     await api("PUT", `/api/contacts/${id}`, data);
@@ -245,6 +258,32 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     await api("POST", "/api/partners/bulk-delete", { ids });
     await Promise.all([fetchPartners(partnersPag), fetchDeals(dealsPag), fetchBoardDeals(), fetchStats()]);
   }, [partnersPag, dealsPag, fetchPartners, fetchDeals, fetchBoardDeals, fetchStats]);
+
+  // ── Customer users CRUD ──
+
+  const addCustomerUser = useCallback(async (data: Partial<CustomerUser>) => {
+    await api("POST", "/api/customer-users", data);
+    await Promise.all([fetchCustomerUsers(customerUsersPag), fetchStats()]);
+  }, [customerUsersPag, fetchCustomerUsers, fetchStats]);
+
+  const fetchCustomerUser = useCallback(async (id: string): Promise<CustomerUser | null> => {
+    try {
+      const data = await api<{ customer_user: CustomerUser }>("GET", `/api/customer-users/${encodeURIComponent(id)}`);
+      return data.customer_user;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const updateCustomerUser = useCallback(async (id: string, data: Partial<CustomerUser>) => {
+    await api("PUT", `/api/customer-users/${encodeURIComponent(id)}`, data);
+    await recordsChanged();
+  }, [recordsChanged]);
+
+  const deleteCustomerUsers = useCallback(async (ids: string[]) => {
+    await api("POST", "/api/customer-users/bulk-delete", { ids });
+    await Promise.all([fetchCustomerUsers(customerUsersPag), fetchStats()]);
+  }, [customerUsersPag, fetchCustomerUsers, fetchStats]);
 
   // ── Deals CRUD ──
 
@@ -320,6 +359,8 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     addCompany, updateCompany, deleteCompanies,
     partners, partnersPag, setPartnersPage: pSet.setPage, setPartnersSort: pSet.setSort, setPartnersSearch: pSet.setSearch, setPartnersFilters: pSet.setFilters, setPartnersView: pSet.setView,
     addPartner, fetchPartner, updatePartner, deletePartners,
+    customerUsers, customerUsersPag, setCustomerUsersPage: uSet.setPage, setCustomerUsersSort: uSet.setSort, setCustomerUsersSearch: uSet.setSearch, setCustomerUsersFilters: uSet.setFilters, setCustomerUsersView: uSet.setView,
+    addCustomerUser, fetchCustomerUser, updateCustomerUser, deleteCustomerUsers,
     deals, dealsPag, dealsTotalValue, setDealsPage: dSet.setPage, setDealsSort: dSet.setSort, setDealsSearch: dSet.setSearch,
     addDeal, fetchDeal, updateDeal, deleteDeal, boardDeals, boardFilters, setBoardFilters,
     fetchActivities, addNote, importEntity,

@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import { Maximize2, Plus, X } from "lucide-react";
+import { Maximize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -8,8 +8,8 @@ type Icon = ComponentType<{ className?: string }>;
 /**
  * The record page's shared anatomy (DESIGN.md → Record pages): a top bar the
  * same height as the sidebar brand row, a details column on the left, and a
- * main column with tabs, highlights, activity and the sections that exist
- * before their features do. Contacts and companies compose the same pieces.
+ * main column with tabs (overview, activity, notes…), each showing its part.
+ * Every record type composes the same pieces.
  */
 
 /** Top bar: h-14 + rule, continuous with the sidebar. */
@@ -93,40 +93,35 @@ export function Tile({ icon: Icon, label, value, empty }: { icon: Icon; label: s
   );
 }
 
-/** The tab strip: icon + label + count chip, the active tab underlined in ink. */
-export function RecordTabs({ tabs }: { tabs: Array<{ key: string; label: string; icon: Icon; count?: number }> }) {
+/** The tab strip: icon + label + count chip, the active tab underlined in ink. Each tab shows its part of the page. */
+export function RecordTabs({ tabs, active, onChange }: {
+  tabs: Array<{ key: string; label: string; icon: Icon; count?: number }>;
+  active: string;
+  onChange: (key: string) => void;
+}) {
   return (
-    <div className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-3">
-      {tabs.map((t, i) => (
-        <button
-          key={t.key}
-          type="button"
-          aria-current={i === 0 ? "page" : undefined}
-          className={cn(
-            "relative inline-flex h-12 items-center gap-1.5 px-3 text-sm",
-            i === 0
-              ? "font-medium text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-foreground"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <t.icon className="size-4" /> {t.label}
-          {t.count !== undefined && <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{t.count}</span>}
-        </button>
-      ))}
+    <div role="tablist" aria-label="Record" className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-3">
+      {tabs.map((t) => {
+        const on = t.key === active;
+        return (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(t.key)}
+            className={cn(
+              "relative inline-flex h-12 items-center gap-1.5 px-3 text-sm",
+              on
+                ? "font-medium text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <t.icon className="size-4" /> {t.label}
+            {t.count !== undefined && <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{t.count}</span>}
+          </button>
+        );
+      })}
     </div>
-  );
-}
-
-/** A section that exists before its feature does: title, count, and a + at the far right. */
-export function FutureSection({ label, count, onAdd }: { label: string; count: number; onAdd?: () => void }) {
-  return (
-    <section className="flex h-9 items-center justify-between">
-      <h2 className="inline-flex items-center gap-2 text-sm font-medium">
-        {label} <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{count}</span>
-      </h2>
-      <Button variant="ghost" size="icon" aria-label={`Add ${label.toLowerCase()}`} disabled={!onAdd} onClick={onAdd}>
-        <Plus className="size-4" />
-      </Button>
-    </section>
   );
 }

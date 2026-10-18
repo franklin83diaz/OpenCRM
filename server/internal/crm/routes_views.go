@@ -40,7 +40,7 @@ var (
 	viewSortRE = regexp.MustCompile(`^(count:)?[a-z][a-z0-9_]*$`)
 )
 
-var defaultViewNames = map[EntityType]string{Contact: "All contacts", Company: "All companies", Deal: "All deals", Partner: "All partners"}
+var defaultViewNames = map[EntityType]string{Contact: "All contacts", Company: "All companies", Deal: "All deals", Partner: "All partners", CustomerUser: "All customer users"}
 
 // viewBody is a view as the API returns it (viewJson). The default view
 // ("All contacts") is the whole list: it holds no filters or sort, and reads

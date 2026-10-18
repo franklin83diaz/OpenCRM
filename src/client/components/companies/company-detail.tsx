@@ -1,20 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mail, Star, LayoutGrid, Activity as ActivityIcon, Phone, Globe, Building2, Tag, AtSign, Users, StickyNote, Calendar, Clock, CheckSquare, BadgeCheck, CalendarClock } from "lucide-react";
+import { ArrowLeft, Mail, Star, IdCard, LayoutGrid, Activity as ActivityIcon, Phone, Globe, Building2, Tag, AtSign, Users, StickyNote, Calendar, Clock, CheckSquare, BadgeCheck, CalendarClock } from "lucide-react";
 import { useCrm } from "@/context";
 import { EntityIcon } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
-import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection } from "@/components/record-page";
+import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
+import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
+import { RecordChip } from "@/lib/relations";
+import { api } from "@/api";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { ValuesField } from "@/components/value-fields";
 import { TasksSection } from "@/components/tasks/tasks-section";
 import { cn, formatDate } from "@/lib/utils";
-import type { Company, Activity } from "@/types";
-
-function formatTimestamp(createdAt: string): string {
-  const d = new Date(createdAt.replace(" ", "T") + "Z");
-  return Number.isNaN(d.getTime()) ? createdAt : d.toLocaleString();
-}
+import type { Company, Activity, Contact, Task } from "@/types";
 
 // The company record page: same anatomy as a contact (DESIGN.md → Record
 // pages), with the company's own attributes and tiles. Every value is the
@@ -26,6 +24,17 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
   const [company, setCompany] = useState<Company | null | undefined>(undefined);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [taskCount, setTaskCount] = useState(0);
+  // The full page shows one tab at a time; the panel, everything in one column.
+  const [tab, setTab] = useState("overview");
+  const [noteOpen, setNoteOpen] = useState(false);
+  const shows = (key: string) => panel || tab === key;
+  // The tab's count while the Tasks tab isn't open: the company's open tasks.
+  useEffect(() => {
+    let alive = true;
+    api<{ tasks: Task[] }>("GET", `/api/tasks?company_id=${encodeURIComponent(id)}&status=open&limit=200`)
+      .then((r) => { if (alive) setTaskCount(r.tasks.length); }, () => {});
+    return () => { alive = false; };
+  }, [id, changes]);
 
   const saveField = async (patch: Partial<Company>) => {
     if (!company) return;
@@ -93,6 +102,10 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
             <Button variant="outline" size="sm" onClick={() => navigate(`/contacts?filters=${encodeURIComponent(JSON.stringify([{ field: "company_id", op: "is", value: [company.id] }]))}`)}>
               <Users className="size-4" /> Contacts {company.contact_count ? <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{company.contact_count}</span> : null}
             </Button>
+            {/* The people who use the product there, filtered the same way. */}
+            <Button variant="outline" size="sm" onClick={() => navigate(`/customer-users?filters=${encodeURIComponent(JSON.stringify([{ field: "company_id", op: "is", value: [company.id] }]))}`)}>
+              <IdCard className="size-4" /> Customer users
+            </Button>
           </div>
 
           <DetailsSection title="Record details">
@@ -138,7 +151,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
         </aside>
 
         <main className={cn("flex min-w-0 flex-col", panel ? "shrink-0 border-t border-border" : "flex-1 overflow-y-auto")}>
-          {!panel && <RecordTabs tabs={[
+          {!panel && <RecordTabs active={tab} onChange={setTab} tabs={[
             { key: "overview", label: "Overview", icon: LayoutGrid },
             { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
             { key: "team", label: "Team", icon: Users, count: company.contact_count ?? 0 },
@@ -147,7 +160,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
           ]} />}
 
           <div className={cn("flex flex-col gap-8", panel ? "p-4" : "p-6")}>
-            {!panel && (
+            {!panel && tab === "overview" && (
               <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-medium">Highlights</h2>
                 <div className="grid grid-cols-3 gap-3">
@@ -161,32 +174,54 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
               </section>
             )}
 
-            <TasksSection companyId={company.id} onCount={setTaskCount} />
+            {!panel && tab === "team" && <CompanyTeam companyId={company.id} />}
 
-            <section className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium">Activity</h2>
-                <button type="button" className="text-[0.8125rem] text-muted-foreground hover:text-foreground">View all</button>
-              </div>
-              {recent.length === 0 ? (
-                <p className="text-sm text-faint">No activity yet.</p>
-              ) : (
-                <ul className="flex flex-col rounded-md bg-card shadow-edge">
-                  {recent.slice(0, 6).map((a) => (
-                    <li key={a.id} className="flex items-start gap-3 px-3.5 py-2.5 [&+li]:border-t [&+li]:border-border">
-                      <span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"><StickyNote className="size-3" /></span>
-                      <p className="min-w-0 flex-1 whitespace-pre-wrap text-sm">{a.body}</p>
-                      <span className="shrink-0 tabular text-xs text-muted-foreground">{formatTimestamp(a.created_at)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+            {shows("tasks") && <TasksSection companyId={company.id} onCount={setTaskCount} />}
 
-            <FutureSection label="Notes" count={noteCount} />
+            {shows("activity") && <ActivityFeed activities={activities} />}
+
+            {shows("notes") && (
+              <NotesSection entity="company" recordId={company.id} activities={activities} open={noteOpen} onOpenChange={setNoteOpen}
+                onAdded={async () => setActivities(await fetchActivities("company", company.id))} />
+            )}
           </div>
         </main>
       </div>
     </div>
+  );
+}
+
+/** The people who work at the company: its contacts, with what they do there. */
+function CompanyTeam({ companyId }: { companyId: string }) {
+  const { changes, setError } = useCrm();
+  const [people, setPeople] = useState<Contact[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api<{ contacts: Contact[] }>("GET", `/api/contacts?company_id=${encodeURIComponent(companyId)}&limit=100&sort=first_name&order=asc`)
+      .then((r) => { if (alive) setPeople(r.contacts); }, (e) => setError(e instanceof Error ? e.message : "Could not load the team"));
+    return () => { alive = false; };
+  }, [companyId, changes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <section className="flex flex-col gap-3" aria-label="Team">
+      <h2 className="inline-flex items-center gap-2 text-sm font-medium">
+        Team <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{people?.length ?? 0}</span>
+      </h2>
+      {people === null ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : people.length === 0 ? (
+        <p className="text-sm text-faint">No contacts at this company yet.</p>
+      ) : (
+        <ul className="flex flex-col rounded-md bg-card shadow-edge">
+          {people.map((p) => (
+            <li key={p.id} className="flex h-11 items-center gap-3 px-3.5 [&+li]:border-t [&+li]:border-border">
+              <span className="min-w-0 flex-1"><RecordChip entity="contact" record={{ id: p.id, label: `${p.first_name} ${p.last_name}`.trim(), domain: null }} /></span>
+              {p.title && <span className="truncate text-[0.8125rem] text-muted-foreground">{p.title}</span>}
+              {p.email && <a href={`mailto:${p.email}`} className="truncate text-[0.8125rem] text-info hover:underline">{p.email}</a>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

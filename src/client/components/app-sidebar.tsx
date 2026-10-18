@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent } from "react";
-import { Activity, BookUser, Building2, CircleUserRound, DollarSign, KeyRound, Layers, LogOut, Network, PanelLeft, User, UsersRound, type LucideIcon } from "lucide-react";
+import { Activity, BookUser, Building2, ChevronRight, CircleUserRound, DollarSign, IdCard, KeyRound, Layers, LogOut, Network, PanelLeft, Settings, User, UsersRound, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/auth";
 import { useCrm } from "@/context";
 import { UserAvatar } from "@/components/shared";
@@ -40,6 +40,7 @@ const RECORDS: NavItem[] = [
   { id: "companies", label: "Companies", href: "/companies", icon: Building2, color: "violet" },
   { id: "deals", label: "Deals", href: "/deals", icon: DollarSign, color: "green" },
   { id: "customers", label: "Customers", href: "/customers", icon: Activity, color: "orange" },
+  { id: "customer-users", label: "Customer users", href: "/customer-users", icon: IdCard, color: "amber" },
 ];
 
 const SETTINGS: NavItem[] = [
@@ -54,6 +55,7 @@ function activeFor(route: Route): string {
   if (route.name === "contact") return "contacts";
   if (route.name === "company") return "companies";
   if (route.name === "partner") return "partners";
+  if (route.name === "customer-user") return "customer-users";
   if (route.name === "deal") return "deals";
   return route.name;
 }
@@ -69,6 +71,24 @@ function useWide() {
     return () => mq.removeEventListener("change", onChange);
   }, []);
   return wide;
+}
+
+// Whether Settings is folded open, remembered on this browser. Storage may be
+// off (a private window): then it just starts folded.
+const SETTINGS_OPEN_KEY = "opencrm.sidebar.settings-open";
+function readSettingsOpen(): boolean {
+  try {
+    return localStorage.getItem(SETTINGS_OPEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeSettingsOpen(open: boolean) {
+  try {
+    localStorage.setItem(SETTINGS_OPEN_KEY, open ? "1" : "0");
+  } catch {
+    /* not remembered */
+  }
 }
 
 /** A plain click goes through the router; cmd/ctrl/shift-click and the middle button keep the link's own behaviour. */
@@ -87,8 +107,17 @@ export function AppSidebar({ route, navigate }: { route: Route; navigate: (to: s
   const [collapsed, setCollapsed] = useState(false);
   const rail = collapsed || !wide;
   const active = activeFor(route);
-  const counts: Record<string, number> = { contacts: stats.contacts, partners: stats.partners, companies: stats.companies, deals: stats.deals, customers: stats.customers };
+  const counts: Record<string, number> = { contacts: stats.contacts, partners: stats.partners, companies: stats.companies, deals: stats.deals, customers: stats.customers, "customer-users": stats.customerUsers };
   const settings = SETTINGS.filter((item) => !item.adminOnly || user.role === "admin");
+  // Settings folds away like an accordion; it is open while one of its pages is.
+  const [settingsOpen, setSettingsOpen] = useState(readSettingsOpen);
+  const onSettingsPage = settings.some((item) => item.id === active);
+  const showSettings = settingsOpen || onSettingsPage;
+  const toggleSettings = () => {
+    const next = !showSettings;
+    setSettingsOpen(next);
+    writeSettingsOpen(next);
+  };
 
   const link = (item: NavItem) => {
     const on = item.id === active;
@@ -160,8 +189,18 @@ export function AppSidebar({ route, navigate }: { route: Route; navigate: (to: s
       <nav aria-label="Primary" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-2">
         <div className="flex flex-col gap-px">{RECORDS.map(link)}</div>
         <div className="flex flex-col gap-px">
-          {rail ? <div className="mx-2 mb-1 border-t border-sidebar-border" /> : <p className="mb-0.5 px-2 text-[0.8125rem] font-medium text-muted-foreground">Settings</p>}
-          {settings.map(link)}
+          <button
+            type="button"
+            onClick={toggleSettings}
+            aria-expanded={showSettings}
+            aria-controls="sidebar-settings"
+            aria-label={rail ? (showSettings ? "Hide settings" : "Show settings") : undefined}
+            title={rail ? "Settings" : undefined}
+            className={cn("flex h-7 items-center gap-1 rounded-[9px] text-[0.8125rem] font-medium text-muted-foreground hover:bg-black/[0.03] hover:text-foreground dark:hover:bg-white/[0.04]", rail ? "justify-center" : "px-2")}
+          >
+            {rail ? <Settings className="size-4" aria-hidden /> : <>Settings<ChevronRight className={cn("size-3.5 transition-transform", showSettings && "rotate-90")} aria-hidden /></>}
+          </button>
+          {showSettings && <div id="sidebar-settings" className="flex flex-col gap-px">{settings.map(link)}</div>}
         </div>
       </nav>
 

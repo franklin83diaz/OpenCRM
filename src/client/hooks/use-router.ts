@@ -16,6 +16,8 @@ export type Route =
   | { name: "deals"; record?: string; view?: string }
   | { name: "deal"; id: string }
   | { name: "customers" }
+  | { name: "customer-users"; record?: string; view?: string; filters?: string }
+  | { name: "customer-user"; id: string }
   | { name: "properties" }
   | { name: "account" }
   | { name: "tokens" }
@@ -40,6 +42,9 @@ function parse(pathname: string, search: string): Route {
   const dm = pathname.match(/^\/deals\/([^/]+)$/);
   if (dm) return { name: "deal", id: decodeURIComponent(dm[1]) };
   if (pathname === "/customers") return { name: "customers" };
+  if (pathname === "/customer-users") return { name: "customer-users", record, view, filters };
+  const um = pathname.match(/^\/customer-users\/([^/]+)$/);
+  if (um) return { name: "customer-user", id: decodeURIComponent(um[1]) };
   if (pathname === "/settings/properties") return { name: "properties" };
   if (pathname === "/settings/account") return { name: "account" };
   if (pathname === "/settings/tokens") return { name: "tokens" };

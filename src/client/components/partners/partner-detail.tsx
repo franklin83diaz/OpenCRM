@@ -9,15 +9,11 @@ import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
+import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RecordPicker } from "@/lib/relations";
 import { cn, colorClasses, formatMoney } from "@/lib/utils";
 import type { Activity, Deal, DealPartner, Partner } from "@/types";
-
-function formatTimestamp(createdAt: string): string {
-  const d = new Date(createdAt.replace(" ", "T") + "Z");
-  return Number.isNaN(d.getTime()) ? createdAt : d.toLocaleString();
-}
 
 // The partner record page: same anatomy as a company (DESIGN.md → Record
 // pages), with the deals the partner takes part in. Every value is the
@@ -29,6 +25,10 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
   const [partner, setPartner] = useState<Partner | null | undefined>(undefined);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  // The full page shows one tab at a time; the panel, everything in one column.
+  const [tab, setTab] = useState("overview");
+  const [noteOpen, setNoteOpen] = useState(false);
+  const shows = (key: string) => panel || tab === key;
 
   const fetchDeals = () =>
     api<{ deals: Deal[] }>("GET", `/api/deals?partner_id=${encodeURIComponent(id)}&limit=100&sort=created_at&order=desc`).then((d) => d.deals);
@@ -136,14 +136,15 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
         </aside>
 
         <main className={cn("flex min-w-0 flex-col", panel ? "shrink-0 border-t border-border" : "flex-1 overflow-y-auto")}>
-          {!panel && <RecordTabs tabs={[
+          {!panel && <RecordTabs active={tab} onChange={setTab} tabs={[
             { key: "overview", label: "Overview", icon: LayoutGrid },
             { key: "deals", label: "Deals", icon: Handshake, count: dealCount },
             { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
+            { key: "notes", label: "Notes", icon: StickyNote, count: activities.filter((a) => a.type === "note").length },
           ]} />}
 
           <div className={cn("flex flex-col gap-8", panel ? "p-4" : "p-6")}>
-            {!panel && (
+            {!panel && tab === "overview" && (
               <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-medium">Highlights</h2>
                 <div className="grid grid-cols-3 gap-3">
@@ -158,24 +159,14 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
               </section>
             )}
 
-            <PartnerDeals partnerId={partner.id} deals={deals} />
+            {shows("deals") && <PartnerDeals partnerId={partner.id} deals={deals} />}
 
-            <section className="flex flex-col gap-3">
-              <h2 className="text-sm font-medium">Activity</h2>
-              {recent.length === 0 ? (
-                <p className="text-sm text-faint">No activity yet.</p>
-              ) : (
-                <ul className="flex flex-col rounded-md bg-card shadow-edge">
-                  {recent.slice(0, 6).map((a) => (
-                    <li key={a.id} className="flex items-start gap-3 px-3.5 py-2.5 [&+li]:border-t [&+li]:border-border">
-                      <span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"><StickyNote className="size-3" /></span>
-                      <p className="min-w-0 flex-1 whitespace-pre-wrap text-sm">{a.body}</p>
-                      <span className="shrink-0 tabular text-xs text-muted-foreground">{formatTimestamp(a.created_at)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+            {shows("activity") && <ActivityFeed activities={activities} />}
+
+            {shows("notes") && (
+              <NotesSection entity="partner" recordId={partner.id} activities={activities} open={noteOpen} onOpenChange={setNoteOpen}
+                onAdded={async () => setActivities(await fetchActivities("partner", partner.id))} />
+            )}
           </div>
         </main>
       </div>

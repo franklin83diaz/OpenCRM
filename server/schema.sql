@@ -72,6 +72,21 @@ CREATE TABLE IF NOT EXISTS partners (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Customer users: the people who use the product at a customer (a company
+-- with customer_since), kept apart from contacts, who are the people we deal
+-- with. Deleting the company leaves them without one.
+CREATE TABLE IF NOT EXISTS customer_users (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT DEFAULT '',
+  phone TEXT DEFAULT '',
+  company_id TEXT REFERENCES companies(id) ON DELETE SET NULL,
+  notes TEXT DEFAULT '',
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_customer_users_company ON customer_users(company_id);
+
 -- The partners taking part in a deal: any number per deal, and per partner,
 -- each with its share of the deal, once and each month. Deleting either side
 -- drops the link.
@@ -109,7 +124,7 @@ CREATE TABLE IF NOT EXISTS stages (
 -- scheduled, Slack notification) plus manual notes.
 CREATE TABLE IF NOT EXISTS activities (
   id TEXT PRIMARY KEY,
-  entity_type TEXT NOT NULL,               -- 'contact' | 'company' | 'deal' | 'partner'
+  entity_type TEXT NOT NULL,               -- 'contact' | 'company' | 'deal' | 'partner' | 'customer_user'
   entity_id TEXT NOT NULL,
   type TEXT NOT NULL DEFAULT 'note',        -- 'note' | 'email' | 'meeting' | 'slack' | 'stage_change'
   body TEXT DEFAULT '',
@@ -123,7 +138,7 @@ CREATE TABLE IF NOT EXISTS activities (
 -- indexable columns — not a JSON blob. This table is only the registry.
 CREATE TABLE IF NOT EXISTS custom_field_defs (
   id TEXT PRIMARY KEY,
-  entity_type TEXT NOT NULL,                -- 'contact' | 'company' | 'deal' | 'partner'
+  entity_type TEXT NOT NULL,                -- 'contact' | 'company' | 'deal' | 'partner' | 'customer_user'
   key TEXT NOT NULL,                        -- column name; ^[a-z][a-z0-9_]*$
   label TEXT NOT NULL,
   field_type TEXT NOT NULL DEFAULT 'string',-- base type; drives SQL affinity + coercion
@@ -148,7 +163,7 @@ CREATE TABLE IF NOT EXISTS custom_field_defs (
 -- changes only the page until someone updates the view.
 CREATE TABLE IF NOT EXISTS views (
   id TEXT PRIMARY KEY,
-  entity_type TEXT NOT NULL,                -- 'contact' | 'company' | 'deal' | 'partner'
+  entity_type TEXT NOT NULL,                -- 'contact' | 'company' | 'deal' | 'partner' | 'customer_user'
   name TEXT NOT NULL,
   icon TEXT NOT NULL DEFAULT 'table',
   is_default INTEGER NOT NULL DEFAULT 0,

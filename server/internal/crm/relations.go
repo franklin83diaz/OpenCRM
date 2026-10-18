@@ -307,10 +307,10 @@ func CountOf(field string) (string, bool) {
 	return "", false
 }
 
-// builtinMany are the built-in one_to_many sides: a company's contacts and
-// deals, a contact's deals, and both ends of deal_partners.
+// builtinMany are the built-in one_to_many sides: a company's contacts, deals
+// and customer users, a contact's deals, and both ends of deal_partners.
 var builtinMany = map[EntityType]map[string]ManyLink{
-	Company: {"contacts": {Table: "contacts", FK: "company_id"}, "deals": {Table: "deals", FK: "company_id"}},
+	Company: {"contacts": {Table: "contacts", FK: "company_id"}, "deals": {Table: "deals", FK: "company_id"}, "customer_users": {Table: "customer_users", FK: "company_id"}},
 	Contact: {"deals": {Table: "deals", FK: "contact_id"}},
 	Deal:    {"partners": {Table: "deal_partners", FK: "deal_id", ID: "partner_id"}},
 	Partner: {"deals": {Table: "deal_partners", FK: "partner_id", ID: "deal_id"}},
@@ -345,8 +345,9 @@ func ManyLinks(ctx context.Context, entity EntityType) (map[string]ManyLink, err
 // builtinLinks are the built-in links, which predate relation defs: column →
 // the entity it holds.
 var builtinLinks = map[EntityType]map[string]EntityType{
-	Contact: {"company_id": Company},
-	Deal:    {"contact_id": Contact, "company_id": Company},
+	Contact:      {"company_id": Company},
+	CustomerUser: {"company_id": Company},
+	Deal:         {"contact_id": Contact, "company_id": Company},
 }
 
 // RelationSortSQL is the ORDER BY for a column holding a linked record's id (a
@@ -373,7 +374,8 @@ func RelationSortSQL(ctx context.Context, entity EntityType, alias, column strin
 }
 
 // DetachRelations clears links to deleted records of entity. The built-in
-// company_id and contact_id are cleared by their foreign keys; custom relation
+// company_id and contact_id (a customer user's company_id too) are cleared by
+// their foreign keys; custom relation
 // columns have none (see CreateRelation), so they are cleared here.
 func DetachRelations(ctx context.Context, entity EntityType, ids []string) error {
 	defs, err := relationDefs(ctx, "")

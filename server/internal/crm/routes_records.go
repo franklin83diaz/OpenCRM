@@ -125,7 +125,7 @@ func (app *App) records(w http.ResponseWriter, r *http.Request) error {
 	return tryJSON(w, func() (int, any, error) {
 		entity := textAt(q, "entity")
 		if !IsEntityType(entity) {
-			return fail(400, "entity must be contact, company, deal or partner")
+			return fail(400, "entity must be contact, company, deal, partner or customer_user")
 		}
 		ids := []string{}
 		for _, s := range strings.Split(textAt(q, "ids"), ",") {
@@ -153,7 +153,7 @@ func (app *App) values(w http.ResponseWriter, r *http.Request) error {
 	return tryJSON(w, func() (int, any, error) {
 		entity := textAt(q, "entity")
 		if !IsEntityType(entity) {
-			return fail(400, "entity must be contact, company, deal or partner")
+			return fail(400, "entity must be contact, company, deal, partner or customer_user")
 		}
 		table := EntityTables[EntityType(entity)]
 		field := textAt(q, "field")

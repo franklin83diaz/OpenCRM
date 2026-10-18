@@ -129,9 +129,9 @@ func recordedDB(t *testing.T, seed []string) *recorder {
 // so TS never answered with them: a replay compares what TS did with them left
 // out — a deal's `partners`, `recurring_value`, `owner_id` and `owner`, the
 // same among a deal's valid fields (partner_ids for partners), the stats'
-// count of partners and recurring value, and the statements on the partners
-// and deal_partners tables or the recurring value (no statement TS ran names
-// any of them).
+// count of partners and customer users and recurring value, and the
+// statements on the partners, deal_partners and customer_users tables or the
+// recurring value (no statement TS ran names any of them).
 
 // postPortDealKeys are a deal's keys TS never had.
 var postPortDealKeys = []string{"partners", "recurring_value", "owner_id", "owner"}
@@ -155,6 +155,7 @@ func withoutPartners(text string) string {
 			if _, stats := v["dealValue"]; stats {
 				delete(v, "partners")
 				delete(v, "dealRecurringValue")
+				delete(v, "customerUsers")
 			}
 			// A deal's valid fields: a company has an owner_id of its own in the replays.
 			if valid, ok := v["valid_fields"].([]any); ok && strings.HasPrefix(fmt.Sprint(v["error"]), "Unknown field(s) for deal:") {
@@ -180,7 +181,7 @@ func withoutPartners(text string) string {
 	return string(b)
 }
 
-var partnerTables = regexp.MustCompile(`\b(partners|deal_partners|recurring_value)\b`)
+var partnerTables = regexp.MustCompile(`\b(partners|deal_partners|recurring_value|customer_users)\b`)
 
 // withoutPartnerStatements is log without the statements that came after the
 // port.

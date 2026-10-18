@@ -2,7 +2,7 @@
 
 # OpenCRM: The Open-Source HubSpot Alternative for SaaS
 
-A lightweight CRM with contacts, companies, partners and deals — built for SaaS teams and AI agents. It runs on your own Cloudflare account: a Go API in a Cloudflare Container, with its data in D1.
+A lightweight CRM with contacts, companies, partners, customer users and deals — built for SaaS teams and AI agents. It runs on your own Cloudflare account: a Go API in a Cloudflare Container, with its data in D1.
 
 Built with **React + Tailwind + shadcn/ui** on **Go + Cloudflare Containers + D1**. Path-based routing, UUID keys, its own accounts and API tokens, and a dual-mode UI: one for humans and one for AI agents (larger targets, always-visible actions).
 
@@ -14,7 +14,7 @@ Unlike HubSpot or Salesforce, it runs on your own Cloudflare account, with no AP
 
 ## Features
 
-- **Four entities** — contacts, companies, partners and deals with foreign-key relationships (UUID keys, not enumerable ids). Partners are the firms that work deals with you (resellers, referrers), kept apart from the companies you sell to; a deal has any number of them
+- **Five entities** — contacts, companies, partners, customer users and deals with foreign-key relationships (UUID keys, not enumerable ids). Partners are the firms that work deals with you (resellers, referrers), kept apart from the companies you sell to; a deal has any number of them. Customer users are the people who use your product at each customer, kept apart from contacts
 - **Accounts and API tokens** — people sign in with an email and a password; an admin adds them in Settings → Users, and everyone can make personal API tokens for agents and scripts in Settings → API tokens (see [Accounts and API tokens](#accounts-and-api-tokens))
 - **Activity timeline** — every contact/company/deal has a feed; notes, deal updates (a call, a message, an email, a meeting), and deals won or lost all log to it
 - **CSV / XLSX import** — upload a spreadsheet, map columns to fields (exact-match auto-mapping), preview, import; company names resolve to existing companies or are created
@@ -134,7 +134,7 @@ pnpm db:migrate:remote   # server/schema.sql, on the production database
 pnpm run deploy
 ```
 
-`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts, without which signing in fails; and `partners` and `deal_partners`, without which every read of deals fails. Columns a version adds to a table you already have (a deal's `recurring_value` and `owner_id`, a partner's share of a deal, a partner's `industry` and `status`) can't come from `server/schema.sql`: the API adds them itself, before the first request it serves. A deal attribute made before Partners with the key `partners` or `partner_ids` is hidden by them: deal reads answer `partners` with the deal's partners, and writes take `partner_ids` as them. Copy its values out and delete it before you upgrade. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
+`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts, without which signing in fails; and `partners`, `deal_partners` and `customer_users`, without which every read of deals fails. Columns a version adds to a table you already have (a deal's `recurring_value` and `owner_id`, a partner's share of a deal, a partner's `industry` and `status`) can't come from `server/schema.sql`: the API adds them itself, before the first request it serves. A deal attribute made before Partners with the key `partners` or `partner_ids` is hidden by them: deal reads answer `partners` with the deal's partners, and writes take `partner_ids` as them. Copy its values out and delete it before you upgrade. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
 
 ## Tech Stack
 
@@ -182,7 +182,7 @@ wrangler.toml         — the Worker, the container, D1
 
 ### Data Model
 
-Four entities with foreign key relationships:
+Five entities with foreign key relationships:
 
 ```mermaid
 erDiagram
@@ -190,6 +190,7 @@ erDiagram
     contacts  ||--o{ deals    : "has"
     companies ||--o{ deals    : "has"
     deals     }o--o{ partners : "deal_partners"
+    companies ||--o{ customer_users : "has"
 
     companies {
         text id PK
@@ -246,6 +247,7 @@ companies (id, name, domain, industry, phone, email, notes, customer_since, rene
 contacts  (id, first_name, last_name, email, phone, company_id → companies, title, status)
 deals     (id, name, contact_id → contacts, company_id → companies, value, recurring_value, stage, close_date, notes, owner_id → users)
 partners  (id, name, industry, status, phone, email, notes)
+customer_users (id, name, email, phone, company_id → companies, notes)
 deal_partners (deal_id → deals, partner_id → partners, one_time_value, recurring_value)
 ```
 
@@ -288,6 +290,12 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | PUT | `/api/partners/:id` | Update a partner |
 | DELETE | `/api/partners/:id` | Delete a partner (its deals stay, without it) |
 | POST | `/api/partners/bulk-delete` | Delete several partners (`{ ids }`) |
+| GET | `/api/customer-users` | List customer users (paginated, sortable, searchable; `company_id` for one customer's) |
+| GET | `/api/customer-users/:id` | Get a single customer user |
+| POST | `/api/customer-users` | Create a customer user (`{ name, email?, phone?, company_id?, notes? }`) |
+| PUT | `/api/customer-users/:id` | Update a customer user |
+| DELETE | `/api/customer-users/:id` | Delete a customer user |
+| POST | `/api/customer-users/bulk-delete` | Delete several customer users (`{ ids }`) |
 | GET | `/api/deals` | List deals (paginated, sortable, searchable; `partner_id` for a partner's deals) |
 | GET | `/api/deals/board` | Every deal for the pipeline board, optionally filtered |
 | GET | `/api/deals/progress` | Open deals worst first: each one's next step and the reasons to look at it |
@@ -310,13 +318,13 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | DELETE | `/api/views/:id` | Delete a view (not the default) |
 | GET | `/api/views/:id/fields` | A view's column layout (visibility, widths, footer calculations) |
 | PUT | `/api/views/:id/fields/:key` | Show/hide, resize or set the footer calculation of one column (`{ visible?, size?, aggregate? }`) |
-| GET | `/api/custom-fields` | The attributes (`entity=contact\|company\|deal\|partner` for one record type's) |
+| GET | `/api/custom-fields` | The attributes (`entity=contact\|company\|deal\|partner\|customer_user` for one record type's) |
 | POST | `/api/custom-fields` | Add an attribute. A relation: `{ entity_type, key, label, field_type: "relation", relation_type: "many_to_one" \| "one_to_many", target_entity, inverse_key, inverse_label }` makes both sides |
 | PUT | `/api/custom-fields/:id` | Change an attribute's label, options, widget or position (its key and type stay) |
 | DELETE | `/api/custom-fields/:id` | Delete an attribute (a relation goes from both sides, with its links) |
 | GET | `/api/records?entity=&search=` | Records by name for a relation picker (or `ids=a,b` to name given ids) |
 | GET | `/api/values?entity=&field=` | The values a column already holds (case-insensitive, up to 200), for a picker that offers them |
-| GET | `/api/contacts/aggregates`, `/api/companies/aggregates`, `/api/partners/aggregates` | Column totals over the filtered list (`ops=[{key, op}]` plus the list's `search`/`filters`) |
+| GET | `/api/contacts/aggregates`, `/api/companies/aggregates`, `/api/partners/aggregates`, `/api/customer-users/aggregates` | Column totals over the filtered list (`ops=[{key, op}]` plus the list's `search`/`filters`) |
 | GET | `/api/customers` | Every customer worst first with its reasons, and what to do first |
 | GET | `/api/lookup` | What the CRM knows about an address (`email`, `domain`): contact, company, customer since, deals |
 | POST | `/api/lookup` | The same for up to 100 addresses at once (`{ addresses: [{ email, domain }] }`), in order |
