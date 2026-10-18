@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ChevronsUpDown } from "lucide-react";
 import { useCrm } from "@/context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,24 +13,11 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ValuesMenu } from "@/components/cell-editors";
+import { CategoryBadge } from "@/components/shared";
 import { CustomFieldsSection, readCustom } from "@/lib/custom-fields";
 import type { Company } from "@/types";
-
-const INDUSTRIES = [
-  "Technology",
-  "Software",
-  "Manufacturing",
-  "Healthcare",
-  "Finance",
-  "Retail",
-  "Education",
-  "Consulting",
-] as const;
-
-// Radix Select forbids an empty-string item value, so we use a sentinel for the
-// "None" industry option and map it back to "" on submit.
-const NO_INDUSTRY = "__none__";
 
 interface FormState {
   name: string;
@@ -128,22 +116,7 @@ export function CompanyDialog({
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="industry">Industry</Label>
-              <Select
-                value={form.industry === "" ? NO_INDUSTRY : form.industry}
-                onValueChange={(v) => set("industry", v === NO_INDUSTRY ? "" : v)}
-              >
-                <SelectTrigger id="industry" className="w-full">
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_INDUSTRY}>None</SelectItem>
-                  {INDUSTRIES.map((i) => (
-                    <SelectItem key={i} value={i}>
-                      {i}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <IndustryPicker value={form.industry} onChange={(v) => set("industry", v)} />
             </div>
           </div>
 
@@ -179,5 +152,29 @@ export function CompanyDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The industries already in use, or a new one typed in: the same menu as the company page. */
+function IndustryPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  // Modal: the dialog underneath blocks wheel scrolling outside itself, and the menu renders outside it.
+  return (
+    <Popover modal open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          id="industry"
+          type="button"
+          className="flex h-8 w-full items-center justify-between gap-2 rounded-sm bg-card shadow-edge px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        >
+          {value ? <CategoryBadge value={value} /> : <span className="text-muted-foreground">None</span>}
+          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-0">
+        <ValuesMenu entity="company" field="industry" value={value || null} emptyLabel="None"
+          onPick={(v) => { setOpen(false); onChange(v ?? ""); }} />
+      </PopoverContent>
+    </Popover>
   );
 }
