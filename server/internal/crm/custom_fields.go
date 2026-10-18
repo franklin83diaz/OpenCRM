@@ -25,13 +25,14 @@ import (
 	"opencrm/internal/js"
 )
 
-// EntityType is "contact", "company" or "deal".
+// EntityType is "contact", "company", "deal" or "partner".
 type EntityType string
 
 const (
 	Contact EntityType = "contact"
 	Company EntityType = "company"
 	Deal    EntityType = "deal"
+	Partner EntityType = "partner"
 )
 
 // A relation's side: many_to_one holds the linked id in its own column;
@@ -46,11 +47,12 @@ var EntityTables = map[EntityType]string{
 	Contact: "contacts",
 	Company: "companies",
 	Deal:    "deals",
+	Partner: "partners",
 }
 
 // IsEntityType reports whether v names an entity type.
 func IsEntityType(v string) bool {
-	return v == "contact" || v == "company" || v == "deal"
+	return v == "contact" || v == "company" || v == "deal" || v == "partner"
 }
 
 // FieldError is an error TS threw with a message meant for the caller (an
@@ -114,11 +116,13 @@ func (d CustomFieldDef) targetEntity() EntityType {
 
 // builtinColumns are the platform columns per table, in schema order — a
 // custom key may never collide with these, so schema-sync can never add/drop a
-// platform column.
+// platform column. A deal's partner_ids is no column (it writes deal_partners)
+// but is a base field all the same.
 var builtinColumns = map[EntityType][]string{
 	Company: {"id", "name", "domain", "industry", "phone", "email", "notes", "customer_since", "renewal_date", "created_at", "updated_at"},
 	Contact: {"id", "first_name", "last_name", "email", "phone", "company_id", "title", "status", "last_contacted_at", "created_at", "updated_at"},
-	Deal:    {"id", "name", "contact_id", "company_id", "value", "stage", "close_date", "notes", "created_at", "updated_at"},
+	Deal:    {"id", "name", "contact_id", "company_id", "value", "stage", "close_date", "notes", "created_at", "updated_at", "partner_ids"},
+	Partner: {"id", "name", "domain", "phone", "email", "notes", "created_at", "updated_at"},
 }
 
 func isBuiltin(entity EntityType, key string) bool {
@@ -130,6 +134,14 @@ func isBuiltin(entity EntityType, key string) bool {
 	return false
 }
 
+// reservedKeys are keys a record answers with that are no field of its own —
+// a deal's partners, a partner's deals and deal_count — so no custom field
+// may take them either.
+var reservedKeys = map[EntityType][]string{
+	Deal:    {"partners"},
+	Partner: {"deals", "deal_count"},
+}
+
 var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
 // AssertValidKey returns a *FieldError if key is not a safe, non-reserved column.
@@ -137,7 +149,7 @@ func AssertValidKey(entity EntityType, key string) error {
 	if !keyPattern.MatchString(key) {
 		return fieldError(`Invalid field key "%s" — use lowercase letters, digits, and underscores (must start with a letter).`, key)
 	}
-	if isBuiltin(entity, key) {
+	if isBuiltin(entity, key) || indexOf(reservedKeys[entity], key) >= 0 {
 		return fieldError(`"%s" is a built-in %s field and can't be used as a custom property.`, key, entity)
 	}
 	return nil

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Handshake, DollarSign, CircleDashed, Calendar, StickyNote, Building2, User, Clock, LayoutGrid, Activity as ActivityIcon } from "lucide-react";
+import { ArrowLeft, Handshake, DollarSign, CircleDashed, Calendar, StickyNote, Building2, User, Clock, LayoutGrid, Network, Activity as ActivityIcon } from "lucide-react";
 import { useCrm } from "@/context";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection } from "@/components/record-page";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
-import { RecordChip, RelationInput } from "@/lib/relations";
+import { RecordChip, RecordsInput, RelationInput } from "@/lib/relations";
 import { formatMoney, colorClasses, cn } from "@/lib/utils";
 import { HealthPill, daysAgo } from "@/components/health";
 import { TasksSection } from "@/components/tasks/tasks-section";
@@ -31,8 +31,9 @@ function formatDay(day: string): string {
 
 // The deal record page: same anatomy as a contact or company. Its company and
 // its contact are both its own links, each optional; setting a contact on a
-// deal with no company fills the company in (the server does it). `panel`
-// renders it in the side panel beside the deals board.
+// deal with no company fills the company in (the server does it). Any number
+// of partners take part in it. `panel` renders it in the side panel beside
+// the deals board.
 export function DealDetail({ id, navigate, panel = false }: { id: string; navigate: (to: string) => void; panel?: boolean }) {
   const { fetchDeal, updateDeal, fetchActivities, setError, customFields, changes, stages } = useCrm();
   const relationDefs = customFields.filter((d) => d.entity_type === "deal" && d.field_type === "relation");
@@ -131,6 +132,10 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
               <Attr icon={User} label="Contact">
                 <RelationInput link entity="contact" value={deal.contact_id} known={contact} placeholder="Set contact…" emptyLabel="No contact"
                   onChange={(v) => void saveField({ contact_id: v })} />
+              </Attr>
+              <Attr icon={Network} label="Partners">
+                <RecordsInput link entity="partner" label="partners" value={(deal.partners ?? []).map((p) => p.id)} known={deal.partners}
+                  onChange={(ids) => saveField({ partner_ids: ids })} />
               </Attr>
               <RelationAttrs defs={relationDefs} row={deal} onSave={(key, v) => saveField({ [key]: v } as Partial<Deal>)} />
             </dl>

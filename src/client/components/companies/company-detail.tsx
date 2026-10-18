@@ -90,7 +90,8 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
             <Button variant="outline" size="sm" disabled={!company.email} asChild={!!company.email}>
               {company.email ? <a href={`mailto:${company.email}`}><Mail className="size-4" /> Compose email</a> : <><Mail className="size-4" /> Compose email</>}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate(`/contacts?company=${encodeURIComponent(company.id)}`)}>
+            {/* The contacts list, filtered to this company: its "Company is …" filter, which can be removed there. */}
+            <Button variant="outline" size="sm" onClick={() => navigate(`/contacts?filters=${encodeURIComponent(JSON.stringify([{ field: "company_id", op: "is", value: [company.id] }]))}`)}>
               <Users className="size-4" /> Contacts {company.contact_count ? <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{company.contact_count}</span> : null}
             </Button>
           </div>

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Plus, Pencil, Trash2, MoreHorizontal, ArrowRightLeft, CircleDollarSign, CalendarDays, Building2, UserRound, HeartHandshake, NotebookText, Clock3, Footprints, type LucideIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, MoreHorizontal, ArrowRightLeft, CircleDollarSign, CalendarDays, Building2, UserRound, HeartHandshake, Network, NotebookText, Clock3, Footprints, type LucideIcon } from "lucide-react";
 import { DndContext, DragOverlay, PointerSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { useCrm } from "@/context";
 import { PageHeader, Avatar, EntityIcon, EmptyState } from "@/components/shared";
@@ -35,6 +35,8 @@ export function DealsBoard({ navigate, openId }: { navigate: (to: string, opts?:
       { key: "value", label: "Value", type: "number", column: "value" },
       { key: "company_id", label: "Company", type: "relation", entity: "company", column: "company_id" },
       { key: "contact_id", label: "Contact", type: "relation", entity: "contact", column: "contact_id" },
+      { key: "partners", label: "Partners", type: "relation", entity: "partner" },
+      { key: "count:partners", label: "Partners count", type: "number" },
       { key: "stage", label: "Stage", type: "enum", column: "stage", options: stages.map((s) => ({ label: s.label, value: s.key })) },
       { key: "close_date", label: "Close date", type: "date", column: "close_date" },
       { key: "notes", label: "Notes", type: "text", column: "notes" },
@@ -426,6 +428,13 @@ function DealFields({ deal: d }: { deal: Deal }) {
           </>
         ) : null}
       </FieldRow>
+      {/* Most deals have no partner: the row shows only on those that do. */}
+      {d.partners && d.partners.length > 0 && (
+        <FieldRow icon={Network} label="Partners">
+          <EntityIcon name={d.partners[0].label} domain={d.partners[0].domain} className="size-5" />
+          <span className="truncate">{d.partners.map((p) => p.label).join(", ")}</span>
+        </FieldRow>
+      )}
       <FieldRow icon={NotebookText} label="Notes" placeholder="Add note…">
         {note ? <span className="truncate text-muted-foreground">{note}</span> : null}
       </FieldRow>

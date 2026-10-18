@@ -87,6 +87,20 @@ function makeCaller(base, record, auth) {
   };
 }
 
+// Partners came after the port: TS never answered with them, so the Go
+// side's answers are compared without what they added — a deal's `partners`,
+// the stats' count of partners, and partner_ids among a deal's valid fields.
+function withoutPartners(v) {
+  if (Array.isArray(v)) return v.map(withoutPartners);
+  if (!v || typeof v !== "object") return v;
+  const o = {};
+  for (const [k, x] of Object.entries(v)) {
+    if (k === "partners" && ("stage" in v || "dealValue" in v)) continue;
+    o[k] = k === "valid_fields" && Array.isArray(x) ? x.filter((f) => f !== "partner_ids") : withoutPartners(x);
+  }
+  return o;
+}
+
 function normalize(records) {
   const n = makeNormalizer();
   return records.map((r) => ({
@@ -151,7 +165,7 @@ for (const file of selected) {
       }
     }
     const a = normalize(rec.ts);
-    const b = normalize(rec.go);
+    const b = normalize(rec.go.map((r) => (r.isJson ? { ...r, body: withoutPartners(r.body) } : r)));
     const n = Math.max(a.length, b.length);
     for (let i = 0; i < n; i++) {
       calls++;

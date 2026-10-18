@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -122,6 +123,65 @@ func recordedDB(t *testing.T, seed []string) *recorder {
 	rec := &recorder{inner: d}
 	db.Use(rec)
 	return rec
+}
+
+// Partners came after the port, so TS never answered with them: a replay
+// compares what TS did with the partners' additions left out — a deal's
+// `partners`, partner_ids among a deal's valid fields, the stats' count of
+// partners, and the statements on the partners and deal_partners tables
+// (no statement TS ran names either).
+
+// withoutPartners is a response body without the partners' additions; text
+// that isn't JSON comes back as it is.
+func withoutPartners(text string) string {
+	var v any
+	if err := json.Unmarshal([]byte(text), &v); err != nil {
+		return text
+	}
+	var strip func(any)
+	strip = func(v any) {
+		switch v := v.(type) {
+		case map[string]any:
+			_, deal := v["stage"]
+			_, stats := v["dealValue"]
+			if deal || stats {
+				delete(v, "partners")
+			}
+			if valid, ok := v["valid_fields"].([]any); ok {
+				kept := []any{}
+				for _, k := range valid {
+					if k != "partner_ids" {
+						kept = append(kept, k)
+					}
+				}
+				v["valid_fields"] = kept
+			}
+			for _, x := range v {
+				strip(x)
+			}
+		case []any:
+			for _, x := range v {
+				strip(x)
+			}
+		}
+	}
+	strip(v)
+	b, _ := json.Marshal(v)
+	return string(b)
+}
+
+var partnerTables = regexp.MustCompile(`\b(partners|deal_partners)\b`)
+
+// withoutPartnerStatements is log without the statements on the partners'
+// tables.
+func withoutPartnerStatements(log []tsStatement) []tsStatement {
+	out := []tsStatement{}
+	for _, st := range log {
+		if !partnerTables.MatchString(st.SQL) {
+			out = append(out, st)
+		}
+	}
+	return out
 }
 
 // canonical is v as JSON with sorted keys, for comparing decoded values.

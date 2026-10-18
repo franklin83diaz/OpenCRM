@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent } from "react";
-import { Activity, BookUser, Building2, CircleUserRound, DollarSign, KeyRound, Layers, LogOut, PanelLeft, User, UsersRound, type LucideIcon } from "lucide-react";
+import { Activity, BookUser, Building2, CircleUserRound, DollarSign, KeyRound, Layers, LogOut, Network, PanelLeft, User, UsersRound, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/auth";
 import { useCrm } from "@/context";
 import { UserAvatar } from "@/components/shared";
@@ -36,6 +36,7 @@ interface NavItem {
 
 const RECORDS: NavItem[] = [
   { id: "contacts", label: "Contacts", href: "/contacts", icon: User, color: "blue" },
+  { id: "partners", label: "Partners", href: "/partners", icon: Network, color: "sky" },
   { id: "companies", label: "Companies", href: "/companies", icon: Building2, color: "violet" },
   { id: "deals", label: "Deals", href: "/deals", icon: DollarSign, color: "green" },
   { id: "customers", label: "Customers", href: "/customers", icon: Activity, color: "orange" },
@@ -52,6 +53,7 @@ const SETTINGS: NavItem[] = [
 function activeFor(route: Route): string {
   if (route.name === "contact") return "contacts";
   if (route.name === "company") return "companies";
+  if (route.name === "partner") return "partners";
   if (route.name === "deal") return "deals";
   return route.name;
 }
@@ -85,7 +87,7 @@ export function AppSidebar({ route, navigate }: { route: Route; navigate: (to: s
   const [collapsed, setCollapsed] = useState(false);
   const rail = collapsed || !wide;
   const active = activeFor(route);
-  const counts: Record<string, number> = { contacts: stats.contacts, companies: stats.companies, deals: stats.deals, customers: stats.customers };
+  const counts: Record<string, number> = { contacts: stats.contacts, partners: stats.partners, companies: stats.companies, deals: stats.deals, customers: stats.customers };
   const settings = SETTINGS.filter((item) => !item.adminOnly || user.role === "admin");
 
   const link = (item: NavItem) => {

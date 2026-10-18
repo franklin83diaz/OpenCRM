@@ -31,6 +31,36 @@
  },
  {
   "method": "GET",
+  "path": "/api/partners",
+  "summary": "List partners with pagination, search, and filtering"
+ },
+ {
+  "method": "GET",
+  "path": "/api/partners/{id}",
+  "summary": "Get one partner"
+ },
+ {
+  "method": "POST",
+  "path": "/api/partners",
+  "summary": "Create a partner"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/partners/{id}",
+  "summary": "Update a partner"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/partners/{id}",
+  "summary": "Delete a partner; its deals stay, without it"
+ },
+ {
+  "method": "POST",
+  "path": "/api/partners/bulk-delete",
+  "summary": "Delete several partners"
+ },
+ {
+  "method": "GET",
   "path": "/api/contacts",
   "summary": "List contacts with pagination, search, and filtering"
  },
@@ -151,6 +181,10 @@
  {
   "method": "GET",
   "path": "/api/contacts/aggregates"
+ },
+ {
+  "method": "GET",
+  "path": "/api/partners/aggregates"
  },
  {
   "method": "GET",

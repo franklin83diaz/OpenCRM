@@ -25,6 +25,7 @@ import type { AttributeType, CustomFieldDef, EntityType, RelationType } from "@/
 
 const ENTITIES: { key: EntityType; label: string }[] = [
   { key: "contact", label: "Contacts" },
+  { key: "partner", label: "Partners" },
   { key: "company", label: "Companies" },
   { key: "deal", label: "Deals" },
 ];
@@ -34,6 +35,7 @@ const NOUN: Record<EntityType, { one: string; many: string }> = {
   contact: { one: "contact", many: "contacts" },
   company: { one: "company", many: "companies" },
   deal: { one: "deal", many: "deals" },
+  partner: { one: "partner", many: "partners" },
 };
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -89,6 +91,15 @@ const BUILTINS: Record<EntityType, BuiltinAttr[]> = {
     { label: "Value", key: "value", type: "Number", icon: Hash },
     { label: "Stage", key: "stage", type: "Status", icon: CircleDot, constraints: "Required" },
     { label: "Close date", key: "close_date", type: "Date", icon: Calendar },
+    { label: "Partners", key: "partner_ids", type: "Records", icon: Link2 },
+    { label: "Notes", key: "notes", type: "Long text", icon: List },
+    { label: "Created at", key: "created_at", type: "Timestamp", icon: Calendar },
+  ],
+  partner: [
+    { label: "Name", key: "name", type: "Text", icon: TypeIcon, constraints: "Required" },
+    { label: "Domain", key: "domain", type: "Text", icon: Link2 },
+    { label: "Phone", key: "phone", type: "Text", icon: TypeIcon },
+    { label: "Email", key: "email", type: "Text", icon: TypeIcon },
     { label: "Notes", key: "notes", type: "Long text", icon: List },
     { label: "Created at", key: "created_at", type: "Timestamp", icon: Calendar },
   ],

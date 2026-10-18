@@ -2,7 +2,7 @@
 
 # OpenCRM: The Open-Source HubSpot Alternative for SaaS
 
-A lightweight CRM with contacts, companies, and deals — built for SaaS teams and AI agents. It runs on your own Cloudflare account: a Go API in a Cloudflare Container, with its data in D1.
+A lightweight CRM with contacts, companies, partners and deals — built for SaaS teams and AI agents. It runs on your own Cloudflare account: a Go API in a Cloudflare Container, with its data in D1.
 
 Built with **React + Tailwind + shadcn/ui** on **Go + Cloudflare Containers + D1**. Path-based routing, UUID keys, its own accounts and API tokens, and a dual-mode UI: one for humans and one for AI agents (larger targets, always-visible actions).
 
@@ -14,7 +14,7 @@ Unlike HubSpot or Salesforce, it runs on your own Cloudflare account, with no AP
 
 ## Features
 
-- **Three entities** — contacts, companies, and deals with foreign-key relationships (UUID keys, not enumerable ids)
+- **Four entities** — contacts, companies, partners and deals with foreign-key relationships (UUID keys, not enumerable ids). Partners are the firms that work deals with you (resellers, referrers), kept apart from the companies you sell to; a deal has any number of them
 - **Accounts and API tokens** — people sign in with an email and a password; an admin adds them in Settings → Users, and everyone can make personal API tokens for agents and scripts in Settings → API tokens (see [Accounts and API tokens](#accounts-and-api-tokens))
 - **Activity timeline** — every contact/company/deal has a feed; notes, deal updates (a call, a message, an email, a meeting), and deals won or lost all log to it
 - **CSV / XLSX import** — upload a spreadsheet, map columns to fields (exact-match auto-mapping), preview, import; company names resolve to existing companies or are created
@@ -134,7 +134,7 @@ pnpm db:migrate:remote   # server/schema.sql, on the production database
 pnpm run deploy
 ```
 
-`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts. Without them, signing in fails. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
+`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts, without which signing in fails; and `partners` and `deal_partners`, without which every read of deals fails. A deal attribute made before Partners with the key `partners` or `partner_ids` is hidden by them: deal reads answer `partners` with the deal's partners, and writes take `partner_ids` as them. Copy its values out and delete it before you upgrade. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
 
 ## Tech Stack
 
@@ -182,13 +182,14 @@ wrangler.toml         — the Worker, the container, D1
 
 ### Data Model
 
-Three entities with foreign key relationships:
+Four entities with foreign key relationships:
 
 ```mermaid
 erDiagram
     companies ||--o{ contacts : "has"
     contacts  ||--o{ deals    : "has"
     companies ||--o{ deals    : "has"
+    deals     }o--o{ partners : "deal_partners"
 
     companies {
         text id PK
@@ -225,15 +226,27 @@ erDiagram
         text created_at
         text updated_at
     }
+    partners {
+        text id PK
+        text name
+        text domain
+        text phone
+        text email
+        text notes
+        text created_at
+        text updated_at
+    }
 ```
 
 ```sql
 companies (id, name, domain, industry, phone, email, notes, customer_since, renewal_date)
 contacts  (id, first_name, last_name, email, phone, company_id → companies, title, status)
 deals     (id, name, contact_id → contacts, company_id → companies, value, stage, close_date, notes)
+partners  (id, name, domain, phone, email, notes)
+deal_partners (deal_id → deals, partner_id → partners)
 ```
 
-Contacts belong to companies. A deal has its own company and its own contact, both optional: a deal can name a company before it has a person. Setting a contact on a deal with no company gives the deal that contact's company. Deleting a company sets `company_id` to NULL on its contacts and deals. Deleting a contact sets `contact_id` to NULL on its deals.
+Contacts belong to companies. A deal has its own company and its own contact, both optional: a deal can name a company before it has a person. Setting a contact on a deal with no company gives the deal that contact's company. Deleting a company sets `company_id` to NULL on its contacts and deals. Deleting a contact sets `contact_id` to NULL on its deals. A deal has any number of partners (`deal_partners`); deleting a deal or a partner drops their links.
 
 Tasks (`tasks`: `owed_by` us or them, each with an optional company, contact and deal) are typed by hand or added as a deal update's next step. A company with `customer_since` set is a customer: the close date of its first won deal, unless someone set it by hand.
 
@@ -247,7 +260,7 @@ Every endpoint below needs a signed-in person or `Authorization: Bearer crm_…`
 
 Reads carry each relation under `relations[key]`: the linked record `{ id, label, domain }` (or null), or for a many side `{ items, total }`. Write the single side by id (`PUT /api/contacts/:id { "partner_company_id": "<company id>" }`, null to clear); the many side is written from the records it lists.
 
-List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}` and groups `{logic: "and"|"or", rules: [...]}` (groups nest one level). A relation's many side (a custom one_to_many key, or `contacts` on companies, `deals` on contacts) takes `is` / `is_not` (linked record ids), `is_empty`, `is_not_empty`; `count:<key>` (e.g. `count:contacts`) compares how many it links with `is` / `is_not` / `gt` / `gte` / `lt` / `lte` (a number) or `is_empty` (none), and is also a `sort`. Operators: `contains`, `does_not_contain`, `is` / `is_not` (a value or a list, case-insensitive), `is_empty`, `is_not_empty`, `gt` / `gte` / `lt` / `lte`, and for dates `on`, `before`, `after` (on or after), `today`, `in_past`, `in_future`, `relative` (`PAST_7_DAY`, `NEXT_2_WEEK`, `THIS_1_MONTH`). Pass `tz` (minutes east of UTC) to put date rules on the viewer's local day.
+List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}` and groups `{logic: "and"|"or", rules: [...]}` (groups nest one level). A relation's many side (a custom one_to_many key, or `contacts` on companies, `deals` on contacts, `partners` on deals, `deals` on partners) takes `is` / `is_not` (linked record ids), `is_empty`, `is_not_empty`; `count:<key>` (e.g. `count:contacts`) compares how many it links with `is` / `is_not` / `gt` / `gte` / `lt` / `lte` (a number) or `is_empty` (none), and is also a `sort`. Operators: `contains`, `does_not_contain`, `is` / `is_not` (a value or a list, case-insensitive), `is_empty`, `is_not_empty`, `gt` / `gte` / `lt` / `lte`, and for dates `on`, `before`, `after` (on or after), `today`, `in_past`, `in_future`, `relative` (`PAST_7_DAY`, `NEXT_2_WEEK`, `THIS_1_MONTH`). Pass `tz` (minutes east of UTC) to put date rules on the viewer's local day.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -266,12 +279,18 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | DELETE | `/api/companies/:id` | Delete a company |
 | POST | `/api/companies/bulk-delete` | Delete several companies (`{ ids }`) |
 | POST | `/api/companies/import` | Import companies (`{ companies: [...] }`); a name that already exists is skipped |
-| GET | `/api/deals` | List deals (paginated, sortable, searchable) |
+| GET | `/api/partners` | List partners (paginated, sortable, searchable), each with its `deal_count` |
+| GET | `/api/partners/:id` | Get a single partner |
+| POST | `/api/partners` | Create a partner |
+| PUT | `/api/partners/:id` | Update a partner |
+| DELETE | `/api/partners/:id` | Delete a partner (its deals stay, without it) |
+| POST | `/api/partners/bulk-delete` | Delete several partners (`{ ids }`) |
+| GET | `/api/deals` | List deals (paginated, sortable, searchable; `partner_id` for a partner's deals) |
 | GET | `/api/deals/board` | Every deal for the pipeline board, optionally filtered |
 | GET | `/api/deals/progress` | Open deals worst first: each one's next step and the reasons to look at it |
 | GET | `/api/deals/:id` | Get a single deal |
-| POST | `/api/deals` | Create a deal |
-| PUT | `/api/deals/:id` | Update a deal |
+| POST | `/api/deals` | Create a deal (`partner_ids`: its partners) |
+| PUT | `/api/deals/:id` | Update a deal (`partner_ids` replaces its partners) |
 | DELETE | `/api/deals/:id` | Delete a deal |
 | POST | `/api/deals/:id/updates` | Log what happened on a deal, the tasks it finished and its next step |
 | GET / POST | `/api/stages` | The pipeline stages in order; add one |
@@ -285,13 +304,13 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | DELETE | `/api/views/:id` | Delete a view (not the default) |
 | GET | `/api/views/:id/fields` | A view's column layout (visibility, widths, footer calculations) |
 | PUT | `/api/views/:id/fields/:key` | Show/hide, resize or set the footer calculation of one column (`{ visible?, size?, aggregate? }`) |
-| GET | `/api/custom-fields` | The attributes (`entity=contact\|company\|deal` for one record type's) |
+| GET | `/api/custom-fields` | The attributes (`entity=contact\|company\|deal\|partner` for one record type's) |
 | POST | `/api/custom-fields` | Add an attribute. A relation: `{ entity_type, key, label, field_type: "relation", relation_type: "many_to_one" \| "one_to_many", target_entity, inverse_key, inverse_label }` makes both sides |
 | PUT | `/api/custom-fields/:id` | Change an attribute's label, options, widget or position (its key and type stay) |
 | DELETE | `/api/custom-fields/:id` | Delete an attribute (a relation goes from both sides, with its links) |
 | GET | `/api/records?entity=&search=` | Records by name for a relation picker (or `ids=a,b` to name given ids) |
 | GET | `/api/values?entity=&field=` | The values a column already holds (case-insensitive, up to 200), for a picker that offers them |
-| GET | `/api/contacts/aggregates`, `/api/companies/aggregates` | Column totals over the filtered list (`ops=[{key, op}]` plus the list's `search`/`filters`) |
+| GET | `/api/contacts/aggregates`, `/api/companies/aggregates`, `/api/partners/aggregates` | Column totals over the filtered list (`ops=[{key, op}]` plus the list's `search`/`filters`) |
 | GET | `/api/customers` | Every customer worst first with its reasons, and what to do first |
 | GET | `/api/lookup` | What the CRM knows about an address (`email`, `domain`): contact, company, customer since, deals |
 | POST | `/api/lookup` | The same for up to 100 addresses at once (`{ addresses: [{ email, domain }] }`), in order |

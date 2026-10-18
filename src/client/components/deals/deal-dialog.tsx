@@ -17,6 +17,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { api } from "@/api";
 import { CustomFieldsSection, readCustom } from "@/lib/custom-fields";
 import { RelationSections } from "@/components/record-relations";
+import { RecordsInput } from "@/lib/relations";
 import type { Deal } from "@/types";
 
 // Radix Select forbids an empty-string item value, so we use a sentinel for the
@@ -31,6 +32,7 @@ interface FormState {
   stage: string;
   close_date: string;
   notes: string;
+  partner_ids: string[];
 }
 
 function toForm(deal: Deal | undefined, defaultStage: string): FormState {
@@ -42,6 +44,7 @@ function toForm(deal: Deal | undefined, defaultStage: string): FormState {
     stage: deal?.stage || defaultStage,
     close_date: deal?.close_date ?? "",
     notes: deal?.notes ?? "",
+    partner_ids: (deal?.partners ?? []).map((p) => p.id),
   };
 }
 
@@ -89,6 +92,8 @@ export function DealDialog({
         stage: form.stage,
         close_date: form.close_date,
         notes: form.notes.trim(),
+        // Sent only when changed: they replace the deal's partners.
+        ...(form.partner_ids.join() !== (deal?.partners ?? []).map((p) => p.id).join() ? { partner_ids: form.partner_ids } : {}),
         custom,
       };
       if (deal) await updateDeal(deal.id, data);
@@ -158,6 +163,14 @@ export function DealDialog({
                 return companies.map((c) => ({ value: c.id, label: c.name || "—" }));
               }}
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Partners</Label>
+            <div className="rounded-sm bg-card shadow-edge">
+              <RecordsInput modal entity="partner" label="partners" value={form.partner_ids} known={deal?.partners}
+                onChange={(ids) => set("partner_ids", ids)} />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

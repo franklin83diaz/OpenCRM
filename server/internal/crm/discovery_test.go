@@ -175,7 +175,7 @@ func TestDiscoveryListsExactlyTheRoutes(t *testing.T) {
 	if err := json.Unmarshal([]byte(openapi), &doc); err != nil {
 		t.Fatalf("openapi.json: %v", err)
 	}
-	if doc.Info.Title != "OpenCRM" || doc.Info.Description != "A CRM with companies, contacts, and deal pipeline management." {
+	if doc.Info.Title != "OpenCRM" || doc.Info.Description != "A CRM with companies, partners, contacts, and deal pipeline management." {
 		t.Errorf("openapi.json info = %+v", doc.Info)
 	}
 	if len(doc.Paths) == 0 {

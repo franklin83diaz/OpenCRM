@@ -229,7 +229,7 @@ func TestCompaniesContactsMatchTS(t *testing.T) {
 							t.Errorf("%s\n got  %s\n want %s", label, g, wt)
 						}
 					default:
-						if g, wt := norm(canonicalJSON(got)), norm(canonicalJSON(want.Body)); g != wt {
+						if g, wt := norm(canonicalJSON(withoutPartners(got))), norm(canonicalJSON(want.Body)); g != wt {
 							t.Errorf("%s\n got  %s\n want %s", label, g, wt)
 						}
 					}
@@ -239,7 +239,7 @@ func TestCompaniesContactsMatchTS(t *testing.T) {
 			}
 
 			rec.mu.Lock()
-			got := append([]tsStatement{}, rec.log...)
+			got := withoutPartnerStatements(rec.log)
 			rec.mu.Unlock()
 			for i := 0; i < len(got) || i < len(sc.Expect.Statements); i++ {
 				var g, w string

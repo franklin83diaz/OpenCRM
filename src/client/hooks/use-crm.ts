@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, type Dispatch, type SetStateAction } from "react";
 import { api } from "../api";
 import type {
-  Contact, Company, Deal, Stats, PaginatedState, StageDef,
+  Contact, Company, Deal, Partner, Stats, PaginatedState, StageDef,
   Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult,
 } from "../types";
 import { sanitize, type FilterNode } from "@/lib/filters";
@@ -24,7 +24,7 @@ function pagParams(pag: PaginatedState): URLSearchParams {
 }
 
 export function useCrmState(isAgent: boolean): CrmContextValue {
-  const [stats, setStats] = useState<Stats>({ contacts: 0, companies: 0, deals: 0, dealValue: 0, customers: 0 });
+  const [stats, setStats] = useState<Stats>({ contacts: 0, companies: 0, deals: 0, dealValue: 0, customers: 0, partners: 0 });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -33,6 +33,9 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companiesPag, setCompaniesPag] = useState<PaginatedState>(defaultPag("created_at"));
+
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [partnersPag, setPartnersPag] = useState<PaginatedState>(defaultPag("created_at"));
 
   const [deals, setDeals] = useState<Deal[]>([]);
   const [dealsPag, setDealsPag] = useState<PaginatedState>(defaultPag("created_at"));
@@ -61,6 +64,12 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     const data = await api<{ companies: Company[]; total: number }>("GET", `/api/companies?${pagParams(pag)}`);
     setCompanies(data.companies);
     setCompaniesPag((prev) => ({ ...prev, total: data.total }));
+  }, []);
+
+  const fetchPartners = useCallback(async (pag: PaginatedState) => {
+    const data = await api<{ partners: Partner[]; total: number }>("GET", `/api/partners?${pagParams(pag)}`);
+    setPartners(data.partners);
+    setPartnersPag((prev) => ({ ...prev, total: data.total }));
   }, []);
 
   const fetchDeals = useCallback(async (pag: PaginatedState) => {
@@ -97,7 +106,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
       setLoading(true);
       try {
         await Promise.all([
-          fetchStats(), fetchContacts(contactsPag), fetchCompanies(companiesPag),
+          fetchStats(), fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag),
           fetchDeals(dealsPag), fetchBoardDeals(),
           refetchCustomFields(), refetchStages(),
         ]);
@@ -118,6 +127,9 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
   useEffect(() => { fetchCompanies(companiesPag).catch((e) => setError((e as Error).message)); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [companiesPag.page, companiesPag.sort, companiesPag.order, companiesPag.search, JSON.stringify(companiesPag.filters)]);
+  useEffect(() => { fetchPartners(partnersPag).catch((e) => setError((e as Error).message)); },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [partnersPag.page, partnersPag.sort, partnersPag.order, partnersPag.search, JSON.stringify(partnersPag.filters)]);
   useEffect(() => { fetchBoardDeals().catch((e) => setError((e as Error).message)); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(sanitize(boardFilters))]);
@@ -138,6 +150,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
   });
   const cSet = makeSetters(setContactsPag);
   const coSet = makeSetters(setCompaniesPag);
+  const pSet = makeSetters(setPartnersPag);
   const dSet = makeSetters(setDealsPag);
 
   // ── Contacts CRUD ──
@@ -151,8 +164,8 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
   // sides), so both lists refetch and any open record page re-reads.
   const recordsChanged = useCallback(async () => {
     setChanges((n) => n + 1);
-    await Promise.all([fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchBoardDeals(), fetchStats()]);
-  }, [contactsPag, companiesPag, fetchContacts, fetchCompanies, fetchBoardDeals, fetchStats]);
+    await Promise.all([fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag), fetchBoardDeals(), fetchStats()]);
+  }, [contactsPag, companiesPag, partnersPag, fetchContacts, fetchCompanies, fetchPartners, fetchBoardDeals, fetchStats]);
 
   const updateContact = useCallback(async (id: string, data: Partial<Contact>) => {
     await api("PUT", `/api/contacts/${id}`, data);
@@ -199,13 +212,41 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     await Promise.all([fetchCompanies(companiesPag), fetchStats()]);
   }, [companiesPag, fetchCompanies, fetchStats]);
 
+  // ── Partners CRUD ──
+
+  const addPartner = useCallback(async (data: Partial<Partner>) => {
+    await api("POST", "/api/partners", data);
+    await Promise.all([fetchPartners(partnersPag), fetchStats()]);
+  }, [partnersPag, fetchPartners, fetchStats]);
+
+  const fetchPartner = useCallback(async (id: string): Promise<Partner | null> => {
+    try {
+      const data = await api<{ partner: Partner }>("GET", `/api/partners/${encodeURIComponent(id)}`);
+      return data.partner;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const updatePartner = useCallback(async (id: string, data: Partial<Partner>) => {
+    await api("PUT", `/api/partners/${encodeURIComponent(id)}`, data);
+    await recordsChanged();
+  }, [recordsChanged]);
+
+  // A partner gone leaves its deals, which no longer list it.
+  const deletePartners = useCallback(async (ids: string[]) => {
+    await api("POST", "/api/partners/bulk-delete", { ids });
+    await Promise.all([fetchPartners(partnersPag), fetchDeals(dealsPag), fetchBoardDeals(), fetchStats()]);
+  }, [partnersPag, dealsPag, fetchPartners, fetchDeals, fetchBoardDeals, fetchStats]);
+
   // ── Deals CRUD ──
 
+  // A deal's partners count it among their deals, so they refetch too.
   const addDeal = useCallback(async (data: Partial<Deal>) => {
     const { deal } = await api<{ deal: Deal }>("POST", "/api/deals", data);
-    await Promise.all([fetchDeals(dealsPag), fetchBoardDeals(), fetchStats()]);
+    await Promise.all([fetchDeals(dealsPag), fetchBoardDeals(), fetchPartners(partnersPag), fetchStats()]);
     return deal;
-  }, [dealsPag, fetchDeals, fetchBoardDeals, fetchStats]);
+  }, [dealsPag, partnersPag, fetchDeals, fetchBoardDeals, fetchPartners, fetchStats]);
 
   const fetchDeal = useCallback(async (id: string): Promise<Deal | null> => {
     try {
@@ -231,8 +272,8 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
 
   const deleteDeal = useCallback(async (id: string) => {
     await api("DELETE", `/api/deals/${id}`);
-    await Promise.all([fetchDeals(dealsPag), fetchBoardDeals(), fetchStats()]);
-  }, [dealsPag, fetchDeals, fetchBoardDeals, fetchStats]);
+    await Promise.all([fetchDeals(dealsPag), fetchBoardDeals(), fetchPartners(partnersPag), fetchStats()]);
+  }, [dealsPag, partnersPag, fetchDeals, fetchBoardDeals, fetchPartners, fetchStats]);
 
   // ── Timeline ──
 
@@ -270,6 +311,8 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     addContact, updateContact, deleteContacts, fetchContact, fetchCompany,
     companies, companiesPag, setCompaniesPage: coSet.setPage, setCompaniesSort: coSet.setSort, setCompaniesSearch: coSet.setSearch, setCompaniesFilters: coSet.setFilters, setCompaniesView: coSet.setView,
     addCompany, updateCompany, deleteCompanies,
+    partners, partnersPag, setPartnersPage: pSet.setPage, setPartnersSort: pSet.setSort, setPartnersSearch: pSet.setSearch, setPartnersFilters: pSet.setFilters, setPartnersView: pSet.setView,
+    addPartner, fetchPartner, updatePartner, deletePartners,
     deals, dealsPag, dealsTotalValue, setDealsPage: dSet.setPage, setDealsSort: dSet.setSort, setDealsSearch: dSet.setSearch,
     addDeal, fetchDeal, updateDeal, deleteDeal, boardDeals, boardFilters, setBoardFilters,
     fetchActivities, addNote, importEntity,

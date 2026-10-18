@@ -149,7 +149,7 @@ func TestCustomersMatchTS(t *testing.T) {
 				}
 			}
 			rec.mu.Lock()
-			got := append([]tsStatement{}, rec.log...)
+			got := withoutPartnerStatements(rec.log)
 			rec.mu.Unlock()
 			for i := 0; i < len(got) || i < len(sc.Expect.Statements); i++ {
 				var g, w string

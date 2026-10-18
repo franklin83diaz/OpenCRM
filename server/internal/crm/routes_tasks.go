@@ -556,7 +556,7 @@ func (app *App) dealUpdate(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	view, err := WithRelationsOne(ctx, Deal, fresh)
+	view, err := dealView(ctx, fresh)
 	if err != nil {
 		return err
 	}

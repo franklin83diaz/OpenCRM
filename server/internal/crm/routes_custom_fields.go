@@ -99,7 +99,7 @@ func (app *App) createCustomField(w http.ResponseWriter, r *http.Request) error 
 		if body["field_type"] == "relation" {
 			target, _ := body["target_entity"].(string)
 			if !IsEntityType(target) {
-				return fail(400, "A relation needs target_entity: contact, company or deal")
+				return fail(400, "A relation needs target_entity: contact, company, deal or partner")
 			}
 			if !js.Truthy(body["inverse_key"]) || !js.Truthy(body["inverse_label"]) {
 				return fail(400, "A relation needs inverse_key and inverse_label for its other side")

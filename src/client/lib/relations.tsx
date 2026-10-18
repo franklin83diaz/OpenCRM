@@ -8,8 +8,8 @@
  * a form) names them through a shared cache filled from GET /api/records.
  */
 
-import { useEffect, useState, useSyncExternalStore, type MouseEvent } from "react";
-import { Ban, Handshake, Pencil, Plus } from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore, type MouseEvent } from "react";
+import { Ban, Handshake, Pencil, Plus, X } from "lucide-react";
 import { Avatar, EntityIcon } from "@/components/shared";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -63,7 +63,7 @@ export async function searchRecords(entity: EntityType, search: string): Promise
   return records;
 }
 
-const CREATE_PATH: Record<EntityType, string> = { contact: "contacts", company: "companies", deal: "deals" };
+const CREATE_PATH: Record<EntityType, string> = { contact: "contacts", company: "companies", deal: "deals", partner: "partners" };
 
 /** A new record of `entity` from just a name, as a picker's "+ Add" makes it. */
 export async function createRecord(entity: EntityType, name: string): Promise<RelationRecord> {
@@ -95,7 +95,7 @@ export function useRecordNames(wanted: Array<{ entity: EntityType; id: string }>
 
 // ── Chips ─────────────────────────────────────────────────────────────
 
-const LIST_PATH: Partial<Record<EntityType, string>> = { contact: "/contacts", company: "/companies", deal: "/deals" };
+const LIST_PATH: Partial<Record<EntityType, string>> = { contact: "/contacts", company: "/companies", deal: "/deals", partner: "/partners" };
 
 /** Where a record opens: its list (the deals board, for a deal) with the record in the side panel. */
 export function recordHref(entity: EntityType, id: string): string | undefined {
@@ -106,7 +106,7 @@ export function recordHref(entity: EntityType, id: string): string | undefined {
 const plainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
 
 export function RecordIcon({ entity, record }: { entity: EntityType; record: RelationRecord }) {
-  if (entity === "company") return <EntityIcon name={record.label} domain={record.domain} className="size-4 rounded-xs text-[0.5rem]" />;
+  if (entity === "company" || entity === "partner") return <EntityIcon name={record.label} domain={record.domain} className="size-4 rounded-xs text-[0.5rem]" />;
   if (entity === "contact") {
     const [first, ...rest] = record.label.split(" ");
     return <Avatar firstName={first} lastName={rest.join(" ")} className="size-4 text-[0.4375rem]" />;
@@ -333,5 +333,82 @@ export function RelationInput({ entity, value, onChange, placeholder = "Select�
       </PopoverTrigger>
       {picker}
     </Popover>
+  );
+}
+
+/**
+ * Several linked records as one control (a deal's partners): their chips, each
+ * with × to drop it, and + to open a picker that stays open, where a pick adds
+ * a record or drops one already there. `known` names the current records
+ * without a fetch. `link` on a record page; `modal` inside a dialog, so the
+ * picker scrolls.
+ *
+ * Picks show at once, and their saves (`onChange`, which may return the save)
+ * go one after another, each with every pick before it: picking two records
+ * quickly saves both, while `value` catches up only after the first save.
+ */
+export function RecordsInput({ entity, value, onChange, known, label, link = false, modal = false }: {
+  entity: EntityType;
+  value: string[];
+  onChange: (ids: string[]) => void | Promise<void>;
+  known?: RelationRecord[];
+  /** What the records are, plural and lower case ("partners"). */
+  label: string;
+  link?: boolean;
+  modal?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [ids, setIds] = useState(value);
+  const saving = useRef<Promise<void>>(Promise.resolve());
+  const pending = useRef(0);
+  // A new value from outside (a save settled, another screen changed it) shows once no pick is waiting to save.
+  const outside = value.join();
+  useEffect(() => {
+    if (!pending.current) setIds(value);
+  }, [outside]); // eslint-disable-line react-hooks/exhaustive-deps
+  const knownById = new Map((known ?? []).map((r) => [r.id, r]));
+  const name = useRecordNames(ids.filter((id) => !knownById.has(id)).map((id) => ({ entity, id })));
+  const toggle = (id: string) => {
+    const next = ids.includes(id) ? ids.filter((v) => v !== id) : [...ids, id];
+    setIds(next);
+    pending.current++;
+    saving.current = saving.current
+      .then(() => onChange(next))
+      .catch(() => {}) // the caller reports its own errors
+      .finally(() => { pending.current--; });
+  };
+  return (
+    <div className="flex min-h-8 w-full min-w-0 flex-wrap items-center gap-1 px-2 py-1">
+      {ids.map((id) => {
+        const record = knownById.get(id) ?? name(entity, id);
+        return (
+          <span key={id} className="group/chip inline-flex min-w-0 items-center">
+            {record ? <RecordChip entity={entity} record={record} link={link} />
+              : <span className="text-sm text-muted-foreground">{record === null ? "Deleted record" : "…"}</span>}
+            <button type="button" onClick={() => toggle(id)} aria-label={`Remove ${record?.label ?? "it"}`} title="Remove"
+              className="inline-flex size-5 shrink-0 items-center justify-center rounded-xs text-muted-foreground opacity-0 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 group-hover/chip:opacity-100 [@media(hover:none)]:opacity-100 [[data-agent]_&]:opacity-100">
+              <X className="size-3" aria-hidden />
+            </button>
+          </span>
+        );
+      })}
+      <Popover modal={modal} open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          {ids.length ? (
+            <button type="button" aria-label={`Add ${label}`} title={`Add ${label}`}
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-secondary hover:text-foreground">
+              <Plus className="size-3.5" aria-hidden />
+            </button>
+          ) : (
+            <button type="button" className="-mx-2 flex h-6 flex-1 items-center rounded-[0.5rem] px-2 text-left text-sm hover:bg-secondary">
+              <span className="text-faint">Add {label}…</span>
+            </button>
+          )}
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-64 p-0">
+          <RecordPicker entity={entity} selected={ids} creatable onPick={(r) => toggle(r.id)} />
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 # OpenCRM — agent guide
 
-A CRM with **companies**, **contacts**, and a **deals** pipeline, plus tasks and
-an activity timeline. React + Go + D1: the API is a Go server in a Cloudflare
+A CRM with **companies**, **contacts**, **partners** and a **deals** pipeline,
+plus tasks and an activity timeline. React + Go + D1: the API is a Go server in a Cloudflare
 Container. `GET /llms.txt` lists every endpoint; `GET /api/openapi.json` is the
 spec.
 
@@ -29,10 +29,16 @@ Authorization: Bearer crm_…
 
 ## Core entities
 
-- `GET/POST/PUT/DELETE /api/contacts` · `/api/companies` · `/api/deals`
+- `GET/POST/PUT/DELETE /api/contacts` · `/api/companies` · `/api/partners` · `/api/deals`
 - Contacts belong to companies. A deal has its own `company_id` and `contact_id`,
   both optional. Setting a contact on a deal with no company gives it the
   contact's company; send `company_id` to set or clear it yourself.
+- Partners are the firms that work deals with us (resellers, referrers,
+  integrators), kept apart from companies. A deal has any number of them:
+  deal reads carry `partners` (`[{ id, label, domain }]`), and a write's
+  `partner_ids` (a list of partner ids) replaces them, `[]` for none.
+  `GET /api/deals?partner_id=` lists a partner's deals; deal filters take
+  `partners` and `count:partners`.
 - `GET /api/stats` — counts + total pipeline value (excludes lost deals).
 
 ## Pipeline stages (data, not code)

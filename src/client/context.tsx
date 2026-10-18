@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { View, Contact, Company, Deal, Stats, PaginatedState, StageDef, Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult } from "./types";
+import type { View, Contact, Company, Deal, Partner, Stats, PaginatedState, StageDef, Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult } from "./types";
 import type { FilterNode } from "./lib/filters";
 
 export interface CrmContextValue {
@@ -31,6 +31,19 @@ export interface CrmContextValue {
   addCompany: (data: Partial<Company>) => Promise<void>;
   updateCompany: (id: string, data: Partial<Company>) => Promise<void>;
   deleteCompanies: (ids: string[]) => Promise<void>;
+
+  // Partners
+  partners: Partner[];
+  partnersPag: PaginatedState;
+  setPartnersPage: (page: number) => void;
+  setPartnersSort: (col: string) => void;
+  setPartnersSearch: (search: string) => void;
+  setPartnersFilters: (filters: PaginatedState["filters"]) => void;
+  setPartnersView: (v: { filters: PaginatedState["filters"]; sort: string; order: "asc" | "desc" }) => void;
+  addPartner: (data: Partial<Partner>) => Promise<void>;
+  fetchPartner: (id: string) => Promise<Partner | null>;
+  updatePartner: (id: string, data: Partial<Partner>) => Promise<void>;
+  deletePartners: (ids: string[]) => Promise<void>;
 
   // Deals
   deals: Deal[];

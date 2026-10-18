@@ -7,7 +7,7 @@ import { RecordChip, RecordPicker, RelationInput } from "@/lib/relations";
 import { api } from "@/api";
 import type { CustomFieldDef, EntityType, RelationRecord, RelationValue } from "@/types";
 
-const API_PATH: Record<EntityType, string> = { contact: "contacts", company: "companies", deal: "deals" };
+const API_PATH: Record<EntityType, string> = { contact: "contacts", company: "companies", deal: "deals", partner: "partners" };
 
 type Row = { id: string; relations?: Record<string, RelationValue> };
 

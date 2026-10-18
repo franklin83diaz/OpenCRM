@@ -51,6 +51,29 @@ CREATE TABLE IF NOT EXISTS deals (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Partners: the firms that work deals with us (resellers, referrers,
+-- integrators), kept apart from companies, which are the accounts we sell to.
+CREATE TABLE IF NOT EXISTS partners (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  domain TEXT DEFAULT '',
+  phone TEXT DEFAULT '',
+  email TEXT DEFAULT '',
+  notes TEXT DEFAULT '',
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- The partners taking part in a deal: any number per deal, and per partner.
+-- Deleting either side drops the link.
+CREATE TABLE IF NOT EXISTS deal_partners (
+  deal_id TEXT NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
+  partner_id TEXT NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  created_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (deal_id, partner_id)
+);
+CREATE INDEX IF NOT EXISTS idx_deal_partners_partner ON deal_partners(partner_id);
+
 -- Pipeline stages — data, not code. `key` is the immutable identifier stored on
 -- deals.stage; label/color/position are editable. Semantic flags drive behavior
 -- with any vocabulary: is_won → celebrate + Slack, is_lost → excluded from
@@ -71,11 +94,11 @@ CREATE TABLE IF NOT EXISTS stages (
 );
 
 -- Activity timeline: one row per interaction logged against a contact, company,
--- or deal. The substrate every integration writes into (email sent, meeting
+-- deal or partner. The substrate every integration writes into (email sent, meeting
 -- scheduled, Slack notification) plus manual notes.
 CREATE TABLE IF NOT EXISTS activities (
   id TEXT PRIMARY KEY,
-  entity_type TEXT NOT NULL,               -- 'contact' | 'company' | 'deal'
+  entity_type TEXT NOT NULL,               -- 'contact' | 'company' | 'deal' | 'partner'
   entity_id TEXT NOT NULL,
   type TEXT NOT NULL DEFAULT 'note',        -- 'note' | 'email' | 'meeting' | 'slack' | 'stage_change'
   body TEXT DEFAULT '',
@@ -89,7 +112,7 @@ CREATE TABLE IF NOT EXISTS activities (
 -- indexable columns — not a JSON blob. This table is only the registry.
 CREATE TABLE IF NOT EXISTS custom_field_defs (
   id TEXT PRIMARY KEY,
-  entity_type TEXT NOT NULL,                -- 'contact' | 'company' | 'deal'
+  entity_type TEXT NOT NULL,                -- 'contact' | 'company' | 'deal' | 'partner'
   key TEXT NOT NULL,                        -- column name; ^[a-z][a-z0-9_]*$
   label TEXT NOT NULL,
   field_type TEXT NOT NULL DEFAULT 'string',-- base type; drives SQL affinity + coercion
@@ -114,7 +137,7 @@ CREATE TABLE IF NOT EXISTS custom_field_defs (
 -- changes only the page until someone updates the view.
 CREATE TABLE IF NOT EXISTS views (
   id TEXT PRIMARY KEY,
-  entity_type TEXT NOT NULL,                -- 'contact' | 'company'
+  entity_type TEXT NOT NULL,                -- 'contact' | 'company' | 'deal' | 'partner'
   name TEXT NOT NULL,
   icon TEXT NOT NULL DEFAULT 'table',
   is_default INTEGER NOT NULL DEFAULT 0,

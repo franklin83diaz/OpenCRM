@@ -1,6 +1,6 @@
 # OpenCRM
 
-> A CRM with companies, contacts, and deal pipeline management.
+> A CRM with companies, partners, contacts, and deal pipeline management.
 
 ## Authentication
 Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` needs an account; without one it answers 401. Agents and scripts send a personal API token as `Authorization: Bearer crm_…`, which its owner makes in the CRM's settings; a token acts as its owner on the CRM's data. Tokens, accounts and passwords are managed only from a browser session: with a token, `/api/tokens`, `/api/users` and `PUT /api/auth/password` answer 403. People sign in with `POST /api/auth/login`, which sets a session cookie.
@@ -12,6 +12,12 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 - `PUT /api/companies/{id}` — Update a company
 - `DELETE /api/companies/{id}` — Delete a company
 - `POST /api/companies/bulk-delete` — Delete several companies
+- `GET /api/partners` — List partners with pagination, search, and filtering
+- `GET /api/partners/{id}` — Get one partner
+- `POST /api/partners` — Create a partner
+- `PUT /api/partners/{id}` — Update a partner
+- `DELETE /api/partners/{id}` — Delete a partner; its deals stay, without it
+- `POST /api/partners/bulk-delete` — Delete several partners
 - `GET /api/contacts` — List contacts with pagination, search, and filtering
 - `POST /api/contacts` — Create a new contact
 - `PUT /api/contacts/{id}` — Update a contact
@@ -23,9 +29,9 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 - `DELETE /api/stages/{key}` — Delete a stage; deals in it must be reassigned via ?reassign_to=<stage key>
 - `GET /api/deals/board` — Get all deals for the pipeline board view, optionally filtered
 - `GET /api/deals/progress` — Open deals, worst first: each one's next step and the reasons to look at it
-- `GET /api/deals` — List deals with pagination, search, and filtering
-- `POST /api/deals` — Create a new deal
-- `PUT /api/deals/{id}` — Update a deal
+- `GET /api/deals` — List deals with pagination, search, and filtering (partner_id: the deals a partner takes part in)
+- `POST /api/deals` — Create a new deal; partner_ids names the partners taking part
+- `PUT /api/deals/{id}` — Update a deal; partner_ids replaces its partners
 - `DELETE /api/deals/{id}` — Delete a deal
 - `GET /api/tasks` — List tasks: open ones by due date (undated last), done ones newest first
 - `POST /api/tasks` — Create a task
@@ -37,6 +43,7 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 - `POST /api/lookup` — What the CRM knows about up to 100 addresses at once
 - `GET /api/companies/aggregates`
 - `GET /api/contacts/aggregates`
+- `GET /api/partners/aggregates`
 - `GET /api/activities`
 - `POST /api/activities`
 - `POST /api/contacts/import`

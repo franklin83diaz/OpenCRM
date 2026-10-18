@@ -467,7 +467,7 @@ func BuildFilters(cols map[string]bool, raw, prefix string, tzOffset int, many m
 			if len(ids) == 0 {
 				return ""
 			}
-			found := fmt.Sprintf("EXISTS (%s AND m.id IN (%s))", linked, addStrings(ids))
+			found := fmt.Sprintf("EXISTS (%s AND m.%s IN (%s))", linked, link.idColumn(), addStrings(ids)) // a built-in name, never a key
 			if op == "is" {
 				return found
 			}

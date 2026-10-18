@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Building2, Handshake, Users } from "lucide-react";
+import { Building2, Handshake, Network, Users } from "lucide-react";
 import { api, ApiError, onUnauthorized } from "./api";
 import { AuthContext, useAuth, type AuthValue } from "./auth";
 import { useCrmState } from "./hooks/use-crm";
@@ -14,6 +14,8 @@ import { ContactsPage } from "./components/contacts/contacts-page";
 import { ContactDetail } from "./components/contacts/contact-detail";
 import { CompaniesPage } from "./components/companies/companies-page";
 import { CompanyDetail } from "./components/companies/company-detail";
+import { PartnersPage } from "./components/partners/partners-page";
+import { PartnerDetail } from "./components/partners/partner-detail";
 import { DealsBoard } from "./components/deals/deals-board";
 import { DealsProgressPage } from "./components/deals/deals-progress-page";
 import { DealDetail } from "./components/deals/deal-detail";
@@ -102,7 +104,7 @@ function Crm() {
   const { route, navigate } = useRouter();
   const { user } = useAuth();
   // A list opens its records in a side panel; the record's own path is the full page.
-  const openRecord = route.name === "contacts" || route.name === "companies" || route.name === "deals" ? route.record : undefined;
+  const openRecord = route.name === "contacts" || route.name === "companies" || route.name === "partners" || route.name === "deals" ? route.record : undefined;
 
   return (
     <CrmContext.Provider value={state}>
@@ -138,6 +140,18 @@ function Crm() {
                 </div>
               )}
               {route.name === "company" && <CompanyDetail id={route.id} navigate={navigate} />}
+              {route.name === "partners" && (
+                <div className="flex min-h-0 flex-1">
+                  <PartnersPage navigate={navigate} openId={openRecord} viewParam={route.view} filtersParam={route.filters} />
+                  {openRecord && (
+                    <RecordPanel label="Partner">
+                      <RecordPanelHeader icon={Network} label="Partner" onExpand={() => navigate(`/partners/${encodeURIComponent(openRecord)}`)} onClose={() => navigate(withQuery({ record: null }))} />
+                      <PartnerDetail key={openRecord} id={openRecord} navigate={navigate} panel />
+                    </RecordPanel>
+                  )}
+                </div>
+              )}
+              {route.name === "partner" && <PartnerDetail id={route.id} navigate={navigate} />}
               {route.name === "deals" && (
                 <div className="flex min-h-0 flex-1">
                   {route.view === "next-steps"

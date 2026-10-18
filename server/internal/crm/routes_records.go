@@ -83,7 +83,7 @@ func (app *App) getDeal(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return 0, nil, err
 		}
-		view, err := WithRelationsOne(ctx, Deal, deal)
+		view, err := dealView(ctx, deal)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -125,7 +125,7 @@ func (app *App) records(w http.ResponseWriter, r *http.Request) error {
 	return tryJSON(w, func() (int, any, error) {
 		entity := textAt(q, "entity")
 		if !IsEntityType(entity) {
-			return fail(400, "entity must be contact, company or deal")
+			return fail(400, "entity must be contact, company, deal or partner")
 		}
 		ids := []string{}
 		for _, s := range strings.Split(textAt(q, "ids"), ",") {
@@ -153,7 +153,7 @@ func (app *App) values(w http.ResponseWriter, r *http.Request) error {
 	return tryJSON(w, func() (int, any, error) {
 		entity := textAt(q, "entity")
 		if !IsEntityType(entity) {
-			return fail(400, "entity must be contact, company or deal")
+			return fail(400, "entity must be contact, company, deal or partner")
 		}
 		table := EntityTables[EntityType(entity)]
 		field := textAt(q, "field")

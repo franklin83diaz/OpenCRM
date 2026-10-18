@@ -136,6 +136,9 @@ func (app *App) dealsBoard(w http.ResponseWriter, r *http.Request) error {
 		for i, d := range deals {
 			out[i] = withProgress(d, p, js.String(d["id"]))
 		}
+		if err := withDealPartners(ctx, out); err != nil {
+			return 0, nil, err
+		}
 		return 200, dealsBody{out}, nil
 	})
 }
@@ -229,6 +232,9 @@ func (app *App) dealsProgress(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return 0, nil, err
 		}
+		if err := withDealPartners(ctx, deals); err != nil {
+			return 0, nil, err
+		}
 		return 200, dealsProgressBody{deals, float64(len(open)), counts, p.Sight}, nil
 	})
 }
@@ -244,11 +250,12 @@ type dealsPage struct {
 var dealSorts = []string{"id", "name", "value", "stage", "close_date", "created_at"}
 
 // listDeals lists deals with pagination, search (name and notes), stage (a
-// stage key, see GET /api/stages), contact and company, sorted by one of a
-// fixed set of columns. totalValue sums the value of every matching deal.
+// stage key, see GET /api/stages), contact, company and partner, sorted by
+// one of a fixed set of columns. totalValue sums the value of every matching
+// deal.
 func (app *App) listDeals(w http.ResponseWriter, r *http.Request) error {
 	q := queryInput(r)
-	if issues := paginationQueryIssues(q, "stage", "contact_id", "company_id"); len(issues) > 0 {
+	if issues := paginationQueryIssues(q, "stage", "contact_id", "company_id", "partner_id"); len(issues) > 0 {
 		return web.ZodError(w, issues)
 	}
 	ctx := r.Context()
@@ -261,6 +268,7 @@ func (app *App) listDeals(w http.ResponseWriter, r *http.Request) error {
 		stage := js.Trim(textAt(q, "stage"))
 		contactID := textAt(q, "contact_id")
 		companyID := textAt(q, "company_id")
+		partnerID := textAt(q, "partner_id")
 
 		sortCol := textAt(q, "sort")
 		if indexOf(dealSorts, sortCol) < 0 {
@@ -286,6 +294,10 @@ func (app *App) listDeals(w http.ResponseWriter, r *http.Request) error {
 			where = append(where, "d.company_id = ?")
 			params = append(params, companyID)
 		}
+		if partnerID != "" {
+			where = append(where, "EXISTS (SELECT 1 FROM deal_partners dp WHERE dp.deal_id = d.id AND dp.partner_id = ?)")
+			params = append(params, partnerID)
+		}
 		whereSQL := whereOf(where)
 
 		count, err := db.Get(ctx, "SELECT COUNT(*) as total FROM deals d"+whereSQL, params...)
@@ -304,7 +316,13 @@ func (app *App) listDeals(w http.ResponseWriter, r *http.Request) error {
 			return 0, nil, err
 		}
 		deals, err := WithRelations(ctx, Deal, rows, 3)
-		return 200, dealsPage{deals, orZero(count, "total"), page, limit, orZero(agg, "total_value")}, err
+		if err != nil {
+			return 0, nil, err
+		}
+		if err := withDealPartners(ctx, deals); err != nil {
+			return 0, nil, err
+		}
+		return 200, dealsPage{deals, orZero(count, "total"), page, limit, orZero(agg, "total_value")}, nil
 	})
 }
 
@@ -312,14 +330,23 @@ type dealBody struct {
 	Deal db.Row `json:"deal,omitempty"` // a row gone missing was undefined: no key
 }
 
-// readDeal is a deal as the write routes answer it: dealSelect's row and its
-// relations.
+// readDeal is a deal as the write routes answer it: dealSelect's row, its
+// relations and its partners.
 func readDeal(ctx context.Context, id string) (db.Row, error) {
 	row, err := db.Get(ctx, dealSelect+" WHERE d.id = ?", id)
 	if err != nil {
 		return nil, err
 	}
-	return WithRelationsOne(ctx, Deal, row)
+	return dealView(ctx, row)
+}
+
+// dealView is a deal row with its relations and its partners; nil for nil.
+func dealView(ctx context.Context, row db.Row) (db.Row, error) {
+	row, err := WithRelationsOne(ctx, Deal, row)
+	if err != nil || row == nil {
+		return row, err
+	}
+	return row, withDealPartners(ctx, []db.Row{row})
 }
 
 // dealValue is `parseFloat(String(body.value)) || 0` on a validated body's
@@ -364,6 +391,9 @@ func dealWriteSchema(create bool) zodCheck {
 		zKey("stage", zOptional(zString(0, 0))),
 		zKey("close_date", zOptional(zString(0, 0))),
 		zKey("notes", zOptional(zString(0, 0))),
+		// The partners taking part in the deal: the whole list, which replaces
+		// the one before ([] for none).
+		zKey("partner_ids", zOptional(zArray(zString(0, 0), maxDealPartners))),
 		zKey("custom", zCustomValues()),
 	)
 }
@@ -394,6 +424,13 @@ func (app *App) createDeal(w http.ResponseWriter, r *http.Request) error {
 		name := trimmedText(body, "name")
 		if name == "" {
 			return fail(400, "Name is required")
+		}
+		partnerIDs, _, problem, err := dealPartnerIDs(ctx, body)
+		if err != nil {
+			return 0, nil, err
+		}
+		if problem != "" {
+			return fail(400, problem)
 		}
 
 		contactID := textOrNull(body["contact_id"])
@@ -435,6 +472,11 @@ func (app *App) createDeal(w http.ResponseWriter, r *http.Request) error {
 
 		if err := custom.apply(ctx, Deal, "deals", id); err != nil {
 			return 0, nil, err
+		}
+		if len(partnerIDs) > 0 {
+			if err := setDealPartners(ctx, id, partnerIDs); err != nil {
+				return 0, nil, err
+			}
 		}
 		if js.Truthy(companyID) {
 			st, err := app.getStageRow(ctx, stageKey)
@@ -508,8 +550,15 @@ func (app *App) updateDeal(w http.ResponseWriter, r *http.Request) error {
 			fields = append(fields, "company_id = ?")
 			params = append(params, textOrNull(company))
 		}
+		partnerIDs, partnersSent, problem, err := dealPartnerIDs(ctx, body)
+		if err != nil {
+			return 0, nil, err
+		}
+		if problem != "" {
+			return fail(400, problem)
+		}
 
-		if len(fields) == 0 && len(custom.values) == 0 {
+		if len(fields) == 0 && len(custom.values) == 0 && !partnersSent {
 			return fail(400, "No fields to update")
 		}
 
@@ -536,7 +585,7 @@ func (app *App) updateDeal(w http.ResponseWriter, r *http.Request) error {
 			}
 		}
 
-		if len(fields) > 0 {
+		if len(fields) > 0 || partnersSent {
 			fields = append(fields, "updated_at = datetime('now')")
 			params = append(params, id)
 			if _, err := db.Run(ctx, "UPDATE deals SET "+strings.Join(fields, ", ")+" WHERE id = ?", params...); err != nil {
@@ -545,6 +594,11 @@ func (app *App) updateDeal(w http.ResponseWriter, r *http.Request) error {
 		}
 		if err := custom.apply(ctx, Deal, "deals", id); err != nil {
 			return 0, nil, err
+		}
+		if partnersSent {
+			if err := setDealPartners(ctx, id, partnerIDs); err != nil {
+				return 0, nil, err
+			}
 		}
 
 		updated, err := db.Get(ctx, dealSelect+" WHERE d.id = ?", id)
@@ -572,7 +626,7 @@ func (app *App) updateDeal(w http.ResponseWriter, r *http.Request) error {
 				}{stage})
 			}
 		}
-		deal, err := WithRelationsOne(ctx, Deal, updated)
+		deal, err := dealView(ctx, updated)
 		return 200, dealBody{deal}, err
 	})
 }
@@ -599,7 +653,8 @@ func (app *App) celebrateWin(ctx context.Context, id, stage string, st, updated 
 	return nil
 }
 
-// deleteDeal deletes a deal; custom relations to it are cleared.
+// deleteDeal deletes a deal; custom relations to it are cleared, and
+// deal_partners drops its partners.
 func (app *App) deleteDeal(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	id := r.PathValue("id")

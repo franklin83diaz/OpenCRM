@@ -19,7 +19,7 @@ import (
 )
 
 // RelationRecord is a linked record as a chip shows it. Domain is a
-// company's, for its logo; null for the others.
+// company's or a partner's, for its logo; null for the others.
 type RelationRecord struct {
 	ID     string  `json:"id"`
 	Label  string  `json:"label"`
@@ -43,7 +43,7 @@ func recordLabel(entity EntityType, a string) string {
 
 func recordColumns(entity EntityType, a string) string {
 	domain := "NULL"
-	if entity == Company {
+	if entity == Company || entity == Partner {
 		domain = a + ".domain"
 	}
 	return fmt.Sprintf("%s.id AS id, %s AS label, %s AS domain", a, recordLabel(entity, a), domain)
@@ -275,10 +275,21 @@ func RelationWriteError(ctx context.Context, entity EntityType, values map[strin
 }
 
 // ManyLink is a one_to_many side as a filter can reach it: the linked table
-// and the column there that points back.
+// and the column there that points back. ID is the column there holding the
+// linked record's id: "" is the table's own id, and a link table (a deal's
+// partners) names the other side's column.
 type ManyLink struct {
 	Table string `json:"table"`
 	FK    string `json:"fk"`
+	ID    string `json:"id,omitempty"`
+}
+
+// idColumn is the column of link.Table holding the linked record's id.
+func (link ManyLink) idColumn() string {
+	if link.ID == "" {
+		return "id"
+	}
+	return link.ID
 }
 
 // CountSQL is how many records link back to the row named by prefix ("c.").
@@ -297,10 +308,12 @@ func CountOf(field string) (string, bool) {
 }
 
 // builtinMany are the built-in one_to_many sides: a company's contacts and
-// deals, a contact's deals.
+// deals, a contact's deals, and both ends of deal_partners.
 var builtinMany = map[EntityType]map[string]ManyLink{
 	Company: {"contacts": {Table: "contacts", FK: "company_id"}, "deals": {Table: "deals", FK: "company_id"}},
 	Contact: {"deals": {Table: "deals", FK: "contact_id"}},
+	Deal:    {"partners": {Table: "deal_partners", FK: "deal_id", ID: "partner_id"}},
+	Partner: {"deals": {Table: "deal_partners", FK: "partner_id", ID: "deal_id"}},
 }
 
 // ManyLinks returns the one_to_many sides of entity, built-in and custom, by

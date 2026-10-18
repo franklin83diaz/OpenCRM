@@ -24,10 +24,11 @@ type statsBody struct {
 	DealValue any `json:"dealValue"`
 	// Customers: companies that are customers (customer_since set).
 	Customers any `json:"customers"`
+	Partners  any `json:"partners"`
 }
 
-// stats is the dashboard's statistics: how many contacts, companies, deals
-// and customers, and the value of the deals not lost.
+// stats is the dashboard's statistics: how many contacts, companies, deals,
+// customers and partners, and the value of the deals not lost.
 func (app *App) stats(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	return tryJSON(w, func() (int, any, error) {
@@ -51,12 +52,17 @@ func (app *App) stats(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return 0, nil, err
 		}
+		partners, err := db.Get(ctx, "SELECT COUNT(*) as count FROM partners")
+		if err != nil {
+			return 0, nil, err
+		}
 		return 200, statsBody{
 			Contacts:  orZero(rows[0], "count"),
 			Companies: orZero(rows[1], "count"),
 			Deals:     orZero(rows[2], "count"),
 			DealValue: orZero(rows[3], "total"),
 			Customers: orZero(customers, "count"),
+			Partners:  orZero(partners, "count"),
 		}, nil
 	})
 }

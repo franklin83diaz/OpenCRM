@@ -53,10 +53,10 @@ export function RecordPanelHeader({ icon: Icon, label, onExpand, onClose }: { ic
   );
 }
 
-/** One attribute row: icon, 144px label, then the value as the control. */
+/** One attribute row: icon, 144px label, then the value as the control (which may wrap onto more lines). */
 export function Attr({ icon: Icon, label, children }: { icon: Icon; label: string; children: ReactNode }) {
   return (
-    <div className="flex h-9 items-center gap-2">
+    <div className="flex min-h-9 items-center gap-2">
       <dt className="flex w-36 shrink-0 items-center gap-2 text-[0.8125rem] text-muted-foreground">
         <Icon className="size-3.5" /> {label}
       </dt>

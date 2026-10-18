@@ -1,7 +1,7 @@
 import type { FilterNode } from "./lib/filters";
 
-export type View = "contacts" | "companies" | "deals";
-export type EntityType = "contact" | "company" | "deal";
+export type View = "contacts" | "companies" | "deals" | "partners";
+export type EntityType = "contact" | "company" | "deal" | "partner";
 
 /** Base storage type for a custom property. Widget flavours ride on top. */
 export type AttributeType =
@@ -20,7 +20,7 @@ export type AttributeType =
  *  column; one_to_many lists the records whose many_to_one points back here. */
 export type RelationType = "many_to_one" | "one_to_many";
 
-/** A linked record as a chip shows it. `domain` is a company's, for its logo. */
+/** A linked record as a chip shows it. `domain` is a company's or a partner's, for its logo. */
 export interface RelationRecord {
   id: string;
   label: string;
@@ -68,6 +68,22 @@ export interface Company {
   updated_at: string;
 }
 
+/** A firm that works deals with us (a reseller, a referrer, an integrator), kept apart from companies. */
+export interface Partner {
+  id: string;
+  name: string;
+  domain: string;
+  phone: string;
+  email: string;
+  notes: string;
+  /** How many deals it takes part in (reads only). */
+  deal_count?: number;
+  custom?: Record<string, unknown>; // write payload; on reads, values are flat columns
+  relations?: Record<string, RelationValue>; // reads only, keyed by relation field
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Contact {
   id: string;
   first_name: string;
@@ -102,6 +118,10 @@ export interface Deal {
   company_domain?: string | null;
   /** How an open deal is moving (board and single-deal reads); null when won or lost. */
   progress?: DealProgress | null;
+  /** The partners taking part in the deal, by name (reads only). */
+  partners?: RelationRecord[];
+  /** Writes only: the whole list of its partners' ids, which replaces the one before. */
+  partner_ids?: string[];
   custom?: Record<string, unknown>; // write payload; on reads, values are flat columns
   relations?: Record<string, RelationValue>; // reads only, keyed by relation field
   created_at: string;
@@ -127,6 +147,7 @@ export interface Stats {
   deals: number;
   dealValue: number;
   customers: number;
+  partners: number;
 }
 
 export interface PaginatedState {
