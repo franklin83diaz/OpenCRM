@@ -6,6 +6,7 @@ import { EntityIcon, EmptyState, PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Eyebrow, HEALTH, HealthPill, StatusPill, daysAgo, sightNotice, tzOffset } from "@/components/health";
+import { RecordChip } from "@/lib/relations";
 import { cn, formatDate } from "@/lib/utils";
 import type { CustomersOverview, FocusItem } from "@/types";
 
@@ -120,6 +121,8 @@ export function CustomersPage({ navigate }: { navigate: (to: string) => void }) 
                   <TableHeader>
                     <TableRow>
                       <TableHead pinned width={220}>Company</TableHead>
+                      <TableHead width={170}>Main contact</TableHead>
+                      <TableHead width={170}>Main partner</TableHead>
                       <TableHead width={340}>Status</TableHead>
                       <TableHead width={120}>Last contact</TableHead>
                       <TableHead width={120}>Renews</TableHead>
@@ -137,6 +140,8 @@ export function CustomersPage({ navigate }: { navigate: (to: string) => void }) 
                             <span className="truncate">{c.name}</span>
                           </a>
                         </TableCell>
+                        <TableCell>{c.main_contact ? <RecordChip entity="contact" record={c.main_contact} /> : <span className="text-faint">Not set</span>}</TableCell>
+                        <TableCell>{c.main_partner ? <RecordChip entity="partner" record={c.main_partner} /> : <span className="text-faint">Not set</span>}</TableCell>
                         <TableCell>
                           <div className="flex min-w-0 items-center gap-2" title={c.reasons.join("\n") || undefined}>
                             <HealthPill status={c.status} />

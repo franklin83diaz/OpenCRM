@@ -78,7 +78,7 @@ func TestCustomersRoutes(t *testing.T) {
 	// change between the seed and a Go clock read across midnight UTC.
 	mustRun(t, context.Background(), "UPDATE deals SET updated_at = '2026-10-14 23:59:59' WHERE id = 'deal-support'")
 	const since = "2026-10-14"
-	northline := `{"customers":[{"id":"company-northline","name":"Northline Studio","domain":"","customer_since":"` + since + `","renewal_date":null,"status":"unknown","reasons":["Calls aren't synced, email isn't synced"],"last_touch_at":null,"days_quiet":null,"last_meeting_at":null,"next_meeting_at":null,"last_summary":null,"last_sentiment":null,"ours_open":0,"ours_overdue":0,"theirs_open":0,"ideas":0,"expansion":0,"risks":0}],"focus":[],"upcoming":[],"counts":{"red":0,"yellow":0,"unknown":1,"green":0},"sight":{"calls":"off","emails":"off"}}`
+	northline := `{"customers":[{"id":"company-northline","name":"Northline Studio","domain":"","customer_since":"` + since + `","renewal_date":null,"status":"unknown","reasons":["Calls aren't synced, email isn't synced"],"last_touch_at":null,"days_quiet":null,"last_meeting_at":null,"next_meeting_at":null,"last_summary":null,"last_sentiment":null,"ours_open":0,"ours_overdue":0,"theirs_open":0,"ideas":0,"expansion":0,"risks":0,"main_contact":null,"main_partner":null}],"focus":[],"upcoming":[],"counts":{"red":0,"yellow":0,"unknown":1,"green":0},"sight":{"calls":"off","emails":"off"}}`
 	for _, q := range []string{"", "?tz=120", "?tz=90.5", "?tz=abc", "?tz=", "?tz=99999", "?tz=-Infinity", "?tz=0x1F", "?tz", "?TZ=5&other=1"} {
 		f.want("GET", "/api/customers"+q, "", "", 200, northline)
 	}

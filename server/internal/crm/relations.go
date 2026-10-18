@@ -372,7 +372,7 @@ func ManyLinks(ctx context.Context, entity EntityType) (map[string]ManyLink, err
 // builtinLinks are the built-in links, which predate relation defs: column →
 // the entity it holds.
 var builtinLinks = map[EntityType]map[string]EntityType{
-	Company:      {"main_contact_id": Contact},
+	Company:      {"main_contact_id": Contact, "main_partner_id": Partner},
 	Contact:      {"company_id": Company},
 	CustomerUser: {"company_id": Company},
 	Deal:         {"contact_id": Contact, "company_id": Company},

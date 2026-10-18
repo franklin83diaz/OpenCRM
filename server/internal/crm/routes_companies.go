@@ -155,6 +155,8 @@ var createCompanyFields = []stringField{
 	{key: "phone", optional: true},
 	{key: "email", optional: true},
 	{key: "notes", optional: true},
+	// The partner who looks after the company; null or "" for none.
+	{key: "main_partner_id", optional: true, nullable: true},
 }
 
 // trimmedText is `(body.<key> || "").trim()` on a validated body, where the
@@ -186,24 +188,55 @@ func readCompany(ctx context.Context, id string) (companyBody, error) {
 	return companyBody{row}, withMainContact(ctx, row)
 }
 
-// withMainContact sets a company row's `main_contact`: its main contact as a
+// withMainContact sets a company row's `main_contact` and `main_partner`: who
+// the customer is beyond the company. main_contact is its main contact as a
 // record ({id, label}), or null when it has none, or the contact has since
-// moved to another company. No query when it has none.
+// moved to another company; main_partner the partner who looks after it, or
+// null. No query for one it has none of.
 func withMainContact(ctx context.Context, row db.Row) error {
 	if row == nil {
 		return nil
 	}
 	row["main_contact"] = nil
-	id := colText(row["main_contact_id"])
-	if id == "" {
-		return nil
+	row["main_partner"] = nil
+	if id := colText(row["main_contact_id"]); id != "" {
+		found, err := db.Get(ctx, "SELECT "+recordColumns(Contact, "t")+" FROM contacts t WHERE t.id = ? AND t.company_id = ?", id, row["id"])
+		if err != nil {
+			return err
+		}
+		if found != nil {
+			row["main_contact"] = toRecord(found)
+		}
 	}
-	found, err := db.Get(ctx, "SELECT "+recordColumns(Contact, "t")+" FROM contacts t WHERE t.id = ? AND t.company_id = ?", id, row["id"])
-	if err != nil || found == nil {
-		return err
+	if id := colText(row["main_partner_id"]); id != "" {
+		found, err := db.Get(ctx, "SELECT "+recordColumns(Partner, "t")+" FROM partners t WHERE t.id = ?", id)
+		if err != nil {
+			return err
+		}
+		if found != nil {
+			row["main_partner"] = toRecord(found)
+		}
 	}
-	row["main_contact"] = toRecord(found)
 	return nil
+}
+
+// mainPartnerID reads a write's main_partner_id: the partner, or nil for none
+// (null or ""); sent is false when the write leaves it alone. problem is the
+// 400 answer for an id that names no partner.
+func mainPartnerID(ctx context.Context, body map[string]any) (partner any, sent bool, problem string, err error) {
+	v, sent := body["main_partner_id"]
+	if !sent {
+		return nil, false, "", nil
+	}
+	id, _ := v.(string)
+	if id = js.Trim(id); id == "" {
+		return nil, true, "", nil
+	}
+	found, err := db.Get(ctx, "SELECT id FROM partners WHERE id = ?", id)
+	if err != nil || found != nil {
+		return id, true, "", err
+	}
+	return nil, true, fmt.Sprintf(`main_partner_id: no partner with id "%s".`, id), nil
 }
 
 // mainContactProblem is the 400 answer for a main_contact_id that isn't one
@@ -241,11 +274,23 @@ func (app *App) createCompany(w http.ResponseWriter, r *http.Request) error {
 		if trimmedText(body, "main_contact_id") != "" {
 			return fail(400, "main_contact_id: a new company has no contacts yet. Set it once it has one")
 		}
+		mainPartner, mainPartnerSent, problem, err := mainPartnerID(ctx, body)
+		if err != nil {
+			return 0, nil, err
+		}
+		if problem != "" {
+			return fail(400, problem)
+		}
 
 		id := js.UUID()
 		if _, err := db.Run(ctx, "INSERT INTO companies (id, name, domain, industry, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
 			id, name, trimmedText(body, "domain"), trimmedText(body, "industry"), trimmedText(body, "phone"), trimmedText(body, "email"), trimmedText(body, "notes")); err != nil {
 			return 0, nil, err
+		}
+		if mainPartnerSent && mainPartner != nil {
+			if _, err := db.Run(ctx, "UPDATE companies SET main_partner_id = ? WHERE id = ?", mainPartner, id); err != nil {
+				return 0, nil, err
+			}
 		}
 
 		if err := custom.apply(ctx, Company, "companies", id); err != nil {
@@ -272,11 +317,13 @@ var updateCompanyFields = []stringField{
 	{key: "renewal_date", optional: true, nullable: true},
 	// One of the company's contacts; null or "" clears it.
 	{key: "main_contact_id", optional: true, nullable: true},
+	// The partner who looks after the company; null or "" clears it.
+	{key: "main_partner_id", optional: true, nullable: true},
 }
 
 // updateCompany updates the fields sent. A field sent as null is not a field
 // left out: null is a zod error for the text fields, and clears
-// customer_since, renewal_date and main_contact_id.
+// customer_since, renewal_date, main_contact_id and main_partner_id.
 func (app *App) updateCompany(w http.ResponseWriter, r *http.Request) error {
 	v, ok := openapiJSON(r)
 	if !ok {
@@ -329,6 +376,17 @@ func (app *App) updateCompany(w http.ResponseWriter, r *http.Request) error {
 		if mainSent {
 			fields = append(fields, "main_contact_id = ?")
 			params = append(params, orNull(mainContactID))
+		}
+		mainPartner, mainPartnerSent, problem, err := mainPartnerID(ctx, body)
+		if err != nil {
+			return 0, nil, err
+		}
+		if problem != "" {
+			return fail(400, problem)
+		}
+		if mainPartnerSent {
+			fields = append(fields, "main_partner_id = ?")
+			params = append(params, mainPartner)
 		}
 
 		if len(fields) == 0 && len(custom.values) == 0 {

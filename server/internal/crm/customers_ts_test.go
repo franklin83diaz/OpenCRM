@@ -132,7 +132,7 @@ func TestCustomersMatchTS(t *testing.T) {
 				if err != nil {
 					got = asJS(t, map[string]string{"error": err.Error()})
 				} else {
-					got = asJS(t, r)
+					got = withoutPartners(asJS(t, r)) // a customer's main contact and partner came after
 				}
 				want := sc.Expect.Results[i]
 				if st.Op == "closed" {

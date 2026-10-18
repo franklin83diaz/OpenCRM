@@ -231,7 +231,10 @@ function PartnerDeals({ partnerId, deals }: { partnerId: string; deals: Deal[] }
                 return (
                   <tr key={d.id} className="group/deal border-t border-border">
                     <td className="min-w-0 py-2 pl-3.5 pr-2">
-                      <RecordChip entity="deal" record={{ id: d.id, label: d.name, domain: null }} />
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <RecordChip entity="deal" record={{ id: d.id, label: d.name, domain: null }} />
+                        {share?.is_main && <span className="inline-block h-5 shrink-0 rounded-full bg-warning-tint px-2 text-xs font-medium leading-5 text-warning">Main partner</span>}
+                      </span>
                       <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
                         <span className={cn("size-2 shrink-0 rounded-full", colorClasses(stage?.color).dot)} />
                         {stage?.label ?? d.stage} · <span className="tabular">{formatMoney(d.value)}{d.recurring_value ? ` + ${formatMoney(d.recurring_value)}/mo` : ""}</span>

@@ -8,8 +8,8 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 ## API
 - `GET /api/stats` — Get dashboard statistics
 - `GET /api/companies` — List companies with pagination, search, and filtering
-- `POST /api/companies` — Create a new company
-- `PUT /api/companies/{id}` — Update a company; main_contact_id is one of its contacts (null for none)
+- `POST /api/companies` — Create a new company; main_partner_id is the partner who looks after it (null for none)
+- `PUT /api/companies/{id}` — Update a company; main_contact_id is one of its contacts, main_partner_id a partner (null for none)
 - `DELETE /api/companies/{id}` — Delete a company
 - `POST /api/companies/bulk-delete` — Delete several companies
 - `GET /api/partners` — List partners with pagination, search, and filtering
@@ -45,7 +45,7 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 - `POST /api/deals` — Create a new deal: value (once), recurring_value (each month), owner_id (GET /api/team; null for nobody), partner_ids (the partners taking part)
 - `PUT /api/deals/{id}` — Update a deal; partner_ids replaces its partners
 - `DELETE /api/deals/{id}` — Delete a deal
-- `PUT /api/deals/{id}/partners/{partner_id}` — Make a partner take part in a deal, and set its share: {one_time_value?, recurring_value?}
+- `PUT /api/deals/{id}/partners/{partner_id}` — Make a partner take part in a deal, and set its share: {one_time_value?, recurring_value?, is_main?}; is_main true makes it the deal's main partner (one per deal)
 - `DELETE /api/deals/{id}/partners/{partner_id}` — Take a partner off a deal
 - `GET /api/team` — The accounts deals can be assigned to
 - `GET /api/tasks` — List tasks: open ones by due date (undated last), done ones newest first

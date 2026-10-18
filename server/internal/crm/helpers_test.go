@@ -161,6 +161,8 @@ func withoutPartners(text string) string {
 			}
 			delete(v, "main_contact_id") // a company's
 			delete(v, "main_contact")
+			delete(v, "main_partner_id")
+			delete(v, "main_partner")
 			// A deal's valid fields: a company has an owner_id of its own in the replays.
 			if valid, ok := v["valid_fields"].([]any); ok && strings.HasPrefix(fmt.Sprint(v["error"]), "Unknown field(s) for deal:") {
 				kept := []any{}
@@ -174,7 +176,7 @@ func withoutPartners(text string) string {
 			if valid, ok := v["valid_fields"].([]any); ok && strings.HasPrefix(fmt.Sprint(v["error"]), "Unknown field(s) for company:") {
 				kept := []any{}
 				for _, k := range valid {
-					if k != "main_contact_id" {
+					if k != "main_contact_id" && k != "main_partner_id" {
 						kept = append(kept, k)
 					}
 				}
@@ -194,7 +196,7 @@ func withoutPartners(text string) string {
 	return string(b)
 }
 
-var partnerTables = regexp.MustCompile(`\b(partners|deal_partners|recurring_value|customer_users|tickets|main_contact_id)\b`)
+var partnerTables = regexp.MustCompile(`\b(partners|deal_partners|recurring_value|customer_users|tickets|main_contact_id|main_partner_id)\b`)
 
 // withoutPartnerStatements is log without the statements that came after the
 // port.

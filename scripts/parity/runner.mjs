@@ -88,15 +88,15 @@ function makeCaller(base, record, auth) {
 }
 
 // Partners, a deal's recurring value and a deal's owner, customer users,
-// tickets and a company's main contact came after the port: TS never answered
-// with them, so the Go side's answers are compared without them — on a deal,
-// in the stats, on a company (anywhere), and among a deal's or a company's
-// valid fields.
+// tickets and a company's main contact and main partner came after the port:
+// TS never answered with them, so the Go side's answers are compared without
+// them — on a deal, in the stats, on a company (anywhere), and among a deal's
+// or a company's valid fields.
 const POST_PORT_DEAL_KEYS = ["partners", "recurring_value", "owner_id", "owner"];
 const POST_PORT_STATS_KEYS = ["partners", "dealRecurringValue", "customerUsers", "tickets", "openTickets"];
-const POST_PORT_KEYS = ["main_contact_id", "main_contact"]; // a company's
+const POST_PORT_KEYS = ["main_contact_id", "main_contact", "main_partner_id", "main_partner"]; // a company's
 const POST_PORT_DEAL_FIELDS = ["partner_ids", "recurring_value", "owner_id"];
-const POST_PORT_COMPANY_FIELDS = ["main_contact_id"];
+const POST_PORT_COMPANY_FIELDS = ["main_contact_id", "main_partner_id"];
 function withoutPartners(v) {
   if (Array.isArray(v)) return v.map(withoutPartners);
   if (!v || typeof v !== "object") return v;

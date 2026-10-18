@@ -405,12 +405,13 @@ func setDealPartners(ctx context.Context, dealID string, ids []string) error {
 	return err
 }
 
-// DealPartner is a partner taking part in a deal: its chip, and its share of
-// the deal, once and each month.
+// DealPartner is a partner taking part in a deal: its chip, its share of the
+// deal, once and each month, and whether it is the deal's main partner.
 type DealPartner struct {
 	RelationRecord
 	OneTimeValue   float64 `json:"one_time_value"`
 	RecurringValue float64 `json:"recurring_value"`
+	IsMain         bool    `json:"is_main"`
 }
 
 // amount is a stored amount: 0 for NULL or anything not a number.
@@ -424,7 +425,7 @@ func amount(v any) float64 {
 	return 0
 }
 
-// withDealPartners sets each deal row's `partners`: the partners taking part
+// withDealPartners sets each deal row's `partners`: the main partner first, then
 // in it, with their shares, by name ([] for none).
 func withDealPartners(ctx context.Context, rows []db.Row) error {
 	ids := make([]string, 0, len(rows))
@@ -435,15 +436,15 @@ func withDealPartners(ctx context.Context, rows []db.Row) error {
 	}
 	byDeal := map[string][]DealPartner{}
 	for _, part := range Chunk(ids, 90) {
-		found, err := db.Query(ctx, fmt.Sprintf(`SELECT dp.deal_id AS deal, %s, dp.one_time_value, dp.recurring_value
+		found, err := db.Query(ctx, fmt.Sprintf(`SELECT dp.deal_id AS deal, %s, dp.one_time_value, dp.recurring_value, dp.is_main
        FROM deal_partners dp JOIN partners p ON p.id = dp.partner_id
-       WHERE dp.deal_id IN (%s) ORDER BY p.name COLLATE NOCASE, p.id`, recordColumns(Partner, "p"), marks(len(part))), stringParams(part)...)
+       WHERE dp.deal_id IN (%s) ORDER BY dp.is_main DESC, p.name COLLATE NOCASE, p.id`, recordColumns(Partner, "p"), marks(len(part))), stringParams(part)...)
 		if err != nil {
 			return err
 		}
 		for _, rec := range found {
 			deal := colText(rec["deal"])
-			byDeal[deal] = append(byDeal[deal], DealPartner{toRecord(rec), amount(rec["one_time_value"]), amount(rec["recurring_value"])})
+			byDeal[deal] = append(byDeal[deal], DealPartner{toRecord(rec), amount(rec["one_time_value"]), amount(rec["recurring_value"]), amount(rec["is_main"]) != 0})
 		}
 	}
 	for _, r := range rows {
@@ -459,14 +460,17 @@ func withDealPartners(ctx context.Context, rows []db.Row) error {
 	return nil
 }
 
-// dealPartnerSchema is a partner's share of a deal; each amount optional.
+// dealPartnerSchema is a partner's share of a deal, each amount optional, and
+// whether it is the deal's main partner.
 var dealPartnerSchema = zObject(
 	zKey("one_time_value", zOptional(zNumberOrString())),
 	zKey("recurring_value", zOptional(zNumberOrString())),
+	zKey("is_main", zOptional(zBool())),
 )
 
 // putDealPartner makes the partner take part in the deal, if it doesn't yet,
-// and sets the amounts sent of its share. Answers the deal.
+// and sets the amounts sent of its share. is_main true makes it the deal's
+// main partner (the one before stops being it); false, not. Answers the deal.
 func (app *App) putDealPartner(w http.ResponseWriter, r *http.Request) error {
 	v, ok := openapiJSON(r)
 	if !ok {
@@ -504,6 +508,15 @@ func (app *App) putDealPartner(w http.ResponseWriter, r *http.Request) error {
 		}
 		if len(fields) > 0 {
 			if _, err := db.Run(ctx, "UPDATE deal_partners SET "+strings.Join(fields, ", ")+" WHERE deal_id = ? AND partner_id = ?", append(params, dealID, partnerID)...); err != nil {
+				return 0, nil, err
+			}
+		}
+		if main, sent := body["is_main"].(bool); sent && main {
+			if _, err := db.Run(ctx, "UPDATE deal_partners SET is_main = CASE WHEN partner_id = ? THEN 1 ELSE 0 END WHERE deal_id = ?", partnerID, dealID); err != nil {
+				return 0, nil, err
+			}
+		} else if sent {
+			if _, err := db.Run(ctx, "UPDATE deal_partners SET is_main = 0 WHERE deal_id = ? AND partner_id = ?", dealID, partnerID); err != nil {
 				return 0, nil, err
 			}
 		}

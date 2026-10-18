@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS companies (
   renewal_date TEXT,
   -- The company's main contact, one of its contacts; NULL = none chosen.
   main_contact_id TEXT REFERENCES contacts(id) ON DELETE SET NULL,
+  -- The partner who looks after the company; NULL = none chosen. With the
+  -- main contact, who the customer is: the company, its person, its partner.
+  main_partner_id TEXT REFERENCES partners(id) ON DELETE SET NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -115,13 +118,14 @@ CREATE INDEX IF NOT EXISTS idx_tickets_owner ON tickets(owner_id);
 CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
 
 -- The partners taking part in a deal: any number per deal, and per partner,
--- each with its share of the deal, once and each month. Deleting either side
--- drops the link.
+-- each with its share of the deal, once and each month. One of them may be
+-- the deal's main partner (is_main = 1). Deleting either side drops the link.
 CREATE TABLE IF NOT EXISTS deal_partners (
   deal_id TEXT NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
   partner_id TEXT NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
   one_time_value REAL DEFAULT 0,
   recurring_value REAL DEFAULT 0,
+  is_main INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   PRIMARY KEY (deal_id, partner_id)
 );

@@ -51,10 +51,13 @@ Authorization: Bearer crm_…
   filters; `sort=status`/`priority` follow the workflow/urgency, `sort=due_date`
   puts undated ones last. Company and customer user filters take
   `count:tickets`.
-- A company may have a main contact: `PUT /api/companies/{id}`
+- A company may have a main contact and a main partner: the customer is the
+  company, its main contact and its main partner. `PUT /api/companies/{id}`
   `{ main_contact_id }`, one of its own contacts (400 otherwise; `null`
-  clears it). `GET /api/companies/{id}` carries `main_contact` (`{ id, label }`
-  or `null`).
+  clears it); `POST`/`PUT` `{ main_partner_id }`, any partner (400 for an id
+  that names none; `null` or `""` clears it). `GET /api/companies/{id}`, and
+  the answers to `POST` and `PUT`, carry `main_contact` and `main_partner`
+  (each `{ id, label }` or `null`).
 - Contacts belong to companies. A deal has its own `company_id` and `contact_id`,
   both optional. Setting a contact on a deal with no company gives it the
   contact's company; send `company_id` to set or clear it yourself.
@@ -67,13 +70,17 @@ Authorization: Bearer crm_…
   integrators), kept apart from companies. Each has an `industry` (free text)
   and a `status`: `prospect` (new ones start there), `onboarding`, `active`
   or `inactive`. A deal has any number of them,
-  each with its share of the deal: deal reads carry `partners`
-  (`[{ id, label, one_time_value, recurring_value }]`).
-  `PUT /api/deals/{id}/partners/{partner_id}` `{ one_time_value?, recurring_value? }`
-  puts a partner on the deal and sets its share; `DELETE` takes it off. A
+  each with its share of the deal, and one of them may be its main partner:
+  deal reads carry `partners`
+  (`[{ id, label, one_time_value, recurring_value, is_main }]`, the main
+  partner first). `PUT /api/deals/{id}/partners/{partner_id}`
+  `{ one_time_value?, recurring_value?, is_main? }` puts a partner on the deal
+  and sets its share; `is_main: true` makes it the deal's main partner (the
+  one before stops being it), `false` unsets it. `DELETE` takes it off. A
   write's `partner_ids` (a list of partner ids) replaces the whole list,
-  keeping the shares of the ones it keeps. `GET /api/deals?partner_id=` lists
-  a partner's deals; deal filters take `partners` and `count:partners`.
+  keeping the shares and the main partner of the ones it keeps.
+  `GET /api/deals?partner_id=` lists a partner's deals; deal filters take
+  `partners` and `count:partners`.
 - `GET /api/stats` — counts (`tickets`, and `openTickets`: not resolved or
   closed) + total pipeline value (excludes lost deals).
 

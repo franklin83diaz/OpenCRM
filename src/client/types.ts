@@ -65,6 +65,10 @@ export interface Company {
   main_contact_id?: string | null;
   /** The main contact as a record (single-company reads); null when none, or they moved to another company. */
   main_contact?: RelationRecord | null;
+  /** The partner who looks after it; null = none chosen. */
+  main_partner_id?: string | null;
+  /** The main partner as a record (single-company reads); null when none. */
+  main_partner?: RelationRecord | null;
   contact_count?: number;
   custom?: Record<string, unknown>; // write payload; on reads, values are flat columns
   relations?: Record<string, RelationValue>; // reads only, keyed by relation field
@@ -169,6 +173,8 @@ export interface DealPartner extends RelationRecord {
   one_time_value: number;
   /** The partner's share, each month. */
   recurring_value: number;
+  /** Whether it is the deal's main partner (one per deal, listed first). */
+  is_main?: boolean;
 }
 
 export interface Deal {
@@ -310,6 +316,9 @@ export interface CustomerRow {
   ours_open: number;
   ours_overdue: number;
   theirs_open: number;
+  /** With the company, who the customer is: its main contact and its main partner. */
+  main_contact?: RelationRecord | null;
+  main_partner?: RelationRecord | null;
 }
 
 export interface FocusItem {

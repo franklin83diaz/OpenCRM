@@ -1,17 +1,18 @@
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, Star, X } from "lucide-react";
 import { useCrm } from "@/context";
 import { api } from "@/api";
 import { DetailsSection } from "@/components/record-page";
 import { InlineField } from "@/components/ui/inline-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RecordChip, RecordPicker } from "@/lib/relations";
-import { formatMoney } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
 import type { Deal, DealPartner } from "@/types";
 
 /**
  * The partners taking part in a deal, each with its share of it: once and
- * each month, edited in place. + puts another partner on the deal (a pick of
+ * each month, edited in place. The star makes one the deal's main partner
+ * (listed first; one per deal), or unmakes it. + puts another partner on the deal (a pick of
  * one already on it takes it off), × takes one off. Each change is its own
  * write (PUT or DELETE /api/deals/:id/partners/:partner_id), so two quick
  * ones never undo each other.
@@ -57,6 +58,7 @@ export function DealPartners({ deal }: { deal: Deal }) {
         <table className="w-full table-fixed text-sm">
           <thead>
             <tr className="text-left text-[0.8125rem] text-muted-foreground">
+              <th className="h-7 w-7" aria-label="Main partner" />
               <th className="h-7 font-normal">Partner</th>
               <th className="h-7 w-28 px-2 font-normal">One-time</th>
               <th className="h-7 w-28 px-2 font-normal">Monthly</th>
@@ -66,7 +68,25 @@ export function DealPartners({ deal }: { deal: Deal }) {
           <tbody>
             {partners.map((p) => (
               <tr key={p.id} className="group/row">
-                <td className="h-9 min-w-0 pr-2"><RecordChip entity="partner" record={p} /></td>
+                <td>
+                  <button
+                    type="button"
+                    onClick={() => void write("PUT", p.id, { is_main: !p.is_main })}
+                    aria-pressed={!!p.is_main}
+                    aria-label={p.is_main ? `${p.label} is the main partner. Unset` : `Make ${p.label} the main partner`}
+                    title={p.is_main ? "Main partner" : "Make main partner"}
+                    className={cn("inline-flex size-6 items-center justify-center rounded-xs hover:bg-secondary",
+                      p.is_main ? "text-warning" : "text-muted-foreground opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 [[data-agent]_&]:opacity-100")}
+                  >
+                    <Star className={cn("size-3.5", p.is_main && "fill-current")} />
+                  </button>
+                </td>
+                <td className="h-9 min-w-0 pr-2">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <RecordChip entity="partner" record={p} />
+                    {p.is_main && <span className="inline-block h-5 shrink-0 rounded-full bg-warning-tint px-2 text-xs font-medium leading-5 text-warning">Main</span>}
+                  </span>
+                </td>
                 <td>
                   <InlineField type="number" value={p.one_time_value ? String(p.one_time_value) : ""} placeholder="One-time…" render={money}
                     onSave={(v) => write("PUT", p.id, { one_time_value: amount(v) })} />

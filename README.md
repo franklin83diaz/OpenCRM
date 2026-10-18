@@ -14,7 +14,7 @@ Unlike HubSpot or Salesforce, it runs on your own Cloudflare account, with no AP
 
 ## Features
 
-- **Six entities** — contacts, companies, partners, customer users, tickets and deals with foreign-key relationships (UUID keys, not enumerable ids). Partners are the firms that work deals with you (resellers, referrers), kept apart from the companies you sell to; a deal has any number of them. Customer users are the people who use your product at each customer, kept apart from contacts. Tickets are a customer's requests and problems: each is for a customer, may name the customer user who reported it, and has a status (open, in progress, waiting, resolved, closed), a priority, an owner and a due date. A company can name one of its contacts as its main contact
+- **Six entities** — contacts, companies, partners, customer users, tickets and deals with foreign-key relationships (UUID keys, not enumerable ids). Partners are the firms that work deals with you (resellers, referrers), kept apart from the companies you sell to; a deal has any number of them. Customer users are the people who use your product at each customer, kept apart from contacts. Tickets are a customer's requests and problems: each is for a customer, may name the customer user who reported it, and has a status (open, in progress, waiting, resolved, closed), a priority, an owner and a due date. A company can name one of its contacts as its main contact, and a partner as its main partner: the company, its main contact and its main partner are who the customer is. A company's Team tab lists its contacts and the partners of its deals, with a star on the main contact and the main partner; a deal can name one of its partners as its main partner
 - **Accounts and API tokens** — people sign in with an email and a password; an admin adds them in Settings → Users, and everyone can make personal API tokens for agents and scripts in Settings → API tokens (see [Accounts and API tokens](#accounts-and-api-tokens))
 - **Activity timeline** — every contact/company/deal has a feed; notes, deal updates (a call, a message, an email, a meeting), and deals won or lost all log to it
 - **CSV / XLSX import** — upload a spreadsheet, map columns to fields (exact-match auto-mapping), preview, import; company names resolve to existing companies or are created
@@ -134,7 +134,7 @@ pnpm db:migrate:remote   # server/schema.sql, on the production database
 pnpm run deploy
 ```
 
-`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts, without which signing in fails; `partners`, `deal_partners` and `customer_users`, without which every read of deals fails; and `tickets`, without which the dashboard's stats fail. Columns a version adds to a table you already have (a deal's `recurring_value` and `owner_id`, a partner's share of a deal, a partner's `industry` and `status`, a company's `main_contact_id`) can't come from `server/schema.sql`: the API adds them itself, before the first request it serves. A deal attribute made before Partners with the key `partners` or `partner_ids` is hidden by them: deal reads answer `partners` with the deal's partners, and writes take `partner_ids` as them. Copy its values out and delete it before you upgrade. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
+`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts, without which signing in fails; `partners`, `deal_partners` and `customer_users`, without which every read of deals fails; and `tickets`, without which the dashboard's stats fail. Columns a version adds to a table you already have (a deal's `recurring_value` and `owner_id`, a partner's share of a deal and whether it is the deal's main partner (`deal_partners.is_main`), a partner's `industry` and `status`, a company's `main_contact_id` and `main_partner_id`) can't come from `server/schema.sql`: the API adds them itself, before the first request it serves. A deal attribute made before Partners with the key `partners` or `partner_ids` is hidden by them: deal reads answer `partners` with the deal's partners, and writes take `partner_ids` as them. Copy its values out and delete it before you upgrade. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
 
 ## Tech Stack
 
@@ -194,6 +194,7 @@ erDiagram
     companies ||--o{ tickets  : "has"
     customer_users ||--o{ tickets : "reports"
     companies |o--o| contacts : "main contact"
+    companies }o--o| partners : "main partner"
 
     companies {
         text id PK
@@ -204,6 +205,7 @@ erDiagram
         text email
         text notes
         text main_contact_id FK "→ contacts · ON DELETE SET NULL"
+        text main_partner_id FK "→ partners · ON DELETE SET NULL"
         text created_at
         text updated_at
     }
@@ -260,16 +262,16 @@ erDiagram
 ```
 
 ```sql
-companies (id, name, domain, industry, phone, email, notes, customer_since, renewal_date, main_contact_id → contacts)
+companies (id, name, domain, industry, phone, email, notes, customer_since, renewal_date, main_contact_id → contacts, main_partner_id → partners)
 contacts  (id, first_name, last_name, email, phone, company_id → companies, title, status)
 deals     (id, name, contact_id → contacts, company_id → companies, value, recurring_value, stage, close_date, notes, owner_id → users)
 partners  (id, name, industry, status, phone, email, notes)
 customer_users (id, name, email, phone, company_id → companies, notes)
 tickets   (id, subject, description, status, priority, company_id → companies, customer_user_id → customer_users, owner_id → users, due_date)
-deal_partners (deal_id → deals, partner_id → partners, one_time_value, recurring_value)
+deal_partners (deal_id → deals, partner_id → partners, one_time_value, recurring_value, is_main)
 ```
 
-Contacts belong to companies. A deal has its own company and its own contact, both optional: a deal can name a company before it has a person. Setting a contact on a deal with no company gives the deal that contact's company. Deleting a company sets `company_id` to NULL on its contacts and deals. Deleting a contact sets `contact_id` to NULL on its deals. A deal is worth `value` once and `recurring_value` each month while they stay a customer, and is assigned to one account (`owner_id`) or to nobody yet. A deal has any number of partners (`deal_partners`), each with its share of the deal, once and each month; deleting a deal or a partner drops their links. A company's main contact (`main_contact_id`) is one of its own contacts, or none.
+Contacts belong to companies. A deal has its own company and its own contact, both optional: a deal can name a company before it has a person. Setting a contact on a deal with no company gives the deal that contact's company. Deleting a company sets `company_id` to NULL on its contacts and deals. Deleting a contact sets `contact_id` to NULL on its deals. A deal is worth `value` once and `recurring_value` each month while they stay a customer, and is assigned to one account (`owner_id`) or to nobody yet. A deal has any number of partners (`deal_partners`), each with its share of the deal, once and each month, and at most one of them its main partner (`is_main`); deleting a deal or a partner drops their links. A company's main contact (`main_contact_id`) is one of its own contacts, or none; its main partner (`main_partner_id`) is any partner, or none, and deleting the partner clears it. The company, its main contact and its main partner are who the customer is.
 
 A ticket is for a customer (`company_id`, a company with `customer_since`) and may name the customer user who reported it, one of that customer's. Its `status` is `open`, `in_progress`, `waiting` (on the customer), `resolved` or `closed` (the last two are done), its `priority` `low`, `medium`, `high` or `urgent`; it is assigned to one account (`owner_id`) or to nobody, and may have a `due_date`. Deleting the company or the customer user leaves the ticket, without them.
 
@@ -298,9 +300,9 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | POST | `/api/contacts/bulk-delete` | Delete several contacts (`{ ids }`) |
 | POST | `/api/contacts/import` | Import contacts (`{ contacts: [...] }`); company names resolve to existing companies or are created |
 | GET | `/api/companies` | List companies (paginated, sortable, searchable) |
-| GET | `/api/companies/:id` | Get a single company, with its `main_contact` (`{ id, label }` or null) |
-| POST | `/api/companies` | Create a company |
-| PUT | `/api/companies/:id` | Update a company (`main_contact_id`: one of its contacts, null to clear) |
+| GET | `/api/companies/:id` | Get a single company, with its `main_contact` and `main_partner` (each `{ id, label }` or null) |
+| POST | `/api/companies` | Create a company (`main_partner_id`: a partner, null for none) |
+| PUT | `/api/companies/:id` | Update a company (`main_contact_id`: one of its contacts, `main_partner_id`: a partner, null to clear) |
 | DELETE | `/api/companies/:id` | Delete a company |
 | POST | `/api/companies/bulk-delete` | Delete several companies (`{ ids }`) |
 | POST | `/api/companies/import` | Import companies (`{ companies: [...] }`); a name that already exists is skipped |
@@ -327,8 +329,8 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | GET | `/api/deals/progress` | Open deals worst first: each one's next step and the reasons to look at it |
 | GET | `/api/deals/:id` | Get a single deal |
 | POST | `/api/deals` | Create a deal (`value` once, `recurring_value` each month, `owner_id`, `partner_ids`: its partners) |
-| PUT | `/api/deals/:id` | Update a deal (`partner_ids` replaces its partners, keeping the shares of the ones it keeps) |
-| PUT | `/api/deals/:id/partners/:partner_id` | Put a partner on a deal and set its share (`{ one_time_value?, recurring_value? }`) |
+| PUT | `/api/deals/:id` | Update a deal (`partner_ids` replaces its partners, keeping the shares and the main partner of the ones it keeps) |
+| PUT | `/api/deals/:id/partners/:partner_id` | Put a partner on a deal and set its share (`{ one_time_value?, recurring_value?, is_main? }`; `is_main: true` makes it the deal's main partner, one per deal) |
 | DELETE | `/api/deals/:id/partners/:partner_id` | Take a partner off a deal |
 | GET | `/api/team` | The accounts deals and tickets can be assigned to |
 | DELETE | `/api/deals/:id` | Delete a deal |

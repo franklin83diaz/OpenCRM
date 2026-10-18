@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mail, Star, IdCard, LayoutGrid, Activity as ActivityIcon, Phone, Globe, Building2, Tag, AtSign, Users, StickyNote, Calendar, Clock, CheckSquare, BadgeCheck, CalendarClock, LifeBuoy, UserRoundCheck } from "lucide-react";
+import { ArrowLeft, Mail, Star, IdCard, LayoutGrid, Activity as ActivityIcon, Phone, Globe, Building2, Tag, AtSign, Users, StickyNote, Calendar, Clock, CheckSquare, BadgeCheck, CalendarClock, LifeBuoy, UserRoundCheck, Network } from "lucide-react";
 import { useCrm } from "@/context";
 import { EntityIcon } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
 import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
-import { RecordChip } from "@/lib/relations";
+import { RecordChip, RelationInput } from "@/lib/relations";
 import { api } from "@/api";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { ValuesField } from "@/components/value-fields";
@@ -14,7 +14,7 @@ import { TasksSection } from "@/components/tasks/tasks-section";
 import { ScopedRecordField } from "@/components/scoped-record-field";
 import { RecordTickets, useOpenTicketCount } from "@/components/tickets/record-tickets";
 import { cn, formatDate } from "@/lib/utils";
-import type { Company, Activity, Contact, RelationRecord, Task } from "@/types";
+import type { Company, Activity, Contact, Deal, RelationRecord, Task } from "@/types";
 
 /** A company's contacts, by name, for its main-contact picker. */
 async function contactsOf(companyId: string): Promise<RelationRecord[]> {
@@ -37,6 +37,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
   const [noteOpen, setNoteOpen] = useState(false);
   const shows = (key: string) => panel || tab === key;
   const openTickets = useOpenTicketCount({ companyId: id });
+  const partners = useCompanyPartners(id, company?.main_partner);
   // The tab's count while the Tasks tab isn't open: the company's open tasks.
   useEffect(() => {
     let alive = true;
@@ -129,6 +130,10 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
                   placeholder="Set main contact…" emptyLabel="No main contact" load={() => contactsOf(company.id)}
                   onChange={(v) => saveField({ main_contact_id: v })} />
               </Attr>
+              <Attr icon={Network} label="Main partner">
+                <RelationInput link entity="partner" label="main partner" value={company.main_partner?.id ?? null} known={company.main_partner}
+                  placeholder="Set main partner…" emptyLabel="No main partner" onChange={(v) => void saveField({ main_partner_id: v })} />
+              </Attr>
               <Attr icon={Tag} label="Industry">
                 <ValuesField entity="company" field="industry" label="industry" value={company.industry} onSave={(v) => saveField({ industry: v })} />
               </Attr>
@@ -168,7 +173,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
           {!panel && <RecordTabs active={tab} onChange={setTab} tabs={[
             { key: "overview", label: "Overview", icon: LayoutGrid },
             { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
-            { key: "team", label: "Team", icon: Users, count: company.contact_count ?? 0 },
+            { key: "team", label: "Team", icon: Users, count: (company.contact_count ?? 0) + (partners?.length ?? 0) },
             { key: "notes", label: "Notes", icon: StickyNote, count: noteCount },
             { key: "tasks", label: "Tasks", icon: CheckSquare, count: taskCount },
             { key: "tickets", label: "Tickets", icon: LifeBuoy, count: openTickets ?? 0 },
@@ -181,6 +186,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
                 <div className="grid grid-cols-3 gap-3">
                   <Tile icon={Globe} label="Domain" empty="No domain" value={host && <a href={`https://${host}`} target="_blank" rel="noreferrer" className="text-info hover:underline">{host}</a>} />
                   <Tile icon={UserRoundCheck} label="Main contact" empty="No main contact" value={company.main_contact && <RecordChip entity="contact" record={company.main_contact} />} />
+                  <Tile icon={Network} label="Main partner" empty="No main partner" value={company.main_partner && <RecordChip entity="partner" record={company.main_partner} />} />
                   <Tile icon={Users} label="Team" empty="No team" value={company.contact_count ? `${company.contact_count} ${company.contact_count === 1 ? "person" : "people"}` : undefined} />
                   <Tile icon={Tag} label="Industry" empty="No industry" value={company.industry} />
                   <Tile icon={AtSign} label="Email" empty="No email address" value={company.email} />
@@ -190,7 +196,11 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
               </section>
             )}
 
-            {!panel && tab === "team" && <CompanyTeam companyId={company.id} mainId={company.main_contact?.id ?? null} onMain={(v) => saveField({ main_contact_id: v })} />}
+            {!panel && tab === "team" && (
+              <CompanyTeam companyId={company.id} partners={partners}
+                mainContactId={company.main_contact?.id ?? null} onMainContact={(v) => saveField({ main_contact_id: v })}
+                mainPartnerId={company.main_partner?.id ?? null} onMainPartner={(v) => saveField({ main_partner_id: v })} />
+            )}
 
             {shows("tasks") && <TasksSection companyId={company.id} onCount={setTaskCount} />}
 
@@ -209,9 +219,65 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
   );
 }
 
-/** The people who work at the company: its contacts, with what they do there.
- *  Its main contact comes first, marked Main; a star makes another one main. */
-function CompanyTeam({ companyId, mainId, onMain }: { companyId: string; mainId: string | null; onMain: (id: string | null) => void | Promise<void> }) {
+/** A partner on the company's team: one that worked its deals (which ones, and
+ *  whether it was the deal's main partner), or its main partner. */
+interface TeamPartner {
+  record: RelationRecord;
+  deals: { id: string; name: string; main: boolean }[];
+}
+
+/** The partners who worked the company's deals, by name, and its main partner
+ *  even if it worked none (first then); null while loading. */
+function useCompanyPartners(companyId: string, main: RelationRecord | null | undefined): TeamPartner[] | null {
+  const { changes } = useCrm();
+  const [fromDeals, setFromDeals] = useState<TeamPartner[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api<{ deals: Deal[] }>("GET", `/api/deals?company_id=${encodeURIComponent(companyId)}&limit=100&sort=created_at&order=asc`)
+      .then((r) => {
+        const byId = new Map<string, TeamPartner>();
+        for (const d of r.deals) {
+          for (const p of d.partners ?? []) {
+            const tp = byId.get(p.id) ?? { record: { id: p.id, label: p.label, domain: p.domain }, deals: [] };
+            tp.deals.push({ id: d.id, name: d.name, main: !!p.is_main });
+            byId.set(p.id, tp);
+          }
+        }
+        if (alive) setFromDeals([...byId.values()].sort((a, b) => a.record.label.localeCompare(b.record.label)));
+      }, () => { if (alive) setFromDeals([]); });
+    return () => { alive = false; };
+  }, [companyId, changes]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!fromDeals) return null;
+  return main && !fromDeals.some((p) => p.record.id === main.id) ? [{ record: main, deals: [] }, ...fromDeals] : fromDeals;
+}
+
+const mainBadge = <span className="inline-block h-5 shrink-0 rounded-full bg-warning-tint px-2 text-[0.8125rem] font-medium leading-5 text-warning">Main</span>;
+
+/** The star on a team row: it marks the main one, or makes this one main. */
+function MainStar({ name, role, main, onClick }: { name: string; role: string; main: boolean; onClick: () => void }) {
+  const action = main ? `${name} is the ${role}. Unset` : `Make ${name} the ${role}`;
+  return (
+    <button type="button" aria-label={action} title={action} aria-pressed={main} onClick={onClick}
+      className={cn("inline-flex size-7 shrink-0 items-center justify-center rounded-sm transition-opacity hover:bg-secondary",
+        main ? "text-warning" : "text-muted-foreground opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 [[data-agent]_&]:opacity-100")}>
+      <Star className={cn("size-4", main && "fill-current")} />
+    </button>
+  );
+}
+
+/**
+ * Who the customer is: the company's contacts, with what they do there, and
+ * the partners who worked its deals. Its main contact and its main partner
+ * come first, marked Main; a star makes another one main.
+ */
+function CompanyTeam({ companyId, partners, mainContactId, onMainContact, mainPartnerId, onMainPartner }: {
+  companyId: string;
+  partners: TeamPartner[] | null;
+  mainContactId: string | null;
+  onMainContact: (id: string | null) => void | Promise<void>;
+  mainPartnerId: string | null;
+  onMainPartner: (id: string | null) => void | Promise<void>;
+}) {
   const { changes, setError } = useCrm();
   const [people, setPeople] = useState<Contact[] | null>(null);
   useEffect(() => {
@@ -221,42 +287,74 @@ function CompanyTeam({ companyId, mainId, onMain }: { companyId: string; mainId:
     return () => { alive = false; };
   }, [companyId, changes]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const count = (n: number) => <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{n}</span>;
+  const mainFirst = <T,>(list: T[], isMain: (x: T) => boolean) => [...list.filter(isMain), ...list.filter((x) => !isMain(x))];
+
   return (
-    <section className="flex flex-col gap-3" aria-label="Team">
-      <h2 className="inline-flex items-center gap-2 text-sm font-medium">
-        Team <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{people?.length ?? 0}</span>
-      </h2>
-      {people === null ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : people.length === 0 ? (
-        <p className="text-sm text-faint">No contacts at this company yet.</p>
-      ) : (
-        <>
-          {!mainId && <p className="text-[0.8125rem] text-muted-foreground">No main contact yet: pick one with its star.</p>}
-          <ul className="flex flex-col rounded-md bg-card shadow-edge">
-            {[...people.filter((p) => p.id === mainId), ...people.filter((p) => p.id !== mainId)].map((p) => {
-              const name = `${p.first_name} ${p.last_name}`.trim();
-              const main = p.id === mainId;
-              const action = main ? `${name} is the main contact. Unset` : `Make ${name} the main contact`;
-              return (
-                <li key={p.id} className="group/row flex h-11 items-center gap-3 px-3.5 [&+li]:border-t [&+li]:border-border">
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <RecordChip entity="contact" record={{ id: p.id, label: name, domain: null }} />
-                    {main && <span className="inline-block h-5 shrink-0 rounded-full bg-warning-tint px-2 text-[0.8125rem] font-medium leading-5 text-warning">Main</span>}
-                  </span>
-                  {p.title && <span className="truncate text-[0.8125rem] text-muted-foreground">{p.title}</span>}
-                  {p.email && <a href={`mailto:${p.email}`} className="truncate text-[0.8125rem] text-info hover:underline">{p.email}</a>}
-                  <button type="button" aria-label={action} title={action} aria-pressed={main} onClick={() => void onMain(main ? null : p.id)}
-                    className={cn("inline-flex size-7 shrink-0 items-center justify-center rounded-sm transition-opacity hover:bg-secondary",
-                      main ? "text-warning" : "text-muted-foreground opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 [[data-agent]_&]:opacity-100")}>
-                    <Star className={cn("size-4", main && "fill-current")} />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
+    <section className="flex flex-col gap-6" aria-label="Team">
+      <div className="flex flex-col gap-3">
+        <h2 className="inline-flex items-center gap-2 text-sm font-medium">Contacts {count(people?.length ?? 0)}</h2>
+        {people === null ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : people.length === 0 ? (
+          <p className="text-sm text-faint">No contacts at this company yet.</p>
+        ) : (
+          <>
+            {!mainContactId && <p className="text-[0.8125rem] text-muted-foreground">No main contact yet: pick one with its star.</p>}
+            <ul className="flex flex-col rounded-md bg-card shadow-edge">
+              {mainFirst(people, (p) => p.id === mainContactId).map((p) => {
+                const name = `${p.first_name} ${p.last_name}`.trim();
+                const main = p.id === mainContactId;
+                return (
+                  <li key={p.id} className="group/row flex h-11 items-center gap-3 px-3.5 [&+li]:border-t [&+li]:border-border">
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <RecordChip entity="contact" record={{ id: p.id, label: name, domain: null }} />
+                      {main && mainBadge}
+                    </span>
+                    {p.title && <span className="truncate text-[0.8125rem] text-muted-foreground">{p.title}</span>}
+                    {p.email && <a href={`mailto:${p.email}`} className="truncate text-[0.8125rem] text-info hover:underline">{p.email}</a>}
+                    <MainStar name={name} role="main contact" main={main} onClick={() => void onMainContact(main ? null : p.id)} />
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="inline-flex items-center gap-2 text-sm font-medium">Partners {count(partners?.length ?? 0)}</h2>
+        {partners === null ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : partners.length === 0 ? (
+          <p className="text-sm text-faint">No partner has worked a deal with this company yet.</p>
+        ) : (
+          <>
+            {!mainPartnerId && <p className="text-[0.8125rem] text-muted-foreground">No main partner yet: pick one with its star.</p>}
+            <ul className="flex flex-col rounded-md bg-card shadow-edge">
+              {mainFirst(partners, (p) => p.record.id === mainPartnerId).map((p) => {
+                const main = p.record.id === mainPartnerId;
+                return (
+                  <li key={p.record.id} className="group/row flex min-h-11 items-center gap-3 px-3.5 py-1.5 [&+li]:border-t [&+li]:border-border">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <RecordChip entity="partner" record={p.record} />
+                        {main && mainBadge}
+                      </span>
+                      {p.deals.length > 0 && (
+                        <span className="truncate text-[0.8125rem] text-muted-foreground">
+                          {p.deals.map((d, i) => <span key={d.id}>{i > 0 && ", "}{d.name}{d.main && <span className="text-warning"> (main)</span>}</span>)}
+                        </span>
+                      )}
+                    </span>
+                    <MainStar name={p.record.label} role="main partner" main={main} onClick={() => void onMainPartner(main ? null : p.record.id)} />
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </div>
     </section>
   );
 }

@@ -197,7 +197,7 @@
  {
   "method": "PUT",
   "path": "/api/deals/{id}/partners/{partner_id}",
-  "summary": "Make a partner take part in a deal, and set its share: {one_time_value?, recurring_value?}"
+  "summary": "Make a partner take part in a deal, and set its share: {one_time_value?, recurring_value?, is_main?}"
  },
  {
   "method": "DELETE",

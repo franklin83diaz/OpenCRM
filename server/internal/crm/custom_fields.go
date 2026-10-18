@@ -125,7 +125,7 @@ func (d CustomFieldDef) targetEntity() EntityType {
 // platform column. A deal's partner_ids is no column (it writes deal_partners)
 // but is a base field all the same.
 var builtinColumns = map[EntityType][]string{
-	Company:      {"id", "name", "domain", "industry", "phone", "email", "notes", "customer_since", "renewal_date", "main_contact_id", "created_at", "updated_at"},
+	Company:      {"id", "name", "domain", "industry", "phone", "email", "notes", "customer_since", "renewal_date", "main_contact_id", "main_partner_id", "created_at", "updated_at"},
 	Contact:      {"id", "first_name", "last_name", "email", "phone", "company_id", "title", "status", "last_contacted_at", "created_at", "updated_at"},
 	Deal:         {"id", "name", "contact_id", "company_id", "value", "recurring_value", "stage", "close_date", "notes", "owner_id", "created_at", "updated_at", "partner_ids"},
 	Partner:      {"id", "name", "industry", "status", "phone", "email", "notes", "created_at", "updated_at"},
@@ -144,11 +144,11 @@ func isBuiltin(entity EntityType, key string) bool {
 
 // reservedKeys are keys a record answers with that are no field of its own —
 // a deal's partners and owner, a partner's deals and deal_count, a customer
-// user's company name and domain, a company's customer users and main contact, the tickets of
+// user's company name and domain, a company's customer users, main contact and main partner, the tickets of
 // a company or customer user, a ticket's names of its company, customer user
 // and owner — so no custom field may take them either.
 var reservedKeys = map[EntityType][]string{
-	Company:      {"customer_users", "tickets", "main_contact"},
+	Company:      {"customer_users", "tickets", "main_contact", "main_partner"},
 	CustomerUser: {"company_name", "company_domain", "tickets"},
 	Deal:         {"partners", "owner"},
 	Partner:      {"deals", "deal_count"},
