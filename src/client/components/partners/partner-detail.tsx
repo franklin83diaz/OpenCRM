@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Mail, LayoutGrid, Activity as ActivityIcon, Phone, AtSign, DollarSign, Tag, CircleDot, StickyNote, Calendar, Clock, Handshake, Plus, X } from "lucide-react";
 import { useCrm } from "@/context";
 import { api } from "@/api";
-import { EntityIcon, CategoryBadge } from "@/components/shared";
+import { EntityIcon } from "@/components/shared";
 import { OptionField, ValuesField } from "@/components/value-fields";
-import { PARTNER_STATUSES, statusLabel } from "@/components/partners/statuses";
+import { PARTNER_STATUSES, PartnerStatusBadge } from "@/components/partners/statuses";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -109,7 +109,7 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
                 <ValuesField entity="partner" field="industry" label="industry" value={partner.industry} onSave={(v) => saveField({ industry: v })} />
               </Attr>
               <Attr icon={CircleDot} label="Status">
-                <OptionField options={PARTNER_STATUSES} label="status" value={partner.status} onSave={(v) => saveField({ status: v })} />
+                <OptionField options={PARTNER_STATUSES} label="status" value={partner.status} onSave={(v) => saveField({ status: v })} badge={(v) => <PartnerStatusBadge value={v} />} />
               </Attr>
               <Attr icon={AtSign} label="Email">
                 <InlineField type="email" value={partner.email} placeholder="Set email…" onSave={(v) => saveField({ email: v })}
@@ -147,7 +147,7 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
               <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-medium">Highlights</h2>
                 <div className="grid grid-cols-3 gap-3">
-                  <Tile icon={CircleDot} label="Status" empty="No status" value={partner.status && <CategoryBadge value={statusLabel(partner.status)} />} />
+                  <Tile icon={CircleDot} label="Status" empty="No status" value={partner.status && <PartnerStatusBadge value={partner.status} />} />
                   <Tile icon={Tag} label="Industry" empty="No industry" value={partner.industry} />
                   <Tile icon={AtSign} label="Email" empty="No email address" value={partner.email} />
                   <Tile icon={Handshake} label="Deals" empty="No deals" value={dealCount ? `${dealCount} ${dealCount === 1 ? "deal" : "deals"}` : undefined} />

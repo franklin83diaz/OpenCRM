@@ -56,9 +56,10 @@ export function ValuesField({ entity, field, label, value, onSave, id, input = f
   );
 }
 
-/** One of a fixed list of options (a status); it can't be left empty. */
-export function OptionField({ options, label, value, onSave, id, input = false, modal = false }: {
+/** One of a fixed list of options (a status); it can't be left empty. `badge` draws a value (its own colours). */
+export function OptionField({ options, label, value, onSave, badge, id, input = false, modal = false }: {
   options: { value: string; label: string }[];
+  badge?: (value: string) => ReactNode;
   /** What the field is, lower case ("status"). */
   label: string;
   value: string;
@@ -69,9 +70,9 @@ export function OptionField({ options, label, value, onSave, id, input = false, 
 }) {
   const current = options.find((o) => o.value === value);
   return (
-    <PillField id={id} label={label} value={value} input={input} modal={modal} shown={<CategoryBadge value={current?.label ?? value} />}
+    <PillField id={id} label={label} value={value} input={input} modal={modal} shown={badge ? badge(value) : <CategoryBadge value={current?.label ?? value} />}
       menu={(close) => (
-        <OptionMenu options={options} value={value || null}
+        <OptionMenu options={options} value={value || null} render={badge}
           onPick={(v) => { close(); if (v && v !== value) void onSave(v); }} />
       )} />
   );

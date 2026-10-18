@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Ban, ChevronsUpDown } from "lucide-react";
 import { useCrm } from "@/context";
 import { UserAvatar } from "@/components/shared";
@@ -23,8 +23,10 @@ export function OwnerField({ value, owner, onChange, input = false, modal = fals
   input?: boolean;
   modal?: boolean;
 }) {
-  const { team } = useCrm();
+  const { team, refetchTeam } = useCrm();
   const [open, setOpen] = useState(false);
+  // The team loads with the app; one that failed then is asked again when the list opens.
+  useEffect(() => { if (open && !team.length) refetchTeam().catch(() => {}); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const current = (value && (team.find((m) => m.id === value) ?? (owner?.id === value ? owner : null))) || null;
   const pick = (id: string | null) => {
     setOpen(false);

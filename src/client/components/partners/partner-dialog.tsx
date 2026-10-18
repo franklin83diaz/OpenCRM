@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { CustomFieldsSection } from "@/lib/custom-fields";
 import { OptionField, ValuesField } from "@/components/value-fields";
-import { PARTNER_STATUSES } from "@/components/partners/statuses";
+import { PARTNER_STATUSES, PartnerStatusBadge } from "@/components/partners/statuses";
 import type { Partner } from "@/types";
 
 interface FormState {
@@ -85,7 +85,7 @@ export function PartnerDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="partner-status">Status</Label>
-              <OptionField input modal id="partner-status" options={PARTNER_STATUSES} label="status" value={form.status} onSave={(v) => set("status", v)} />
+              <OptionField input modal id="partner-status" options={PARTNER_STATUSES} label="status" value={form.status} onSave={(v) => set("status", v)} badge={(v) => <PartnerStatusBadge value={v} />} />
             </div>
           </div>
 

@@ -4,6 +4,7 @@ import { DndContext, DragOverlay, PointerSensor, pointerWithin, useDraggable, us
 import { useCrm } from "@/context";
 import { PageHeader, Avatar, EntityIcon, EmptyState, UserAvatar } from "@/components/shared";
 import { memberName } from "@/components/deals/owner-field";
+import { OwnerSwitch } from "@/components/deals/owner-switch";
 import { DealDialog } from "@/components/deals/deal-dialog";
 import { StageDialog } from "@/components/deals/stage-dialog";
 import { FilterBar } from "@/components/filter-bar";
@@ -133,6 +134,7 @@ export function DealsBoard({ navigate, openId }: { navigate: (to: string, opts?:
       </PageHeader>
 
       <FilterBar
+        leading={<OwnerSwitch filters={boardFilters} onChange={setBoardFilters} />}
         fields={filterFields}
         filters={boardFilters}
         onChange={setBoardFilters}

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Search, Plus, Trash2, X } from "lucide-react";
 import { useCrm } from "@/context";
 import { PageHeader, EntityIcon, EmptyState, CategoryBadge } from "@/components/shared";
-import { PARTNER_STATUSES, statusLabel } from "@/components/partners/statuses";
+import { PARTNER_STATUSES, PartnerStatusBadge, statusLabel } from "@/components/partners/statuses";
 import { PartnerDialog } from "@/components/partners/partner-dialog";
 import { FilterBar } from "@/components/filter-bar";
 import { fieldsFromDefs, sanitize } from "@/lib/filters";
@@ -69,8 +69,8 @@ export function PartnersPage({ navigate, openId, viewParam, filtersParam }: { na
     { key: "industry", label: "Industry", sort: "industry", text: (p) => p.industry, edit: valuesEdit("partner", "industry", "Industry", saveCell), render: (p) => <CategoryBadge value={p.industry} /> },
     {
       key: "status", label: "Status", sort: "status", text: (p) => statusLabel(p.status),
-      edit: optionEdit("status", PARTNER_STATUSES, saveCell),
-      render: (p) => <CategoryBadge value={statusLabel(p.status)} />,
+      edit: optionEdit("status", PARTNER_STATUSES, saveCell, undefined, (v) => <PartnerStatusBadge value={v} />),
+      render: (p) => <PartnerStatusBadge value={p.status} />,
     },
     { key: "email", label: "Email", sort: "email", text: (p) => p.email, edit: textEdit("email", saveCell, { input: "email" }), render: (p) => p.email ? <span className="truncate">{p.email}</span> : dash },
     { key: "phone", label: "Phone", sort: "phone", text: (p) => p.phone, edit: textEdit("phone", saveCell, { input: "tel" }), render: (p) => p.phone ? <span className="tabular truncate">{p.phone}</span> : dash },

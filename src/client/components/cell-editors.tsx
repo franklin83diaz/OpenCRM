@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Ban, Plus } from "lucide-react";
 import { api } from "@/api";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -16,11 +16,13 @@ type Save<T> = (row: T, patch: Record<string, unknown>) => Promise<void>;
  * A list of options to pick one from, the current one highlighted (never
  * ticked). With `emptyLabel`, a first row clears the value.
  */
-export function OptionMenu({ options, value, onPick, emptyLabel }: {
+export function OptionMenu({ options, value, onPick, emptyLabel, render }: {
   options: { value: string; label: string }[];
   value: string | null;
   onPick: (value: string | null) => void;
   emptyLabel?: string;
+  /** Draws an option (a coloured status) instead of its label. */
+  render?: (value: string) => ReactNode;
 }) {
   return (
     <Command>
@@ -35,7 +37,7 @@ export function OptionMenu({ options, value, onPick, emptyLabel }: {
           )}
           {options.map((o) => (
             <CommandItem key={o.value} value={`${o.label} ${o.value}`} onSelect={() => onPick(o.value)} aria-selected={o.value === value} className={cn(o.value === value && "bg-secondary font-medium")}>
-              {o.label}
+              {render ? render(o.value) : o.label}
             </CommandItem>
           ))}
         </CommandGroup>
@@ -126,8 +128,8 @@ export function textEdit<T>(key: string, save: Save<T>, opts: { input?: "text" |
   };
 }
 
-/** A cell edit that picks one option (a status, a badge). */
-export function optionEdit<T>(key: string, options: { value: string; label: string }[], save: Save<T>, emptyLabel?: string): CellEdit<T> {
+/** A cell edit that picks one option (a status, a badge); `render` draws an option. */
+export function optionEdit<T>(key: string, options: { value: string; label: string }[], save: Save<T>, emptyLabel?: string, render?: (value: string) => ReactNode): CellEdit<T> {
   return {
     type: "menu",
     render: (row, close) => {
@@ -137,6 +139,7 @@ export function optionEdit<T>(key: string, options: { value: string; label: stri
           options={options}
           value={v == null || v === "" ? null : String(v)}
           emptyLabel={emptyLabel}
+          render={render}
           onPick={(next) => { close(); void save(row, { [key]: next }); }}
         />
       );
