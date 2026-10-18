@@ -8,7 +8,7 @@
  * a form) names them through a shared cache filled from GET /api/records.
  */
 
-import { useEffect, useRef, useState, useSyncExternalStore, type MouseEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { Ban, Handshake, Pencil, Plus, X } from "lucide-react";
 import { Avatar, EntityIcon } from "@/components/shared";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -95,12 +95,13 @@ export function useRecordNames(wanted: Array<{ entity: EntityType; id: string }>
 
 // ── Chips ─────────────────────────────────────────────────────────────
 
-const LIST_PATH: Partial<Record<EntityType, string>> = { contact: "/contacts", company: "/companies", deal: "/deals", partner: "/partners" };
+const RECORD_PATH: Partial<Record<EntityType, string>> = { contact: "/contacts", company: "/companies", deal: "/deals", partner: "/partners" };
 
-/** Where a record opens: its list (the deals board, for a deal) with the record in the side panel. */
+/** Where a link to a record opens it: its own page, which shows that record
+ *  alone. (A list opens its own rows in the side panel beside it.) */
 export function recordHref(entity: EntityType, id: string): string | undefined {
-  const base = LIST_PATH[entity];
-  return base ? `${base}?record=${encodeURIComponent(id)}` : undefined;
+  const base = RECORD_PATH[entity];
+  return base ? `${base}/${encodeURIComponent(id)}` : undefined;
 }
 
 const plainClick = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
@@ -275,7 +276,7 @@ export function RecordPicker({ entity, selected, onPick, onClear, emptyLabel, pl
  * placeholder), which opens the picker. `emptyLabel` ("No company") is the
  * picker's row for clearing it. `known` names the current value without a fetch.
  */
-export function RelationInput({ entity, value, onChange, placeholder = "Select…", emptyLabel, known, className, link = false, label }: {
+export function RelationInput({ entity, value, onChange, placeholder = "Select…", emptyLabel, known, className, link = false, label, suffix }: {
   entity: EntityType;
   value: string | null;
   onChange: (id: string | null) => void;
@@ -287,6 +288,8 @@ export function RelationInput({ entity, value, onChange, placeholder = "Select�
   link?: boolean;
   /** What the field is, for the pencil's name ("Change account manager"); the entity by default. */
   label?: string;
+  /** On a record page, shown right after the linked record (a contact's company). */
+  suffix?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const name = useRecordNames(value && known?.id !== value ? [{ entity, id: value }] : []);
@@ -310,6 +313,7 @@ export function RelationInput({ entity, value, onChange, placeholder = "Select�
         <PopoverAnchor asChild>
           <div className={cn("group/rel flex h-8 w-full min-w-0 items-center gap-1 px-2", className)}>
             <RecordChip entity={entity} record={record} />
+            {suffix}
             <PopoverTrigger asChild>
               <button type="button" aria-label={change} title={change}
                 className="inline-flex size-6 shrink-0 items-center justify-center rounded-sm bg-card text-muted-foreground shadow-edge opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/rel:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-100 [[data-agent]_&]:opacity-100">

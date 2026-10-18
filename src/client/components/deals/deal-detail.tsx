@@ -6,7 +6,8 @@ import { InlineField } from "@/components/ui/inline-field";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection } from "@/components/record-page";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
-import { RecordChip, RelationInput } from "@/lib/relations";
+import { RecordChip, RelationInput, recordHref } from "@/lib/relations";
+import { go } from "@/hooks/use-router";
 import { OwnerField, memberName } from "@/components/deals/owner-field";
 import { DealPartners } from "@/components/deals/deal-partners";
 import { formatMoney, colorClasses, cn } from "@/lib/utils";
@@ -38,7 +39,7 @@ function formatDay(day: string): string {
 // nobody yet, and any number of partners take part in it, each with its share.
 // `panel` renders it in the side panel beside the deals board.
 export function DealDetail({ id, navigate, panel = false }: { id: string; navigate: (to: string) => void; panel?: boolean }) {
-  const { fetchDeal, updateDeal, fetchActivities, setError, customFields, changes, stages } = useCrm();
+  const { fetchDeal, updateDeal, fetchActivities, fetchContact, setError, customFields, changes, stages } = useCrm();
   const relationDefs = customFields.filter((d) => d.entity_type === "deal" && d.field_type === "relation");
   const [deal, setDeal] = useState<Deal | null | undefined>(undefined);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -72,6 +73,21 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
     return () => { alive = false; };
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The company the deal's contact works at, which may not be the deal's own:
+  // read from the contact, again after any record write (it may have moved).
+  const contactId = deal?.contact_id ?? null;
+  const [contactCompany, setContactCompany] = useState<RelationRecord | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setContactCompany(null);
+    if (contactId) {
+      fetchContact(contactId).then((c) => {
+        if (alive && c?.company_id && c.company_name != null) setContactCompany({ id: c.company_id, label: c.company_name, domain: c.company_domain ?? null });
+      });
+    }
+    return () => { alive = false; };
+  }, [contactId, changes]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (deal === undefined) {
     return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading…</div>;
   }
@@ -94,6 +110,9 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
   const contact: RelationRecord | undefined = deal.contact_id && deal.contact_first_name != null
     ? { id: deal.contact_id, label: contactName, domain: null }
     : undefined;
+  // Shown beside the contact when it isn't the deal's company, as a link to it.
+  const otherCompany = contactCompany && contactCompany.id !== deal.company_id ? contactCompany : null;
+  const otherCompanyHref = otherCompany ? recordHref("company", otherCompany.id) : undefined;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -141,7 +160,17 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
               </Attr>
               <Attr icon={User} label="Contact">
                 <RelationInput link entity="contact" value={deal.contact_id} known={contact} placeholder="Set contact…" emptyLabel="No contact"
-                  onChange={(v) => void saveField({ contact_id: v })} />
+                  onChange={(v) => void saveField({ contact_id: v })}
+                  suffix={otherCompany && otherCompanyHref && (
+                    <a
+                      href={otherCompanyHref}
+                      onClick={(e) => { if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); go(otherCompanyHref); } }}
+                      title={`${contactName || "The contact"} works at ${otherCompany.label}, not at this deal's company`}
+                      className="min-w-0 truncate text-[0.8125rem] text-muted-foreground underline decoration-border underline-offset-2 hover:text-foreground hover:decoration-foreground"
+                    >
+                      ({otherCompany.label})
+                    </a>
+                  )} />
               </Attr>
               <RelationAttrs defs={relationDefs} row={deal} onSave={(key, v) => saveField({ [key]: v } as Partial<Deal>)} />
             </dl>
