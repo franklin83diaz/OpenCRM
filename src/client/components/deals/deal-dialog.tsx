@@ -18,6 +18,7 @@ import { api } from "@/api";
 import { CustomFieldsSection, readCustom } from "@/lib/custom-fields";
 import { RelationSections } from "@/components/record-relations";
 import { RecordsInput } from "@/lib/relations";
+import { OwnerField } from "@/components/deals/owner-field";
 import type { Deal } from "@/types";
 
 // Radix Select forbids an empty-string item value, so we use a sentinel for the
@@ -29,6 +30,8 @@ interface FormState {
   contact_id: string;
   company_id: string;
   value: string;
+  recurring_value: string;
+  owner_id: string | null;
   stage: string;
   close_date: string;
   notes: string;
@@ -41,6 +44,8 @@ function toForm(deal: Deal | undefined, defaultStage: string): FormState {
     contact_id: deal?.contact_id ?? "",
     company_id: deal?.company_id ?? "",
     value: deal?.value != null ? String(deal.value) : "",
+    recurring_value: deal?.recurring_value ? String(deal.recurring_value) : "",
+    owner_id: deal?.owner_id ?? null,
     stage: deal?.stage || defaultStage,
     close_date: deal?.close_date ?? "",
     notes: deal?.notes ?? "",
@@ -89,6 +94,9 @@ export function DealDialog({
         // company its contact's company.
         ...(form.company_id !== (deal?.company_id ?? "") ? { company_id: form.company_id || null } : {}),
         value: parseFloat(form.value) || 0,
+        recurring_value: parseFloat(form.recurring_value) || 0,
+        // Sent only when changed: a new deal is nobody's until someone takes it.
+        ...((form.owner_id ?? null) !== (deal?.owner_id ?? null) ? { owner_id: form.owner_id } : {}),
         stage: form.stage,
         close_date: form.close_date,
         notes: form.notes.trim(),
@@ -175,7 +183,7 @@ export function DealDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="value">Value</Label>
+              <Label htmlFor="value">One-time value</Label>
               <Input
                 id="value"
                 type="number"
@@ -184,6 +192,25 @@ export function DealDialog({
                 value={form.value}
                 onChange={(e) => set("value", e.target.value)}
               />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="recurring_value">Monthly value</Label>
+              <Input
+                id="recurring_value"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="While they stay a customer"
+                value={form.recurring_value}
+                onChange={(e) => set("recurring_value", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label>Owner</Label>
+              <OwnerField input modal value={form.owner_id} owner={deal?.owner} onChange={(id) => set("owner_id", id)} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="stage">Stage</Label>

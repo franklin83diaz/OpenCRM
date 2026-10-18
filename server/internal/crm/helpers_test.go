@@ -125,13 +125,18 @@ func recordedDB(t *testing.T, seed []string) *recorder {
 	return rec
 }
 
-// Partners came after the port, so TS never answered with them: a replay
-// compares what TS did with the partners' additions left out — a deal's
-// `partners`, partner_ids among a deal's valid fields, the stats' count of
-// partners, and the statements on the partners and deal_partners tables
-// (no statement TS ran names either).
+// Partners, a deal's recurring value and a deal's owner came after the port,
+// so TS never answered with them: a replay compares what TS did with them left
+// out — a deal's `partners`, `recurring_value`, `owner_id` and `owner`, the
+// same among a deal's valid fields (partner_ids for partners), the stats'
+// count of partners and recurring value, and the statements on the partners
+// and deal_partners tables or the recurring value (no statement TS ran names
+// any of them).
 
-// withoutPartners is a response body without the partners' additions; text
+// postPortDealKeys are a deal's keys TS never had.
+var postPortDealKeys = []string{"partners", "recurring_value", "owner_id", "owner"}
+
+// withoutPartners is a response body without what came after the port; text
 // that isn't JSON comes back as it is.
 func withoutPartners(text string) string {
 	var v any
@@ -142,15 +147,20 @@ func withoutPartners(text string) string {
 	strip = func(v any) {
 		switch v := v.(type) {
 		case map[string]any:
-			_, deal := v["stage"]
-			_, stats := v["dealValue"]
-			if deal || stats {
-				delete(v, "partners")
+			if _, deal := v["stage"]; deal {
+				for _, k := range postPortDealKeys {
+					delete(v, k)
+				}
 			}
-			if valid, ok := v["valid_fields"].([]any); ok {
+			if _, stats := v["dealValue"]; stats {
+				delete(v, "partners")
+				delete(v, "dealRecurringValue")
+			}
+			// A deal's valid fields: a company has an owner_id of its own in the replays.
+			if valid, ok := v["valid_fields"].([]any); ok && strings.HasPrefix(fmt.Sprint(v["error"]), "Unknown field(s) for deal:") {
 				kept := []any{}
 				for _, k := range valid {
-					if k != "partner_ids" {
+					if k != "partner_ids" && k != "recurring_value" && k != "owner_id" {
 						kept = append(kept, k)
 					}
 				}
@@ -170,10 +180,10 @@ func withoutPartners(text string) string {
 	return string(b)
 }
 
-var partnerTables = regexp.MustCompile(`\b(partners|deal_partners)\b`)
+var partnerTables = regexp.MustCompile(`\b(partners|deal_partners|recurring_value)\b`)
 
-// withoutPartnerStatements is log without the statements on the partners'
-// tables.
+// withoutPartnerStatements is log without the statements that came after the
+// port.
 func withoutPartnerStatements(log []tsStatement) []tsStatement {
 	out := []tsStatement{}
 	for _, st := range log {

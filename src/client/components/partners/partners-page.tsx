@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Search, Plus, Trash2, X, ExternalLink } from "lucide-react";
+import { Search, Plus, Trash2, X } from "lucide-react";
 import { useCrm } from "@/context";
-import { PageHeader, EntityIcon, EmptyState } from "@/components/shared";
+import { PageHeader, EntityIcon, EmptyState, CategoryBadge } from "@/components/shared";
+import { PARTNER_STATUSES, statusLabel } from "@/components/partners/statuses";
 import { PartnerDialog } from "@/components/partners/partner-dialog";
 import { FilterBar } from "@/components/filter-bar";
 import { fieldsFromDefs, sanitize } from "@/lib/filters";
@@ -14,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { CustomFieldDisplay, readCustom } from "@/lib/custom-fields";
 import { relationColumn } from "@/lib/relations";
-import { customFieldCopy, customFieldEdit, textEdit } from "@/components/cell-editors";
+import { customFieldCopy, customFieldEdit, optionEdit, textEdit, valuesEdit } from "@/components/cell-editors";
 import { useTableView, useAggregates, listFilterQuery } from "@/hooks/use-table-view";
 import { downloadCsv, exportListCsv, exportViewCsv } from "@/lib/csv";
 import { ExportButton } from "@/components/export-button";
@@ -22,8 +23,8 @@ import type { Partner } from "@/types";
 
 const dash = <span className="text-muted-foreground">—</span>;
 
-// The partners list: the companies' list without industry, contacts and
-// import, and with how many deals each partner takes part in. `openId`,
+// The partners list: the companies' list without contacts and import, with
+// each partner's status and how many deals it takes part in. `openId`,
 // `viewParam` and `filtersParam` as ContactsPage.
 export function PartnersPage({ navigate, openId, viewParam, filtersParam }: { navigate: (to: string, opts?: { replace?: boolean }) => void; openId?: string; viewParam?: string; filtersParam?: string }) {
   const { partners, partnersPag, stats, setPartnersPage, setPartnersSort, setPartnersSearch, setPartnersFilters, setPartnersView, deletePartners, updatePartner, customFields, setError } = useCrm();
@@ -31,7 +32,8 @@ export function PartnersPage({ navigate, openId, viewParam, filtersParam }: { na
   const filterFields = fieldsFromDefs(
     [
       { key: "name", label: "Name", type: "text", column: "name" },
-      { key: "domain", label: "Domain", type: "text", column: "domain" },
+      { key: "industry", label: "Industry", type: "text", column: "industry" },
+      { key: "status", label: "Status", type: "enum", column: "status", options: PARTNER_STATUSES },
       { key: "email", label: "Email", type: "text", column: "email" },
       { key: "phone", label: "Phone", type: "text", column: "phone" },
       { key: "deals", label: "Deals", type: "relation", entity: "deal", column: "deals" },
@@ -40,7 +42,7 @@ export function PartnersPage({ navigate, openId, viewParam, filtersParam }: { na
     ],
     partnerFields,
   );
-  const view = useTableView("partner", viewParam, { name: 220, domain: 180, email: 220, phone: 160, deals: 112 });
+  const view = useTableView("partner", viewParam, { name: 220, industry: 160, status: 130, email: 220, phone: 160, deals: 112 });
   const listView = useListView({ entity: "partner", table: view, filtersParam, pag: partnersPag, setFilters: setPartnersFilters, setView: setPartnersView, navigate });
 
   const name: NameColumn<Partner> = {
@@ -50,7 +52,7 @@ export function PartnersPage({ navigate, openId, viewParam, filtersParam }: { na
     text: (p) => p.name,
     render: (p) => (
       <>
-        <EntityIcon name={p.name} domain={p.domain} className="size-5" />
+        <EntityIcon name={p.name} className="size-5" />
         <span className="truncate">{p.name || "—"}</span>
       </>
     ),
@@ -64,22 +66,11 @@ export function PartnersPage({ navigate, openId, viewParam, filtersParam }: { na
     }
   };
   const columns: RecordColumn<Partner>[] = [
+    { key: "industry", label: "Industry", sort: "industry", text: (p) => p.industry, edit: valuesEdit("partner", "industry", "Industry", saveCell), render: (p) => <CategoryBadge value={p.industry} /> },
     {
-      key: "domain", label: "Domain", sort: "domain", text: (p) => p.domain, edit: textEdit("domain", saveCell),
-      render: (p) => p.domain
-        ? (
-          <a
-            href={/^https?:\/\//i.test(p.domain) ? p.domain : `https://${p.domain}`}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex max-w-full items-center gap-1 align-middle text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground"
-          >
-            <span className="truncate">{p.domain.replace(/^https?:\/\//i, "").replace(/\/$/, "")}</span>
-            <ExternalLink className="size-3 shrink-0" />
-          </a>
-        )
-        : dash,
+      key: "status", label: "Status", sort: "status", text: (p) => statusLabel(p.status),
+      edit: optionEdit("status", PARTNER_STATUSES, saveCell),
+      render: (p) => <CategoryBadge value={statusLabel(p.status)} />,
     },
     { key: "email", label: "Email", sort: "email", text: (p) => p.email, edit: textEdit("email", saveCell, { input: "email" }), render: (p) => p.email ? <span className="truncate">{p.email}</span> : dash },
     { key: "phone", label: "Phone", sort: "phone", text: (p) => p.phone, edit: textEdit("phone", saveCell, { input: "tel" }), render: (p) => p.phone ? <span className="tabular truncate">{p.phone}</span> : dash },

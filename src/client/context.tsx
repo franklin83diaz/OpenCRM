@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { View, Contact, Company, Deal, Partner, Stats, PaginatedState, StageDef, Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult } from "./types";
+import type { View, Contact, Company, Deal, Partner, TeamMember, Stats, PaginatedState, StageDef, Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult } from "./types";
 import type { FilterNode } from "./lib/filters";
 
 export interface CrmContextValue {
@@ -80,6 +80,10 @@ export interface CrmContextValue {
   // Pipeline stages (data-driven vocabulary, ordered by position)
   stages: StageDef[];
   refetchStages: () => Promise<void>;
+
+  // The accounts deals can be assigned to (GET /api/team)
+  team: TeamMember[];
+  refetchTeam: () => Promise<void>;
   refetchBoard: () => Promise<void>;
   refetchStats: () => Promise<void>;
 

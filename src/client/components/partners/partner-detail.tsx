@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mail, LayoutGrid, Activity as ActivityIcon, Phone, Globe, AtSign, StickyNote, Calendar, Clock, Handshake, Plus, X } from "lucide-react";
+import { ArrowLeft, Mail, LayoutGrid, Activity as ActivityIcon, Phone, AtSign, DollarSign, Tag, CircleDot, StickyNote, Calendar, Clock, Handshake, Plus, X } from "lucide-react";
 import { useCrm } from "@/context";
 import { api } from "@/api";
-import { EntityIcon } from "@/components/shared";
+import { EntityIcon, CategoryBadge } from "@/components/shared";
+import { OptionField, ValuesField } from "@/components/value-fields";
+import { PARTNER_STATUSES, statusLabel } from "@/components/partners/statuses";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,7 +12,7 @@ import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/componen
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RecordPicker } from "@/lib/relations";
 import { cn, colorClasses, formatMoney } from "@/lib/utils";
-import type { Activity, Deal, Partner } from "@/types";
+import type { Activity, Deal, DealPartner, Partner } from "@/types";
 
 function formatTimestamp(createdAt: string): string {
   const d = new Date(createdAt.replace(" ", "T") + "Z");
@@ -22,7 +24,7 @@ function formatTimestamp(createdAt: string): string {
 // control; there is no edit mode. `panel` renders it in the side panel beside
 // the partners list.
 export function PartnerDetail({ id, navigate, panel = false }: { id: string; navigate: (to: string) => void; panel?: boolean }) {
-  const { fetchPartner, updatePartner, fetchActivities, setError, customFields, changes } = useCrm();
+  const { fetchPartner, updatePartner, fetchActivities, setError, customFields, changes, stages } = useCrm();
   const relationDefs = customFields.filter((d) => d.entity_type === "partner" && d.field_type === "relation");
   const [partner, setPartner] = useState<Partner | null | undefined>(undefined);
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -74,8 +76,13 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
   }
 
   const recent = [...activities].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const host = (partner.domain || "").replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
   const dealCount = partner.deal_count ?? deals.length;
+  // What the partner gets from the deals won: its shares of them, once and each month.
+  const won = deals.filter((d) => stages.find((s) => s.key === d.stage)?.is_won);
+  const earned = won.reduce((t, d) => {
+    const share = d.partners?.find((p) => p.id === partner.id);
+    return { once: t.once + (share?.one_time_value ?? 0), monthly: t.monthly + (share?.recurring_value ?? 0) };
+  }, { once: 0, monthly: 0 });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -84,7 +91,7 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
       <div className={cn("flex min-h-0 flex-1", panel && "flex-col overflow-y-auto")}>
         <aside className={cn("flex shrink-0 flex-col", !panel && "w-[31.25rem] overflow-y-auto border-r border-border")}>
           <div className="flex items-center gap-3 px-4 pt-4">
-            <EntityIcon name={partner.name} domain={partner.domain} className="size-9 rounded-md text-sm" />
+            <EntityIcon name={partner.name} className="size-9 rounded-md text-sm" />
             <div className="min-w-0 flex-1">
               <InlineField value={partner.name} placeholder="Partner name" onSave={(v) => { if (v) return saveField({ name: v }); }} className="h-8 w-auto px-1.5 text-base font-semibold" />
             </div>
@@ -98,9 +105,11 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
 
           <DetailsSection title="Record details">
             <dl className="flex flex-col">
-              <Attr icon={Globe} label="Domain">
-                <InlineField value={partner.domain} placeholder="Set domain…" onSave={(v) => saveField({ domain: v })}
-                  render={(v) => <a href={`https://${v.replace(/^https?:\/\//i, "")}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-info hover:underline">{v}</a>} />
+              <Attr icon={Tag} label="Industry">
+                <ValuesField entity="partner" field="industry" label="industry" value={partner.industry} onSave={(v) => saveField({ industry: v })} />
+              </Attr>
+              <Attr icon={CircleDot} label="Status">
+                <OptionField options={PARTNER_STATUSES} label="status" value={partner.status} onSave={(v) => saveField({ status: v })} />
               </Attr>
               <Attr icon={AtSign} label="Email">
                 <InlineField type="email" value={partner.email} placeholder="Set email…" onSave={(v) => saveField({ email: v })}
@@ -138,12 +147,13 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
               <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-medium">Highlights</h2>
                 <div className="grid grid-cols-3 gap-3">
-                  <Tile icon={Globe} label="Domain" empty="No domain" value={host && <a href={`https://${host}`} target="_blank" rel="noreferrer" className="text-info hover:underline">{host}</a>} />
-                  <Tile icon={Handshake} label="Deals" empty="No deals" value={dealCount ? `${dealCount} ${dealCount === 1 ? "deal" : "deals"}` : undefined} />
+                  <Tile icon={CircleDot} label="Status" empty="No status" value={partner.status && <CategoryBadge value={statusLabel(partner.status)} />} />
+                  <Tile icon={Tag} label="Industry" empty="No industry" value={partner.industry} />
                   <Tile icon={AtSign} label="Email" empty="No email address" value={partner.email} />
-                  <Tile icon={Phone} label="Phone" empty="No phone" value={partner.phone} />
+                  <Tile icon={Handshake} label="Deals" empty="No deals" value={dealCount ? `${dealCount} ${dealCount === 1 ? "deal" : "deals"}` : undefined} />
+                  <Tile icon={DollarSign} label="From won deals" empty="Nothing won yet"
+                    value={won.length ? <span className="tabular">{formatMoney(earned.once)} + {formatMoney(earned.monthly)}/mo</span> : undefined} />
                   <Tile icon={Clock} label="Last activity" empty="No activity" value={recent[0] ? formatTimestamp(recent[0].created_at) : undefined} />
-                  <Tile icon={Calendar} label="Created" empty="Unknown" value={formatTimestamp(partner.created_at)} />
                 </div>
               </section>
             )}
@@ -174,26 +184,26 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
 }
 
 /**
- * The deals a partner takes part in: each with its stage and value, + to
- * add the partner to another deal and × to take it off one. Both write the
- * deal's partner_ids.
+ * The deals a partner takes part in: each with its stage and value, and the
+ * partner's share of it, once and each month, edited in place. + adds the
+ * partner to another deal, × takes it off one; each change is its own write
+ * to the deal's partners.
  */
 function PartnerDeals({ partnerId, deals }: { partnerId: string; deals: Deal[] }) {
-  const { fetchDeal, updateDeal, setError, stages } = useCrm();
+  const { setError, recordsChanged, stages } = useCrm();
   const [open, setOpen] = useState(false);
   const linked = deals.map((d) => d.id);
 
-  // Reads the deal for its partners as they are now, then writes them back with this one added or taken off.
-  const toggle = async (dealId: string) => {
+  const write = async (method: "PUT" | "DELETE", dealId: string, body?: Partial<DealPartner>) => {
     try {
-      const deal = await fetchDeal(dealId);
-      if (!deal) throw new Error("That deal no longer exists");
-      const ids = (deal.partners ?? []).map((p) => p.id);
-      await updateDeal(dealId, { partner_ids: ids.includes(partnerId) ? ids.filter((x) => x !== partnerId) : [...ids, partnerId] });
+      await api(method, `/api/deals/${encodeURIComponent(dealId)}/partners/${encodeURIComponent(partnerId)}`, body);
+      await recordsChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
     }
   };
+  const amount = (v: string) => Number(v) || 0;
+  const money = (v: string) => <span className="tabular">{formatMoney(Number(v))}</span>;
 
   return (
     <section className="flex flex-col gap-3" aria-label="Deals">
@@ -206,37 +216,61 @@ function PartnerDeals({ partnerId, deals }: { partnerId: string; deals: Deal[] }
             <Button variant="ghost" size="icon" aria-label="Add to a deal" title="Add to a deal"><Plus className="size-4" /></Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 p-0">
-            <RecordPicker entity="deal" selected={linked} placeholder="Search deals…" onPick={(r) => void toggle(r.id)} />
+            <RecordPicker entity="deal" selected={linked} placeholder="Search deals…" onPick={(r) => void write(linked.includes(r.id) ? "DELETE" : "PUT", r.id, linked.includes(r.id) ? undefined : {})} />
           </PopoverContent>
         </Popover>
       </div>
       {deals.length === 0 ? (
         <p className="text-sm text-faint">Not part of any deal yet.</p>
       ) : (
-        <ul className="flex flex-col rounded-md bg-card shadow-edge">
-          {deals.map((d) => {
-            const stage = stages.find((s) => s.key === d.stage);
-            return (
-              <li key={d.id} className="group/deal flex h-11 items-center gap-3 px-3.5 [&+li]:border-t [&+li]:border-border">
-                <span className="min-w-0 flex-1"><RecordChip entity="deal" record={{ id: d.id, label: d.name, domain: null }} /></span>
-                <span className="inline-flex shrink-0 items-center gap-1.5 text-[0.8125rem] text-muted-foreground">
-                  <span className={cn("size-2 rounded-full", colorClasses(stage?.color).dot)} />
-                  {stage?.label ?? d.stage}
-                </span>
-                <span className="w-24 shrink-0 text-right tabular text-sm">{formatMoney(d.value)}</span>
-                <button
-                  type="button"
-                  onClick={() => void toggle(d.id)}
-                  aria-label={`Take off ${d.name}`}
-                  title="Take off this deal"
-                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-xs text-muted-foreground opacity-0 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 group-hover/deal:opacity-100 [@media(hover:none)]:opacity-100 [[data-agent]_&]:opacity-100"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="rounded-md bg-card shadow-edge">
+          <table className="w-full table-fixed text-sm">
+            <thead>
+              <tr className="text-left text-[0.8125rem] text-muted-foreground">
+                <th className="h-9 pl-3.5 font-normal">Deal</th>
+                <th className="h-9 w-28 px-2 font-normal">Share once</th>
+                <th className="h-9 w-28 px-2 font-normal">Share monthly</th>
+                <th className="h-9 w-9" aria-label="Remove" />
+              </tr>
+            </thead>
+            <tbody>
+              {deals.map((d) => {
+                const stage = stages.find((s) => s.key === d.stage);
+                const share = d.partners?.find((p) => p.id === partnerId);
+                return (
+                  <tr key={d.id} className="group/deal border-t border-border">
+                    <td className="min-w-0 py-2 pl-3.5 pr-2">
+                      <RecordChip entity="deal" record={{ id: d.id, label: d.name, domain: null }} />
+                      <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                        <span className={cn("size-2 shrink-0 rounded-full", colorClasses(stage?.color).dot)} />
+                        {stage?.label ?? d.stage} · <span className="tabular">{formatMoney(d.value)}{d.recurring_value ? ` + ${formatMoney(d.recurring_value)}/mo` : ""}</span>
+                      </span>
+                    </td>
+                    <td>
+                      <InlineField type="number" value={share?.one_time_value ? String(share.one_time_value) : ""} placeholder="Once…" render={money}
+                        onSave={(v) => write("PUT", d.id, { one_time_value: amount(v) })} />
+                    </td>
+                    <td>
+                      <InlineField type="number" value={share?.recurring_value ? String(share.recurring_value) : ""} placeholder="Monthly…" render={(v) => <>{money(v)}<span className="text-muted-foreground">/mo</span></>}
+                        onSave={(v) => write("PUT", d.id, { recurring_value: amount(v) })} />
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => void write("DELETE", d.id)}
+                        aria-label={`Take off ${d.name}`}
+                        title="Take off this deal"
+                        className="inline-flex size-6 items-center justify-center rounded-xs text-muted-foreground opacity-0 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 group-hover/deal:opacity-100 [@media(hover:none)]:opacity-100 [[data-agent]_&]:opacity-100"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

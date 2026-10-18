@@ -30,9 +30,12 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 - `GET /api/deals/board` — Get all deals for the pipeline board view, optionally filtered
 - `GET /api/deals/progress` — Open deals, worst first: each one's next step and the reasons to look at it
 - `GET /api/deals` — List deals with pagination, search, and filtering (partner_id: the deals a partner takes part in)
-- `POST /api/deals` — Create a new deal; partner_ids names the partners taking part
+- `POST /api/deals` — Create a new deal: value (once), recurring_value (each month), owner_id (GET /api/team; null for nobody), partner_ids (the partners taking part)
 - `PUT /api/deals/{id}` — Update a deal; partner_ids replaces its partners
 - `DELETE /api/deals/{id}` — Delete a deal
+- `PUT /api/deals/{id}/partners/{partner_id}` — Make a partner take part in a deal, and set its share: {one_time_value?, recurring_value?}
+- `DELETE /api/deals/{id}/partners/{partner_id}` — Take a partner off a deal
+- `GET /api/team` — The accounts deals can be assigned to
 - `GET /api/tasks` — List tasks: open ones by due date (undated last), done ones newest first
 - `POST /api/tasks` — Create a task
 - `PUT /api/tasks/{id}` — Update a task, or mark it done (done: true) or open again (done: false)

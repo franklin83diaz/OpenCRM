@@ -136,7 +136,7 @@ func (app *App) dealsBoard(w http.ResponseWriter, r *http.Request) error {
 		for i, d := range deals {
 			out[i] = withProgress(d, p, js.String(d["id"]))
 		}
-		if err := withDealPartners(ctx, out); err != nil {
+		if err := withDealLinks(ctx, out); err != nil {
 			return 0, nil, err
 		}
 		return 200, dealsBody{out}, nil
@@ -232,7 +232,7 @@ func (app *App) dealsProgress(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return 0, nil, err
 		}
-		if err := withDealPartners(ctx, deals); err != nil {
+		if err := withDealLinks(ctx, deals); err != nil {
 			return 0, nil, err
 		}
 		return 200, dealsProgressBody{deals, float64(len(open)), counts, p.Sight}, nil
@@ -247,7 +247,7 @@ type dealsPage struct {
 	TotalValue any      `json:"totalValue"`
 }
 
-var dealSorts = []string{"id", "name", "value", "stage", "close_date", "created_at"}
+var dealSorts = []string{"id", "name", "value", "recurring_value", "stage", "close_date", "created_at"}
 
 // listDeals lists deals with pagination, search (name and notes), stage (a
 // stage key, see GET /api/stages), contact, company and partner, sorted by
@@ -319,7 +319,7 @@ func (app *App) listDeals(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return 0, nil, err
 		}
-		if err := withDealPartners(ctx, deals); err != nil {
+		if err := withDealLinks(ctx, deals); err != nil {
 			return 0, nil, err
 		}
 		return 200, dealsPage{deals, orZero(count, "total"), page, limit, orZero(agg, "total_value")}, nil
@@ -331,7 +331,7 @@ type dealBody struct {
 }
 
 // readDeal is a deal as the write routes answer it: dealSelect's row, its
-// relations and its partners.
+// relations, its partners and its owner.
 func readDeal(ctx context.Context, id string) (db.Row, error) {
 	row, err := db.Get(ctx, dealSelect+" WHERE d.id = ?", id)
 	if err != nil {
@@ -340,13 +340,14 @@ func readDeal(ctx context.Context, id string) (db.Row, error) {
 	return dealView(ctx, row)
 }
 
-// dealView is a deal row with its relations and its partners; nil for nil.
+// dealView is a deal row with its relations, its partners and its owner;
+// nil for nil.
 func dealView(ctx context.Context, row db.Row) (db.Row, error) {
 	row, err := WithRelationsOne(ctx, Deal, row)
 	if err != nil || row == nil {
 		return row, err
 	}
-	return row, withDealPartners(ctx, []db.Row{row})
+	return row, withDealLinks(ctx, []db.Row{row})
 }
 
 // dealValue is `parseFloat(String(body.value)) || 0` on a validated body's
@@ -387,10 +388,15 @@ func dealWriteSchema(create bool) zodCheck {
 		// setting a contact on a deal without one also sets it, to the contact's
 		// company.
 		zKey("company_id", zOptional(zNullable(zString(0, 0)))),
+		// What the deal is worth once.
 		zKey("value", zOptional(zNumberOrString())),
+		// What it is worth each month while they stay a customer.
+		zKey("recurring_value", zOptional(zNumberOrString())),
 		zKey("stage", zOptional(zString(0, 0))),
 		zKey("close_date", zOptional(zString(0, 0))),
 		zKey("notes", zOptional(zString(0, 0))),
+		// The account the deal is assigned to (GET /api/team); null for nobody.
+		zKey("owner_id", zOptional(zNullable(zString(0, 0)))),
 		// The partners taking part in the deal: the whole list, which replaces
 		// the one before ([] for none).
 		zKey("partner_ids", zOptional(zArray(zString(0, 0), maxDealPartners))),
@@ -432,6 +438,13 @@ func (app *App) createDeal(w http.ResponseWriter, r *http.Request) error {
 		if problem != "" {
 			return fail(400, problem)
 		}
+		owner, ownerSent, problem, err := dealOwnerID(ctx, body)
+		if err != nil {
+			return 0, nil, err
+		}
+		if problem != "" {
+			return fail(400, problem)
+		}
 
 		contactID := textOrNull(body["contact_id"])
 		var companyID any
@@ -465,8 +478,17 @@ func (app *App) createDeal(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		id := js.UUID()
-		if _, err := db.Run(ctx, "INSERT INTO deals (id, name, contact_id, company_id, value, stage, close_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-			id, name, contactID, companyID, value, stageKey, trimmedText(body, "close_date"), trimmedText(body, "notes")); err != nil {
+		cols := []string{"id", "name", "contact_id", "company_id", "value", "stage", "close_date", "notes"}
+		params := []any{id, name, contactID, companyID, value, stageKey, trimmedText(body, "close_date"), trimmedText(body, "notes")}
+		// The columns that came after the port, only when sent: a deal without
+		// them is written as it always was.
+		if v, sent := body["recurring_value"]; sent {
+			cols, params = append(cols, "recurring_value"), append(params, dealValue(v))
+		}
+		if ownerSent {
+			cols, params = append(cols, "owner_id"), append(params, owner)
+		}
+		if _, err := db.Run(ctx, fmt.Sprintf("INSERT INTO deals (%s) VALUES (%s)", strings.Join(cols, ", "), marks(len(cols))), params...); err != nil {
 			return 0, nil, err
 		}
 
@@ -540,6 +562,10 @@ func (app *App) updateDeal(w http.ResponseWriter, r *http.Request) error {
 			fields = append(fields, "value = ?")
 			params = append(params, dealValue(v))
 		}
+		if v, sent := body["recurring_value"]; sent {
+			fields = append(fields, "recurring_value = ?")
+			params = append(params, dealValue(v))
+		}
 		contact, contactSent := body["contact_id"]
 		if contactSent {
 			fields = append(fields, "contact_id = ?")
@@ -556,6 +582,17 @@ func (app *App) updateDeal(w http.ResponseWriter, r *http.Request) error {
 		}
 		if problem != "" {
 			return fail(400, problem)
+		}
+		owner, ownerSent, problem, err := dealOwnerID(ctx, body)
+		if err != nil {
+			return 0, nil, err
+		}
+		if problem != "" {
+			return fail(400, problem)
+		}
+		if ownerSent {
+			fields = append(fields, "owner_id = ?")
+			params = append(params, owner)
 		}
 
 		if len(fields) == 0 && len(custom.values) == 0 && !partnersSent {

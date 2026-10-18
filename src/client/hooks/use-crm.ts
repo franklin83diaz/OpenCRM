@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, type Dispatch, type SetStateAction } from "react";
 import { api } from "../api";
 import type {
-  Contact, Company, Deal, Partner, Stats, PaginatedState, StageDef,
+  Contact, Company, Deal, Partner, Stats, PaginatedState, StageDef, TeamMember,
   Activity, EntityType, CustomFieldDef, ImportRow, ImportEntity, ImportResult,
 } from "../types";
 import { sanitize, type FilterNode } from "@/lib/filters";
@@ -24,7 +24,7 @@ function pagParams(pag: PaginatedState): URLSearchParams {
 }
 
 export function useCrmState(isAgent: boolean): CrmContextValue {
-  const [stats, setStats] = useState<Stats>({ contacts: 0, companies: 0, deals: 0, dealValue: 0, customers: 0, partners: 0 });
+  const [stats, setStats] = useState<Stats>({ contacts: 0, companies: 0, deals: 0, dealValue: 0, dealRecurringValue: 0, customers: 0, partners: 0 });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -45,6 +45,8 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
 
   const [customFields, setCustomFields] = useState<CustomFieldDef[]>([]);
   const [stages, setStages] = useState<StageDef[]>([]);
+  // The accounts deals can be assigned to.
+  const [team, setTeam] = useState<TeamMember[]>([]);
   // Bumped on every record write, so an open record page re-reads itself.
   const [changes, setChanges] = useState(0);
 
@@ -94,6 +96,11 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     setCustomFields(data.defs);
   }, []);
 
+  const refetchTeam = useCallback(async () => {
+    const data = await api<{ team: TeamMember[] }>("GET", "/api/team");
+    setTeam(data.team);
+  }, []);
+
   const refetchStages = useCallback(async () => {
     const data = await api<{ stages: StageDef[] }>("GET", "/api/stages");
     setStages(data.stages);
@@ -108,7 +115,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
         await Promise.all([
           fetchStats(), fetchContacts(contactsPag), fetchCompanies(companiesPag), fetchPartners(partnersPag),
           fetchDeals(dealsPag), fetchBoardDeals(),
-          refetchCustomFields(), refetchStages(),
+          refetchCustomFields(), refetchStages(), refetchTeam(),
         ]);
       } catch (err) {
         setError((err as Error).message);
@@ -319,6 +326,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     customFields, refetchCustomFields,
     changes, recordsChanged,
     stages, refetchStages,
+    team, refetchTeam,
     refetchBoard: fetchBoardDeals, refetchStats: fetchStats,
     loading, error, setError,
   };

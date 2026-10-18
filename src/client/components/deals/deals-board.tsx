@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from "react";
-import { Plus, Pencil, Trash2, MoreHorizontal, ArrowRightLeft, CircleDollarSign, CalendarDays, Building2, UserRound, HeartHandshake, Network, NotebookText, Clock3, Footprints, type LucideIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, MoreHorizontal, ArrowRightLeft, CircleDollarSign, CalendarDays, Building2, UserRound, UserCheck, HeartHandshake, Network, NotebookText, Clock3, Footprints, type LucideIcon } from "lucide-react";
 import { DndContext, DragOverlay, PointerSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { useCrm } from "@/context";
-import { PageHeader, Avatar, EntityIcon, EmptyState } from "@/components/shared";
+import { PageHeader, Avatar, EntityIcon, EmptyState, UserAvatar } from "@/components/shared";
+import { memberName } from "@/components/deals/owner-field";
 import { DealDialog } from "@/components/deals/deal-dialog";
 import { StageDialog } from "@/components/deals/stage-dialog";
 import { FilterBar } from "@/components/filter-bar";
@@ -24,7 +25,7 @@ import type { Deal, StageDef } from "@/types";
 
 // `openId` is the deal open in the side panel beside the board (`?record=`).
 export function DealsBoard({ navigate, openId }: { navigate: (to: string, opts?: { replace?: boolean }) => void; openId?: string }) {
-  const { boardDeals, boardFilters, setBoardFilters, stats, dealsTotalValue, addDeal, updateDeal, deleteDeal, stages, refetchStages, refetchBoard, refetchStats, setError, isAgent, customFields } = useCrm();
+  const { boardDeals, boardFilters, setBoardFilters, stats, dealsTotalValue, addDeal, updateDeal, deleteDeal, stages, refetchStages, refetchBoard, refetchStats, setError, isAgent, customFields, team } = useCrm();
   const openRecord = (id: string) => navigate(withQuery({ record: id }), { replace: !!openId });
 
   // The board has no saved views: filters apply to what it shows, and a card
@@ -32,7 +33,10 @@ export function DealsBoard({ navigate, openId }: { navigate: (to: string, opts?:
   const filterFields = fieldsFromDefs(
     [
       { key: "name", label: "Name", type: "text", column: "name" },
-      { key: "value", label: "Value", type: "number", column: "value" },
+      { key: "value", label: "One-time value", type: "number", column: "value" },
+      { key: "recurring_value", label: "Monthly value", type: "number", column: "recurring_value" },
+      // "Owner is empty": the deals nobody has taken yet.
+      { key: "owner_id", label: "Owner", type: "enum", column: "owner_id", options: team.map((m) => ({ label: memberName(m), value: m.id })) },
       { key: "company_id", label: "Company", type: "relation", entity: "company", column: "company_id" },
       { key: "contact_id", label: "Contact", type: "relation", entity: "contact", column: "contact_id" },
       { key: "partners", label: "Partners", type: "relation", entity: "partner" },
@@ -120,7 +124,10 @@ export function DealsBoard({ navigate, openId }: { navigate: (to: string, opts?:
         <DealsViewSwitch view="board" navigate={navigate} />
         <div className="flex flex-col items-end">
           <div className="section-label">Pipeline value</div>
-          <span className="tabular text-sm font-semibold">{formatMoney(dealsTotalValue)}</span>
+          <span className="tabular text-sm font-semibold">
+            {formatMoney(dealsTotalValue)}
+            {stats.dealRecurringValue > 0 && <span className="font-normal text-muted-foreground"> + {formatMoney(stats.dealRecurringValue)}/mo</span>}
+          </span>
         </div>
         {addButton}
       </PageHeader>
@@ -144,6 +151,7 @@ export function DealsBoard({ navigate, openId }: { navigate: (to: string, opts?:
             {stages.map((stage) => {
               const columnDeals = boardDeals.filter((d) => d.stage === stage.key);
               const columnTotal = columnDeals.reduce((sum, d) => sum + (d.value || 0), 0);
+              const columnMonthly = columnDeals.reduce((sum, d) => sum + (d.recurring_value || 0), 0);
               const c = colorClasses(stage.color);
               return (
                 <StageDrop key={stage.key} stage={stage.key}>
@@ -154,7 +162,9 @@ export function DealsBoard({ navigate, openId }: { navigate: (to: string, opts?:
                       <span className="rounded-sm bg-card px-1.5 text-xs tabular text-muted-foreground shadow-edge">{columnDeals.length}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-0.5">
-                      <span className="tabular text-[0.8125rem] text-muted-foreground">{formatMoney(columnTotal)}</span>
+                      <span className="tabular text-[0.8125rem] text-muted-foreground">
+                        {formatMoney(columnTotal)}
+                      </span>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button aria-label={`Actions for stage ${stage.label}`}
@@ -184,6 +194,10 @@ export function DealsBoard({ navigate, openId }: { navigate: (to: string, opts?:
                       )}
                     </div>
                   </div>
+                  {/* Each month, under the once total, so the stage's name keeps its room. */}
+                  {columnMonthly > 0 && (
+                    <div className="-mt-1 pr-14 text-right text-xs tabular text-muted-foreground">+ {formatMoney(columnMonthly)}/mo</div>
+                  )}
 
                   {/* The tray keeps its height; a long stage scrolls its own deals under a fixed header. */}
                   <div className="-mx-3 -mb-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pb-3">
@@ -410,7 +424,18 @@ function DealFields({ deal: d }: { deal: Deal }) {
         {d.close_date ? formatDate(d.close_date) : null}
       </FieldRow>
       <FieldRow icon={CircleDollarSign} label="Amount">
-        <span className="tabular">{formatMoney(d.value)}</span>
+        <span className="tabular">
+          {formatMoney(d.value)}
+          {!!d.recurring_value && <span className="text-muted-foreground"> + {formatMoney(d.recurring_value)}/mo</span>}
+        </span>
+      </FieldRow>
+      <FieldRow icon={UserCheck} label="Owner" placeholder="Unassigned">
+        {d.owner ? (
+          <>
+            <UserAvatar name={d.owner.name} email={d.owner.email} className="size-5 text-[0.5625rem]" />
+            <span className="truncate">{memberName(d.owner)}</span>
+          </>
+        ) : null}
       </FieldRow>
       <FieldRow icon={Building2} label="Company">
         {d.company_name ? (

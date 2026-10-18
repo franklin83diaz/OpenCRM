@@ -33,8 +33,10 @@ type Open =
  */
 export function UsersPage({ navigate }: { navigate: (to: string) => void }) {
   const { user: me, setUser } = useAuth();
-  const { setError } = useCrm();
+  const { setError, refetchTeam } = useCrm();
   const [accounts, setAccounts] = useState<Account[] | null>(null);
+  // Who deals can be assigned to follows the accounts: added, renamed, disabled or deleted here.
+  useEffect(() => { if (accounts) refetchTeam().catch(() => {}); }, [accounts, refetchTeam]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [open, setOpen] = useState<Open>(null);
 

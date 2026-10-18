@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Handshake, DollarSign, CircleDashed, Calendar, StickyNote, Building2, User, Clock, LayoutGrid, Network, Activity as ActivityIcon } from "lucide-react";
+import { ArrowLeft, Handshake, DollarSign, CircleDashed, Calendar, StickyNote, Building2, User, Clock, LayoutGrid, Network, Repeat, UserCheck, Activity as ActivityIcon } from "lucide-react";
 import { useCrm } from "@/context";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection } from "@/components/record-page";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
-import { RecordChip, RecordsInput, RelationInput } from "@/lib/relations";
+import { RecordChip, RelationInput } from "@/lib/relations";
+import { OwnerField, memberName } from "@/components/deals/owner-field";
+import { DealPartners } from "@/components/deals/deal-partners";
 import { formatMoney, colorClasses, cn } from "@/lib/utils";
 import { HealthPill, daysAgo } from "@/components/health";
 import { TasksSection } from "@/components/tasks/tasks-section";
@@ -31,9 +33,10 @@ function formatDay(day: string): string {
 
 // The deal record page: same anatomy as a contact or company. Its company and
 // its contact are both its own links, each optional; setting a contact on a
-// deal with no company fills the company in (the server does it). Any number
-// of partners take part in it. `panel` renders it in the side panel beside
-// the deals board.
+// deal with no company fills the company in (the server does it). It is worth
+// something once and something each month, is assigned to one account or to
+// nobody yet, and any number of partners take part in it, each with its share.
+// `panel` renders it in the side panel beside the deals board.
 export function DealDetail({ id, navigate, panel = false }: { id: string; navigate: (to: string) => void; panel?: boolean }) {
   const { fetchDeal, updateDeal, fetchActivities, setError, customFields, changes, stages } = useCrm();
   const relationDefs = customFields.filter((d) => d.entity_type === "deal" && d.field_type === "relation");
@@ -107,12 +110,19 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
 
           <DetailsSection title="Deal">
             <dl className="flex flex-col">
-              <Attr icon={DollarSign} label="Value">
-                <InlineField type="number" value={deal.value ? String(deal.value) : ""} placeholder="Set value…" onSave={(v) => saveField({ value: Number(v) || 0 })}
+              <Attr icon={DollarSign} label="One-time">
+                <InlineField type="number" value={deal.value ? String(deal.value) : ""} placeholder="Set one-time value…" onSave={(v) => saveField({ value: Number(v) || 0 })}
                   render={(v) => <span className="tabular">{formatMoney(Number(v))}</span>} />
+              </Attr>
+              <Attr icon={Repeat} label="Monthly">
+                <InlineField type="number" value={deal.recurring_value ? String(deal.recurring_value) : ""} placeholder="Set monthly value…" onSave={(v) => saveField({ recurring_value: Number(v) || 0 })}
+                  render={(v) => <span className="tabular">{formatMoney(Number(v))}<span className="text-muted-foreground">/mo</span></span>} />
               </Attr>
               <Attr icon={CircleDashed} label="Stage">
                 <StageField value={deal.stage} stage={stage} stages={stages} onSave={(key) => saveField({ stage: key })} />
+              </Attr>
+              <Attr icon={UserCheck} label="Owner">
+                <OwnerField value={deal.owner_id} owner={deal.owner} onChange={(id) => saveField({ owner_id: id })} />
               </Attr>
               <Attr icon={Calendar} label="Close date">
                 <InlineField type="date" value={deal.close_date} placeholder="Set close date…" onSave={(v) => saveField({ close_date: v })} render={formatDay} />
@@ -133,13 +143,11 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
                 <RelationInput link entity="contact" value={deal.contact_id} known={contact} placeholder="Set contact…" emptyLabel="No contact"
                   onChange={(v) => void saveField({ contact_id: v })} />
               </Attr>
-              <Attr icon={Network} label="Partners">
-                <RecordsInput link entity="partner" label="partners" value={(deal.partners ?? []).map((p) => p.id)} known={deal.partners}
-                  onChange={(ids) => saveField({ partner_ids: ids })} />
-              </Attr>
               <RelationAttrs defs={relationDefs} row={deal} onSave={(key, v) => saveField({ [key]: v } as Partial<Deal>)} />
             </dl>
           </DetailsSection>
+
+          <DealPartners deal={deal} />
 
           <RelationSections defs={relationDefs} row={deal} />
 
@@ -184,9 +192,12 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
               <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-medium">Highlights</h2>
                 <div className="grid grid-cols-3 gap-3">
-                  <Tile icon={DollarSign} label="Value" empty="No value" value={deal.value ? <span className="tabular">{formatMoney(deal.value)}</span> : undefined} />
+                  <Tile icon={DollarSign} label="One-time" empty="No one-time value" value={deal.value ? <span className="tabular">{formatMoney(deal.value)}</span> : undefined} />
+                  <Tile icon={Repeat} label="Monthly" empty="No monthly value" value={deal.recurring_value ? <span className="tabular">{formatMoney(deal.recurring_value)}/mo</span> : undefined} />
                   <Tile icon={CircleDashed} label="Stage" empty="No stage" value={stage?.label ?? deal.stage} />
+                  <Tile icon={UserCheck} label="Owner" empty="Unassigned" value={deal.owner ? memberName(deal.owner) : undefined} />
                   <Tile icon={Calendar} label="Close date" empty="No close date" value={deal.close_date ? formatDay(deal.close_date) : undefined} />
+                  <Tile icon={Network} label="Partners" empty="No partners" value={deal.partners?.length ? deal.partners.map((p) => p.label).join(", ") : undefined} />
                   <Tile icon={Building2} label="Company" empty="No company" value={company && <RecordChip entity="company" record={company} />} />
                   <Tile icon={User} label="Contact" empty="No contact" value={contact && <RecordChip entity="contact" record={contact} />} />
                   <Tile icon={Clock} label="Last activity" empty="No activity" value={recent[0] ? formatTimestamp(recent[0].created_at) : undefined} />

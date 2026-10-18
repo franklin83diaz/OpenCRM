@@ -19,7 +19,7 @@ import (
 )
 
 // RelationRecord is a linked record as a chip shows it. Domain is a
-// company's or a partner's, for its logo; null for the others.
+// company's, for its logo; null for the others.
 type RelationRecord struct {
 	ID     string  `json:"id"`
 	Label  string  `json:"label"`
@@ -43,7 +43,7 @@ func recordLabel(entity EntityType, a string) string {
 
 func recordColumns(entity EntityType, a string) string {
 	domain := "NULL"
-	if entity == Company || entity == Partner {
+	if entity == Company {
 		domain = a + ".domain"
 	}
 	return fmt.Sprintf("%s.id AS id, %s AS label, %s AS domain", a, recordLabel(entity, a), domain)

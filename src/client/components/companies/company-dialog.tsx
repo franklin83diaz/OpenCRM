@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { ChevronsUpDown } from "lucide-react";
 import { useCrm } from "@/context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +12,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ValuesMenu } from "@/components/cell-editors";
-import { CategoryBadge } from "@/components/shared";
+import { ValuesField } from "@/components/value-fields";
 import { CustomFieldsSection, readCustom } from "@/lib/custom-fields";
 import type { Company } from "@/types";
 
@@ -116,7 +113,7 @@ export function CompanyDialog({
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="industry">Industry</Label>
-              <IndustryPicker value={form.industry} onChange={(v) => set("industry", v)} />
+              <ValuesField input modal id="industry" entity="company" field="industry" label="industry" value={form.industry} onSave={(v) => set("industry", v)} />
             </div>
           </div>
 
@@ -152,29 +149,5 @@ export function CompanyDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** The industries already in use, or a new one typed in: the same menu as the company page. */
-function IndustryPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(false);
-  // Modal: the dialog underneath blocks wheel scrolling outside itself, and the menu renders outside it.
-  return (
-    <Popover modal open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          id="industry"
-          type="button"
-          className="flex h-8 w-full items-center justify-between gap-2 rounded-sm bg-card shadow-edge px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-        >
-          {value ? <CategoryBadge value={value} /> : <span className="text-muted-foreground">None</span>}
-          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-0">
-        <ValuesMenu entity="company" field="industry" value={value || null} emptyLabel="None"
-          onPick={(v) => { setOpen(false); onChange(v ?? ""); }} />
-      </PopoverContent>
-    </Popover>
   );
 }

@@ -22,13 +22,16 @@ type statsBody struct {
 	Companies any `json:"companies"`
 	Deals     any `json:"deals"`
 	DealValue any `json:"dealValue"`
+	// DealRecurringValue: what the deals not lost are worth each month.
+	DealRecurringValue any `json:"dealRecurringValue"`
 	// Customers: companies that are customers (customer_since set).
 	Customers any `json:"customers"`
 	Partners  any `json:"partners"`
 }
 
 // stats is the dashboard's statistics: how many contacts, companies, deals,
-// customers and partners, and the value of the deals not lost.
+// customers and partners, and the value of the deals not lost, once and
+// each month.
 func (app *App) stats(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	return tryJSON(w, func() (int, any, error) {
@@ -56,13 +59,18 @@ func (app *App) stats(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return 0, nil, err
 		}
+		recurring, err := db.Get(ctx, "SELECT COALESCE(SUM(recurring_value), 0) as total FROM deals WHERE stage NOT IN (SELECT key FROM stages WHERE is_lost = 1)")
+		if err != nil {
+			return 0, nil, err
+		}
 		return 200, statsBody{
-			Contacts:  orZero(rows[0], "count"),
-			Companies: orZero(rows[1], "count"),
-			Deals:     orZero(rows[2], "count"),
-			DealValue: orZero(rows[3], "total"),
-			Customers: orZero(customers, "count"),
-			Partners:  orZero(partners, "count"),
+			Contacts:           orZero(rows[0], "count"),
+			Companies:          orZero(rows[1], "count"),
+			Deals:              orZero(rows[2], "count"),
+			DealValue:          orZero(rows[3], "total"),
+			Customers:          orZero(customers, "count"),
+			Partners:           orZero(partners, "count"),
+			DealRecurringValue: orZero(recurring, "total"),
 		}, nil
 	})
 }

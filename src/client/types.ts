@@ -20,7 +20,7 @@ export type AttributeType =
  *  column; one_to_many lists the records whose many_to_one points back here. */
 export type RelationType = "many_to_one" | "one_to_many";
 
-/** A linked record as a chip shows it. `domain` is a company's or a partner's, for its logo. */
+/** A linked record as a chip shows it. `domain` is a company's, for its logo. */
 export interface RelationRecord {
   id: string;
   label: string;
@@ -72,7 +72,9 @@ export interface Company {
 export interface Partner {
   id: string;
   name: string;
-  domain: string;
+  industry: string;
+  /** prospect | onboarding | active | inactive */
+  status: string;
   phone: string;
   email: string;
   notes: string;
@@ -103,12 +105,33 @@ export interface Contact {
   updated_at: string;
 }
 
+/** An account a deal can be assigned to (GET /api/team). */
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+}
+
+/** A partner taking part in a deal, with its share of it. */
+export interface DealPartner extends RelationRecord {
+  /** The partner's share, once. */
+  one_time_value: number;
+  /** The partner's share, each month. */
+  recurring_value: number;
+}
+
 export interface Deal {
   id: string;
   name: string;
   contact_id: string | null;
   company_id: string | null;
+  /** What the deal is worth once. */
   value: number;
+  /** What it is worth each month while they stay a customer. */
+  recurring_value?: number;
+  /** The account it is assigned to; null = nobody's yet. */
+  owner_id?: string | null;
+  owner?: TeamMember | null;
   stage: string;
   close_date: string;
   notes: string;
@@ -118,8 +141,8 @@ export interface Deal {
   company_domain?: string | null;
   /** How an open deal is moving (board and single-deal reads); null when won or lost. */
   progress?: DealProgress | null;
-  /** The partners taking part in the deal, by name (reads only). */
-  partners?: RelationRecord[];
+  /** The partners taking part in the deal, by name, with their shares (reads only). */
+  partners?: DealPartner[];
   /** Writes only: the whole list of its partners' ids, which replaces the one before. */
   partner_ids?: string[];
   custom?: Record<string, unknown>; // write payload; on reads, values are flat columns
@@ -146,6 +169,8 @@ export interface Stats {
   companies: number;
   deals: number;
   dealValue: number;
+  /** What the deals not lost are worth each month. */
+  dealRecurringValue: number;
   customers: number;
   partners: number;
 }

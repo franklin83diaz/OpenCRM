@@ -19,7 +19,7 @@ import (
 // accounts we sell to. A deal takes part with any number of them
 // (deal_partners, written through a deal's partner_ids). They came after the
 // port from TS, so nothing here has a TS original to match; the routes are
-// the companies' own, without industry, customers and contacts.
+// the companies' own, without customers and contacts, and with a status.
 //
 // Route order: ServeMux prefers the literal paths (aggregates, bulk-delete)
 // to {id} whatever the order.
@@ -33,20 +33,22 @@ func init() {
 		rt.Handle("PUT /api/partners/{id}", app.updatePartner)
 		rt.Handle("DELETE /api/partners/{id}", app.deletePartner)
 		rt.Handle("POST /api/partners/bulk-delete", app.bulkDeletePartners)
+		rt.Handle("PUT /api/deals/{id}/partners/{partner_id}", app.putDealPartner)
+		rt.Handle("DELETE /api/deals/{id}/partners/{partner_id}", app.deleteDealPartner)
 	})
 }
 
 // partnerDealCount is how many deals a partner takes part in, over alias p.
 const partnerDealCount = "(SELECT COUNT(*) FROM deal_partners WHERE partner_id = p.id)"
 
-// partnersWhere is the partners list's WHERE: search and filters. Shared by
+// partnersWhere is the partners list's WHERE: search (name, email) and filters. Shared by
 // the list and its footer aggregates, so both see the same rows.
 func partnersWhere(q map[string]any, cols map[string]bool, many map[string]ManyLink) (string, []any, error) {
 	where := []string{}
 	params := []any{}
 	if search := js.Trim(textAt(q, "search")); search != "" {
-		where = append(where, "(name LIKE ? OR domain LIKE ? OR email LIKE ?)")
-		params = append(params, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		where = append(where, "(name LIKE ? OR email LIKE ?)")
+		params = append(params, "%"+search+"%", "%"+search+"%")
 	}
 	clauses, flt, err := BuildFilters(cols, textAt(q, "filters"), "p.", TzOffsetOf(textAt(q, "tz")), many, time.Now())
 	if err != nil {
@@ -74,11 +76,12 @@ func (app *App) partnersAggregates(w http.ResponseWriter, r *http.Request) error
 			return 0, nil, err
 		}
 		columns := map[string]AggregateColumn{
-			"name":   {SQL: "p.name", Kind: KindText},
-			"domain": {SQL: "p.domain", Kind: KindText},
-			"email":  {SQL: "p.email", Kind: KindText},
-			"phone":  {SQL: "p.phone", Kind: KindText},
-			"deals":  {SQL: partnerDealCount, Kind: KindNumber},
+			"name":     {SQL: "p.name", Kind: KindText},
+			"industry": {SQL: "p.industry", Kind: KindText},
+			"status":   {SQL: "p.status", Kind: KindText},
+			"email":    {SQL: "p.email", Kind: KindText},
+			"phone":    {SQL: "p.phone", Kind: KindText},
+			"deals":    {SQL: partnerDealCount, Kind: KindNumber},
 		}
 		custom, err := CustomAggregateColumns(ctx, Partner, "p", cols)
 		if err != nil {
@@ -99,7 +102,7 @@ type partnersPage struct {
 	Limit    float64  `json:"limit"`
 }
 
-// listPartners lists partners with pagination, search (name, domain, email)
+// listPartners lists partners with pagination, search (name, email)
 // and filters, sorted by any real column (incl. custom fields), a linked
 // record's name, or "count:deals". Each has its deal_count and relations.
 func (app *App) listPartners(w http.ResponseWriter, r *http.Request) error {
@@ -170,11 +173,30 @@ func (app *App) getPartner(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-var partnerTextKeys = []string{"name", "domain", "phone", "email", "notes"}
+var partnerTextKeys = []string{"name", "industry", "phone", "email", "notes"}
+
+// PartnerStatuses are where a partnership stands, in order.
+var PartnerStatuses = []string{"prospect", "onboarding", "active", "inactive"}
+
+// partnerStatus reads a write's status, in any case: the status, whether it
+// was sent, and the 400 answer when it isn't one of PartnerStatuses. On a
+// create, an empty one is the first.
+func partnerStatus(body map[string]any, create bool) (status string, sent bool, problem string) {
+	s, sent := body["status"].(string)
+	status = strings.ToLower(js.Trim(s))
+	if create && status == "" {
+		return PartnerStatuses[0], sent, ""
+	}
+	if sent && indexOf(PartnerStatuses, status) < 0 {
+		return "", sent, fmt.Sprintf(`status must be one of %s, not "%s"`, strings.Join(PartnerStatuses, ", "), s)
+	}
+	return status, sent, ""
+}
 
 var createPartnerFields = []stringField{
 	{key: "name", min: 1},
-	{key: "domain", optional: true},
+	{key: "industry", optional: true},
+	{key: "status", optional: true},
 	{key: "phone", optional: true},
 	{key: "email", optional: true},
 	{key: "notes", optional: true},
@@ -201,9 +223,13 @@ func (app *App) createPartner(w http.ResponseWriter, r *http.Request) error {
 		if name == "" {
 			return fail(400, "Name is required")
 		}
+		status, _, problem := partnerStatus(body, true)
+		if problem != "" {
+			return fail(400, problem)
+		}
 		id := js.UUID()
-		if _, err := db.Run(ctx, "INSERT INTO partners (id, name, domain, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)",
-			id, name, trimmedText(body, "domain"), trimmedText(body, "phone"), trimmedText(body, "email"), trimmedText(body, "notes")); err != nil {
+		if _, err := db.Run(ctx, "INSERT INTO partners (id, name, industry, status, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			id, name, trimmedText(body, "industry"), status, trimmedText(body, "phone"), trimmedText(body, "email"), trimmedText(body, "notes")); err != nil {
 			return 0, nil, err
 		}
 		if err := custom.apply(ctx, Partner, "partners", id); err != nil {
@@ -216,14 +242,15 @@ func (app *App) createPartner(w http.ResponseWriter, r *http.Request) error {
 
 var updatePartnerFields = []stringField{
 	{key: "name", optional: true},
-	{key: "domain", optional: true},
+	{key: "industry", optional: true},
+	{key: "status", optional: true},
 	{key: "phone", optional: true},
 	{key: "email", optional: true},
 	{key: "notes", optional: true},
 }
 
 // updatePartner updates the fields sent. A name sent empty is refused: a
-// partner always has one.
+// partner always has one; so is a status that isn't one of PartnerStatuses.
 func (app *App) updatePartner(w http.ResponseWriter, r *http.Request) error {
 	v, ok := openapiJSON(r)
 	if !ok {
@@ -240,6 +267,10 @@ func (app *App) updatePartner(w http.ResponseWriter, r *http.Request) error {
 		if err != nil || refused != 0 {
 			return refused, answer, err
 		}
+		status, statusSent, problem := partnerStatus(body, false)
+		if problem != "" {
+			return fail(400, problem)
+		}
 		fields := []string{}
 		params := []any{}
 		for _, key := range partnerTextKeys {
@@ -250,6 +281,10 @@ func (app *App) updatePartner(w http.ResponseWriter, r *http.Request) error {
 				fields = append(fields, key+" = ?")
 				params = append(params, js.Trim(s))
 			}
+		}
+		if statusSent {
+			fields = append(fields, "status = ?")
+			params = append(params, status)
 		}
 		if len(fields) == 0 && len(custom.values) == 0 {
 			return fail(400, "No fields to update")
@@ -370,8 +405,27 @@ func setDealPartners(ctx context.Context, dealID string, ids []string) error {
 	return err
 }
 
+// DealPartner is a partner taking part in a deal: its chip, and its share of
+// the deal, once and each month.
+type DealPartner struct {
+	RelationRecord
+	OneTimeValue   float64 `json:"one_time_value"`
+	RecurringValue float64 `json:"recurring_value"`
+}
+
+// amount is a stored amount: 0 for NULL or anything not a number.
+func amount(v any) float64 {
+	if f, ok := v.(float64); ok {
+		return f
+	}
+	if n, ok := v.(int64); ok {
+		return float64(n)
+	}
+	return 0
+}
+
 // withDealPartners sets each deal row's `partners`: the partners taking part
-// in it, as relation chips, by name ([] for none).
+// in it, with their shares, by name ([] for none).
 func withDealPartners(ctx context.Context, rows []db.Row) error {
 	ids := make([]string, 0, len(rows))
 	for _, r := range rows {
@@ -379,9 +433,9 @@ func withDealPartners(ctx context.Context, rows []db.Row) error {
 			ids = append(ids, js.String(r["id"]))
 		}
 	}
-	byDeal := map[string][]RelationRecord{}
+	byDeal := map[string][]DealPartner{}
 	for _, part := range Chunk(ids, 90) {
-		found, err := db.Query(ctx, fmt.Sprintf(`SELECT dp.deal_id AS deal, %s
+		found, err := db.Query(ctx, fmt.Sprintf(`SELECT dp.deal_id AS deal, %s, dp.one_time_value, dp.recurring_value
        FROM deal_partners dp JOIN partners p ON p.id = dp.partner_id
        WHERE dp.deal_id IN (%s) ORDER BY p.name COLLATE NOCASE, p.id`, recordColumns(Partner, "p"), marks(len(part))), stringParams(part)...)
 		if err != nil {
@@ -389,7 +443,7 @@ func withDealPartners(ctx context.Context, rows []db.Row) error {
 		}
 		for _, rec := range found {
 			deal := colText(rec["deal"])
-			byDeal[deal] = append(byDeal[deal], toRecord(rec))
+			byDeal[deal] = append(byDeal[deal], DealPartner{toRecord(rec), amount(rec["one_time_value"]), amount(rec["recurring_value"])})
 		}
 	}
 	for _, r := range rows {
@@ -399,8 +453,90 @@ func withDealPartners(ctx context.Context, rows []db.Row) error {
 		if list := byDeal[js.String(r["id"])]; list != nil {
 			r["partners"] = list
 		} else {
-			r["partners"] = []RelationRecord{}
+			r["partners"] = []DealPartner{}
 		}
 	}
 	return nil
+}
+
+// dealPartnerSchema is a partner's share of a deal; each amount optional.
+var dealPartnerSchema = zObject(
+	zKey("one_time_value", zOptional(zNumberOrString())),
+	zKey("recurring_value", zOptional(zNumberOrString())),
+)
+
+// putDealPartner makes the partner take part in the deal, if it doesn't yet,
+// and sets the amounts sent of its share. Answers the deal.
+func (app *App) putDealPartner(w http.ResponseWriter, r *http.Request) error {
+	v, ok := openapiJSON(r)
+	if !ok {
+		return malformedJSON(w)
+	}
+	if issues := zodIssues(dealPartnerSchema, v); len(issues) > 0 {
+		return web.ZodError(w, issues)
+	}
+	ctx := r.Context()
+	dealID, partnerID := r.PathValue("id"), r.PathValue("partner_id")
+	body := v.(map[string]any)
+	return tryJSON(w, func() (int, any, error) {
+		if deal, err := db.Get(ctx, "SELECT id FROM deals WHERE id = ?", dealID); err != nil || deal == nil {
+			if err != nil {
+				return 0, nil, err
+			}
+			return fail(404, "Deal not found")
+		}
+		if partner, err := db.Get(ctx, "SELECT id FROM partners WHERE id = ?", partnerID); err != nil || partner == nil {
+			if err != nil {
+				return 0, nil, err
+			}
+			return fail(404, "Partner not found")
+		}
+		if _, err := db.Run(ctx, "INSERT OR IGNORE INTO deal_partners (deal_id, partner_id) VALUES (?, ?)", dealID, partnerID); err != nil {
+			return 0, nil, err
+		}
+		fields := []string{}
+		params := []any{}
+		for _, key := range []string{"one_time_value", "recurring_value"} {
+			if v, sent := body[key]; sent {
+				fields = append(fields, key+" = ?")
+				params = append(params, dealValue(v))
+			}
+		}
+		if len(fields) > 0 {
+			if _, err := db.Run(ctx, "UPDATE deal_partners SET "+strings.Join(fields, ", ")+" WHERE deal_id = ? AND partner_id = ?", append(params, dealID, partnerID)...); err != nil {
+				return 0, nil, err
+			}
+		}
+		if _, err := db.Run(ctx, "UPDATE deals SET updated_at = datetime('now') WHERE id = ?", dealID); err != nil {
+			return 0, nil, err
+		}
+		deal, err := readDeal(ctx, dealID)
+		return 200, dealBody{deal}, err
+	})
+}
+
+// deleteDealPartner takes the partner off the deal (nothing to do when it
+// wasn't on it). Answers the deal.
+func (app *App) deleteDealPartner(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+	dealID, partnerID := r.PathValue("id"), r.PathValue("partner_id")
+	return tryJSON(w, func() (int, any, error) {
+		res, err := db.Run(ctx, "DELETE FROM deal_partners WHERE deal_id = ? AND partner_id = ?", dealID, partnerID)
+		if err != nil {
+			return 0, nil, err
+		}
+		if res.Changes > 0 {
+			if _, err := db.Run(ctx, "UPDATE deals SET updated_at = datetime('now') WHERE id = ?", dealID); err != nil {
+				return 0, nil, err
+			}
+		}
+		deal, err := readDeal(ctx, dealID)
+		if err != nil {
+			return 0, nil, err
+		}
+		if deal == nil {
+			return fail(404, "Deal not found")
+		}
+		return 200, dealBody{deal}, nil
+	})
 }

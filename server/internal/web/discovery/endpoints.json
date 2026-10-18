@@ -135,6 +135,21 @@
   "summary": "Delete a deal"
  },
  {
+  "method": "PUT",
+  "path": "/api/deals/{id}/partners/{partner_id}",
+  "summary": "Make a partner take part in a deal, and set its share: {one_time_value?, recurring_value?}"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/deals/{id}/partners/{partner_id}",
+  "summary": "Take a partner off a deal"
+ },
+ {
+  "method": "GET",
+  "path": "/api/team",
+  "summary": "The accounts deals can be assigned to"
+ },
+ {
   "method": "GET",
   "path": "/api/tasks",
   "summary": "List tasks: open ones by due date (undated last), done ones newest first"

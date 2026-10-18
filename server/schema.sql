@@ -43,10 +43,15 @@ CREATE TABLE IF NOT EXISTS deals (
   -- The deal's own company, independent of its contact: a deal can name a
   -- company before it has a person, and keeps it if the contact moves on.
   company_id TEXT REFERENCES companies(id) ON DELETE SET NULL,
+  -- What the deal is worth once (value) and each month while they stay a
+  -- customer (recurring_value).
   value REAL DEFAULT 0,
+  recurring_value REAL DEFAULT 0,
   stage TEXT NOT NULL DEFAULT 'prospect',
   close_date TEXT DEFAULT '',
   notes TEXT DEFAULT '',
+  -- The account the deal is assigned to; NULL = nobody's yet.
+  owner_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -56,7 +61,10 @@ CREATE TABLE IF NOT EXISTS deals (
 CREATE TABLE IF NOT EXISTS partners (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  domain TEXT DEFAULT '',
+  industry TEXT DEFAULT '',
+  -- Where the partnership stands: 'prospect' (talking), 'onboarding' (signing
+  -- up, learning the product), 'active' (working deals), 'inactive'.
+  status TEXT NOT NULL DEFAULT 'prospect',
   phone TEXT DEFAULT '',
   email TEXT DEFAULT '',
   notes TEXT DEFAULT '',
@@ -64,11 +72,14 @@ CREATE TABLE IF NOT EXISTS partners (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
--- The partners taking part in a deal: any number per deal, and per partner.
--- Deleting either side drops the link.
+-- The partners taking part in a deal: any number per deal, and per partner,
+-- each with its share of the deal, once and each month. Deleting either side
+-- drops the link.
 CREATE TABLE IF NOT EXISTS deal_partners (
   deal_id TEXT NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
   partner_id TEXT NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  one_time_value REAL DEFAULT 0,
+  recurring_value REAL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   PRIMARY KEY (deal_id, partner_id)
 );
@@ -245,6 +256,8 @@ CREATE INDEX IF NOT EXISTS idx_email_message_contacts_contact ON email_message_c
 CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company_id);
 CREATE INDEX IF NOT EXISTS idx_deals_contact ON deals(contact_id);
 CREATE INDEX IF NOT EXISTS idx_deals_company ON deals(company_id);
+-- deals.owner_id is not indexed here: on a database from before it, the
+-- server adds the column (columns.go), and its index with it.
 CREATE INDEX IF NOT EXISTS idx_contacts_status ON contacts(status);
 CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage);
 CREATE INDEX IF NOT EXISTS idx_activities_entity ON activities(entity_type, entity_id);

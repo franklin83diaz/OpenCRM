@@ -98,7 +98,10 @@ export function DealsProgressPage({ navigate, openId }: { navigate: (to: string)
                       </TableCell>
                       <TableCell><NextStepLine progress={d.progress} className="max-w-full" /></TableCell>
                       <TableCell className="tabular">{daysAgo(d.progress?.days_quiet ?? null)}</TableCell>
-                      <TableCell className="text-right tabular">{formatMoney(d.value)}</TableCell>
+                      <TableCell className="text-right tabular">
+                        {formatMoney(d.value)}
+                        {!!d.recurring_value && <span className="block text-xs text-muted-foreground">+ {formatMoney(d.recurring_value)}/mo</span>}
+                      </TableCell>
                       <TableCell className="tabular">{d.close_date ? formatDate(d.close_date) : <span className="text-faint">Not set</span>}</TableCell>
                       <TableCell aria-hidden="true" />
                     </TableRow>

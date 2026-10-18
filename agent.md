@@ -33,12 +33,22 @@ Authorization: Bearer crm_…
 - Contacts belong to companies. A deal has its own `company_id` and `contact_id`,
   both optional. Setting a contact on a deal with no company gives it the
   contact's company; send `company_id` to set or clear it yourself.
+- A deal is worth `value` once and `recurring_value` each month while they
+  stay a customer.
+- A deal is assigned to one account, `owner_id` (`GET /api/team` lists them;
+  reads also carry `owner: { id, name, email }`), or to nobody: `null`. The
+  board's free deals are the filter `owner_id is_empty`.
 - Partners are the firms that work deals with us (resellers, referrers,
-  integrators), kept apart from companies. A deal has any number of them:
-  deal reads carry `partners` (`[{ id, label, domain }]`), and a write's
-  `partner_ids` (a list of partner ids) replaces them, `[]` for none.
-  `GET /api/deals?partner_id=` lists a partner's deals; deal filters take
-  `partners` and `count:partners`.
+  integrators), kept apart from companies. Each has an `industry` (free text)
+  and a `status`: `prospect` (new ones start there), `onboarding`, `active`
+  or `inactive`. A deal has any number of them,
+  each with its share of the deal: deal reads carry `partners`
+  (`[{ id, label, one_time_value, recurring_value }]`).
+  `PUT /api/deals/{id}/partners/{partner_id}` `{ one_time_value?, recurring_value? }`
+  puts a partner on the deal and sets its share; `DELETE` takes it off. A
+  write's `partner_ids` (a list of partner ids) replaces the whole list,
+  keeping the shares of the ones it keeps. `GET /api/deals?partner_id=` lists
+  a partner's deals; deal filters take `partners` and `count:partners`.
 - `GET /api/stats` — counts + total pipeline value (excludes lost deals).
 
 ## Pipeline stages (data, not code)

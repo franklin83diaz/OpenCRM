@@ -134,7 +134,7 @@ pnpm db:migrate:remote   # server/schema.sql, on the production database
 pnpm run deploy
 ```
 
-`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts, without which signing in fails; and `partners` and `deal_partners`, without which every read of deals fails. A deal attribute made before Partners with the key `partners` or `partner_ids` is hidden by them: deal reads answer `partners` with the deal's partners, and writes take `partner_ids` as them. Copy its values out and delete it before you upgrade. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
+`server/schema.sql` is safe to run on every upgrade. It creates the tables a version adds: the `users`, `sessions` and `api_tokens` the sign-in needs, on a deployment from before the CRM had its own accounts, without which signing in fails; and `partners` and `deal_partners`, without which every read of deals fails. Columns a version adds to a table you already have (a deal's `recurring_value` and `owner_id`, a partner's share of a deal, a partner's `industry` and `status`) can't come from `server/schema.sql`: the API adds them itself, before the first request it serves. A deal attribute made before Partners with the key `partners` or `partner_ids` is hidden by them: deal reads answer `partners` with the deal's partners, and writes take `partner_ids` as them. Copy its values out and delete it before you upgrade. It also switches off the email and calendar syncs, and dismisses the open insights from digested calls, of a CRM that had its integrations: nothing syncs or digests any more, and their old settings would keep Customers and Next steps counting on them. Past calls and meetings stay, as history.
 
 ## Tech Stack
 
@@ -220,16 +220,19 @@ erDiagram
         text contact_id FK "→ contacts · ON DELETE SET NULL"
         text company_id FK "→ companies · ON DELETE SET NULL"
         real value
+        real recurring_value
         text stage
         text close_date
         text notes
+        text owner_id FK "→ users · ON DELETE SET NULL"
         text created_at
         text updated_at
     }
     partners {
         text id PK
         text name
-        text domain
+        text industry
+        text status
         text phone
         text email
         text notes
@@ -241,12 +244,12 @@ erDiagram
 ```sql
 companies (id, name, domain, industry, phone, email, notes, customer_since, renewal_date)
 contacts  (id, first_name, last_name, email, phone, company_id → companies, title, status)
-deals     (id, name, contact_id → contacts, company_id → companies, value, stage, close_date, notes)
-partners  (id, name, domain, phone, email, notes)
-deal_partners (deal_id → deals, partner_id → partners)
+deals     (id, name, contact_id → contacts, company_id → companies, value, recurring_value, stage, close_date, notes, owner_id → users)
+partners  (id, name, industry, status, phone, email, notes)
+deal_partners (deal_id → deals, partner_id → partners, one_time_value, recurring_value)
 ```
 
-Contacts belong to companies. A deal has its own company and its own contact, both optional: a deal can name a company before it has a person. Setting a contact on a deal with no company gives the deal that contact's company. Deleting a company sets `company_id` to NULL on its contacts and deals. Deleting a contact sets `contact_id` to NULL on its deals. A deal has any number of partners (`deal_partners`); deleting a deal or a partner drops their links.
+Contacts belong to companies. A deal has its own company and its own contact, both optional: a deal can name a company before it has a person. Setting a contact on a deal with no company gives the deal that contact's company. Deleting a company sets `company_id` to NULL on its contacts and deals. Deleting a contact sets `contact_id` to NULL on its deals. A deal is worth `value` once and `recurring_value` each month while they stay a customer, and is assigned to one account (`owner_id`) or to nobody yet. A deal has any number of partners (`deal_partners`), each with its share of the deal, once and each month; deleting a deal or a partner drops their links.
 
 Tasks (`tasks`: `owed_by` us or them, each with an optional company, contact and deal) are typed by hand or added as a deal update's next step. A company with `customer_since` set is a customer: the close date of its first won deal, unless someone set it by hand.
 
@@ -289,8 +292,11 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | GET | `/api/deals/board` | Every deal for the pipeline board, optionally filtered |
 | GET | `/api/deals/progress` | Open deals worst first: each one's next step and the reasons to look at it |
 | GET | `/api/deals/:id` | Get a single deal |
-| POST | `/api/deals` | Create a deal (`partner_ids`: its partners) |
-| PUT | `/api/deals/:id` | Update a deal (`partner_ids` replaces its partners) |
+| POST | `/api/deals` | Create a deal (`value` once, `recurring_value` each month, `owner_id`, `partner_ids`: its partners) |
+| PUT | `/api/deals/:id` | Update a deal (`partner_ids` replaces its partners, keeping the shares of the ones it keeps) |
+| PUT | `/api/deals/:id/partners/:partner_id` | Put a partner on a deal and set its share (`{ one_time_value?, recurring_value? }`) |
+| DELETE | `/api/deals/:id/partners/:partner_id` | Take a partner off a deal |
+| GET | `/api/team` | The accounts deals can be assigned to |
 | DELETE | `/api/deals/:id` | Delete a deal |
 | POST | `/api/deals/:id/updates` | Log what happened on a deal, the tasks it finished and its next step |
 | GET / POST | `/api/stages` | The pipeline stages in order; add one |

@@ -20,6 +20,7 @@ type doneOnce struct {
 	dealCompaniesBackfilled atomic.Bool
 	customersBackfilled     atomic.Bool
 	adminChecked            atomic.Bool // the first admin exists, or can't be made from the secrets
+	columnsAdded            atomic.Bool // addColumns has run (columns.go)
 }
 
 // defaultStages is the default sales pipeline: key, label, color, position, is_won, is_lost.

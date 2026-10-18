@@ -87,16 +87,21 @@ function makeCaller(base, record, auth) {
   };
 }
 
-// Partners came after the port: TS never answered with them, so the Go
-// side's answers are compared without what they added — a deal's `partners`,
-// the stats' count of partners, and partner_ids among a deal's valid fields.
+// Partners, a deal's recurring value and a deal's owner came after the port:
+// TS never answered with them, so the Go side's answers are compared without
+// them — on a deal, in the stats, and among a deal's valid fields.
+const POST_PORT_DEAL_KEYS = ["partners", "recurring_value", "owner_id", "owner"];
+const POST_PORT_STATS_KEYS = ["partners", "dealRecurringValue"];
+const POST_PORT_DEAL_FIELDS = ["partner_ids", "recurring_value", "owner_id"];
 function withoutPartners(v) {
   if (Array.isArray(v)) return v.map(withoutPartners);
   if (!v || typeof v !== "object") return v;
+  const dropped = "stage" in v ? POST_PORT_DEAL_KEYS : "dealValue" in v ? POST_PORT_STATS_KEYS : [];
+  const dealFields = typeof v.error === "string" && v.error.startsWith("Unknown field(s) for deal:");
   const o = {};
   for (const [k, x] of Object.entries(v)) {
-    if (k === "partners" && ("stage" in v || "dealValue" in v)) continue;
-    o[k] = k === "valid_fields" && Array.isArray(x) ? x.filter((f) => f !== "partner_ids") : withoutPartners(x);
+    if (dropped.includes(k)) continue;
+    o[k] = k === "valid_fields" && dealFields && Array.isArray(x) ? x.filter((f) => !POST_PORT_DEAL_FIELDS.includes(f)) : withoutPartners(x);
   }
   return o;
 }

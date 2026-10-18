@@ -88,7 +88,9 @@ const BUILTINS: Record<EntityType, BuiltinAttr[]> = {
   deal: [
     { label: "Name", key: "name", type: "Text", icon: TypeIcon, constraints: "Required" },
     { label: "Contact", key: "contact_id", type: "Record", icon: User },
-    { label: "Value", key: "value", type: "Number", icon: Hash },
+    { label: "One-time value", key: "value", type: "Number", icon: Hash },
+    { label: "Monthly value", key: "recurring_value", type: "Number", icon: Hash },
+    { label: "Owner", key: "owner_id", type: "Account", icon: User },
     { label: "Stage", key: "stage", type: "Status", icon: CircleDot, constraints: "Required" },
     { label: "Close date", key: "close_date", type: "Date", icon: Calendar },
     { label: "Partners", key: "partner_ids", type: "Records", icon: Link2 },
@@ -97,7 +99,8 @@ const BUILTINS: Record<EntityType, BuiltinAttr[]> = {
   ],
   partner: [
     { label: "Name", key: "name", type: "Text", icon: TypeIcon, constraints: "Required" },
-    { label: "Domain", key: "domain", type: "Text", icon: Link2 },
+    { label: "Industry", key: "industry", type: "Text", icon: TypeIcon },
+    { label: "Status", key: "status", type: "Status", icon: CircleDot, constraints: "Required" },
     { label: "Phone", key: "phone", type: "Text", icon: TypeIcon },
     { label: "Email", key: "email", type: "Text", icon: TypeIcon },
     { label: "Notes", key: "notes", type: "Long text", icon: List },

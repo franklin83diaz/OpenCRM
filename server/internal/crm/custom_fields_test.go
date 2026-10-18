@@ -315,8 +315,8 @@ func TestCustomClassifyWrite(t *testing.T) {
 	}
 	for entity, want := range map[EntityType]string{
 		Contact: `["first_name","last_name","email","phone","company_id","title","status","last_contacted_at"]`,
-		Deal:    `["name","contact_id","company_id","value","stage","close_date","notes","partner_ids"]`,
-		Partner: `["name","domain","phone","email","notes"]`,
+		Deal:    `["name","contact_id","company_id","value","recurring_value","stage","close_date","notes","owner_id","partner_ids"]`,
+		Partner: `["name","industry","status","phone","email","notes"]`,
 	} {
 		keys, err := WritableFieldKeys(ctx, entity)
 		if err != nil {
@@ -340,7 +340,7 @@ func TestCustomCreateRelation(t *testing.T) {
 		{RelationInput{EntityType: Company, Key: "kids", Label: "K", RelationType: "one_to_many", TargetEntity: Company, InverseKey: "kid", InverseLabel: "X"}, `"kid" holds the linked record's id, so its key must end in _id.`},
 		{RelationInput{EntityType: Company, Key: "tier", Label: "K", RelationType: "many_to_one", TargetEntity: Deal, InverseKey: "tier_id", InverseLabel: "X"}, `"tier" holds the linked record's id, so its key must end in _id.`},
 		{RelationInput{EntityType: Company, Key: "tier_id", Label: "K", RelationType: "one_to_many", TargetEntity: Deal, InverseKey: "Bad_id", InverseLabel: "X"}, `Invalid field key "Bad_id" — use lowercase letters, digits, and underscores (must start with a letter).`},
-		{RelationInput{EntityType: Deal, Key: "owner_id", Label: "K", RelationType: "many_to_one", TargetEntity: Company, InverseKey: "tier", InverseLabel: "X"}, `A "tier" property already exists on company.`},
+		{RelationInput{EntityType: Deal, Key: "sponsor_id", Label: "K", RelationType: "many_to_one", TargetEntity: Company, InverseKey: "tier", InverseLabel: "X"}, `A "tier" property already exists on company.`},
 	}
 	for _, c := range bad {
 		if _, err := CreateRelation(ctx, c.in); fieldErr(t, err) != c.want {
@@ -371,13 +371,13 @@ func TestCustomCreateRelation(t *testing.T) {
 		t.Error("no index on the relation column")
 	}
 	// A failed column add undoes both defs.
-	if _, err := db.Run(ctx, `ALTER TABLE deals ADD COLUMN "owner_id" TEXT`); err != nil {
+	if _, err := db.Run(ctx, `ALTER TABLE deals ADD COLUMN "steward_id" TEXT`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CreateRelation(ctx, RelationInput{EntityType: Deal, Key: "owner_id", Label: "Owner", RelationType: "many_to_one", TargetEntity: Contact, InverseKey: "owned_deals", InverseLabel: "Owned"}); err == nil {
+	if _, err := CreateRelation(ctx, RelationInput{EntityType: Deal, Key: "steward_id", Label: "Steward", RelationType: "many_to_one", TargetEntity: Contact, InverseKey: "stewarded_deals", InverseLabel: "Stewarded"}); err == nil {
 		t.Error("duplicate column: no error")
 	}
-	if n, _ := db.Get(ctx, "SELECT COUNT(*) AS n FROM custom_field_defs WHERE key IN ('owner_id', 'owned_deals')"); n["n"] != 0.0 {
+	if n, _ := db.Get(ctx, "SELECT COUNT(*) AS n FROM custom_field_defs WHERE key IN ('steward_id', 'stewarded_deals')"); n["n"] != 0.0 {
 		t.Errorf("defs left behind: %v", n)
 	}
 

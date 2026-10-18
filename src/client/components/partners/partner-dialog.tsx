@@ -6,17 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { CustomFieldsSection } from "@/lib/custom-fields";
+import { OptionField, ValuesField } from "@/components/value-fields";
+import { PARTNER_STATUSES } from "@/components/partners/statuses";
 import type { Partner } from "@/types";
 
 interface FormState {
   name: string;
-  domain: string;
+  industry: string;
+  status: string;
   phone: string;
   email: string;
   notes: string;
 }
 
-const EMPTY: FormState = { name: "", domain: "", phone: "", email: "", notes: "" };
+const EMPTY: FormState = { name: "", industry: "", status: PARTNER_STATUSES[0].value, phone: "", email: "", notes: "" };
 
 /** A new partner: its name, how to reach it, and its custom fields. Everything else is edited in place on its page. */
 export function PartnerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -43,7 +46,8 @@ export function PartnerDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     try {
       const data: Partial<Partner> = {
         name: form.name.trim(),
-        domain: form.domain.trim(),
+        industry: form.industry.trim(),
+        status: form.status,
         phone: form.phone.trim(),
         email: form.email.trim(),
         notes: form.notes.trim(),
@@ -73,20 +77,27 @@ export function PartnerDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             <Input id="partner-name" required value={form.name} onChange={(e) => set("name", e.target.value)} />
           </div>
 
+
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="partner-domain">Domain</Label>
-              <Input id="partner-domain" placeholder="example.com" value={form.domain} onChange={(e) => set("domain", e.target.value)} />
+              <Label htmlFor="partner-industry">Industry</Label>
+              <ValuesField input modal id="partner-industry" entity="partner" field="industry" label="industry" value={form.industry} onSave={(v) => set("industry", v)} />
             </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="partner-status">Status</Label>
+              <OptionField input modal id="partner-status" options={PARTNER_STATUSES} label="status" value={form.status} onSave={(v) => set("status", v)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="partner-email">Email</Label>
               <Input id="partner-email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
             </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="partner-phone">Phone</Label>
-            <Input id="partner-phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="partner-phone">Phone</Label>
+              <Input id="partner-phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">

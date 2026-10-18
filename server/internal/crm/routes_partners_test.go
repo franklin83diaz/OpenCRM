@@ -30,7 +30,8 @@ func partnersCall(t *testing.T, api http.Handler, method, path, body string, wan
 type partnerJSON struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
-	Domain    string  `json:"domain"`
+	Industry  string  `json:"industry"`
+	Status    string  `json:"status"`
 	DealCount float64 `json:"deal_count"`
 	UpdatedAt string  `json:"updated_at"`
 }
@@ -65,11 +66,17 @@ func TestPartnersCRUD(t *testing.T) {
 	partnersCall(t, api, "POST", "/api/partners", `{"name":"  "}`, 400, nil)
 	partnersCall(t, api, "POST", "/api/partners", `{"name":"Nimbus","bogus":1}`, 422, nil)
 	var created struct{ Partner partnerJSON }
-	partnersCall(t, api, "POST", "/api/partners", `{"name":" Nimbus ","domain":"nimbus.example","email":"hi@nimbus.example"}`, 201, &created)
-	if p := created.Partner; p.Name != "Nimbus" || p.Domain != "nimbus.example" || p.DealCount != 0 || p.ID == "" {
+	partnersCall(t, api, "POST", "/api/partners", `{"name":"Nope","domain":"nimbus.example"}`, 422, nil)
+	partnersCall(t, api, "POST", "/api/partners", `{"name":" Nimbus ","email":"hi@nimbus.example"}`, 201, &created)
+	if p := created.Partner; p.Name != "Nimbus" || p.DealCount != 0 || p.ID == "" || p.Status != "prospect" {
 		t.Fatalf("created %+v", p)
 	}
-	partnersCall(t, api, "POST", "/api/partners", `{"name":"Acme Resellers"}`, 201, nil)
+	partnersCall(t, api, "POST", "/api/partners", `{"name":"Bad","status":"gold"}`, 400, nil)
+	var acme struct{ Partner partnerJSON }
+	partnersCall(t, api, "POST", "/api/partners", `{"name":"Acme Resellers","industry":"Software","status":" Active "}`, 201, &acme)
+	if p := acme.Partner; p.Industry != "Software" || p.Status != "active" {
+		t.Fatalf("industry and status: %+v", p)
+	}
 
 	var page struct {
 		Partners []partnerJSON
@@ -95,8 +102,22 @@ func TestPartnersCRUD(t *testing.T) {
 	partnersCall(t, api, "PUT", "/api/partners/"+id, `{}`, 400, nil)
 	partnersCall(t, api, "PUT", "/api/partners/nope", `{"name":"X"}`, 404, nil)
 	partnersCall(t, api, "PUT", "/api/partners/"+id, `{"name":"Nimbus Cloud","phone":" 555 "}`, 200, &one)
-	if one.Partner.Name != "Nimbus Cloud" {
+	if one.Partner.Name != "Nimbus Cloud" || one.Partner.Status != "prospect" {
 		t.Fatalf("update: %+v", one)
+	}
+	partnersCall(t, api, "PUT", "/api/partners/"+id, `{"status":""}`, 400, nil)
+	partnersCall(t, api, "PUT", "/api/partners/"+id, `{"status":"Onboarding","industry":"Hosting"}`, 200, &one)
+	if one.Partner.Status != "onboarding" || one.Partner.Industry != "Hosting" {
+		t.Fatalf("status and industry: %+v", one)
+	}
+	partnersCall(t, api, "GET", "/api/partners?filters="+url.QueryEscape(`[{"field":"status","op":"is","value":["active"]}]`), "", 200, &page)
+	if page.Total != 1 || page.Partners[0].Name != "Acme Resellers" {
+		t.Fatalf("active partners: %+v", page)
+	}
+	var values pickerValuesBody
+	partnersCall(t, api, "GET", "/api/values?entity=partner&field=industry", "", 200, &values)
+	if strings.Join(values.Values, ",") != "Hosting,Software" {
+		t.Fatalf("industries: %+v", values)
 	}
 
 	partnersCall(t, api, "DELETE", "/api/partners/"+id, "", 200, nil)
@@ -110,7 +131,7 @@ func TestPartnersCRUD(t *testing.T) {
 
 func TestDealPartners(t *testing.T) {
 	recordedDB(t, []string{
-		`INSERT INTO partners (id, name, domain) VALUES ('pa-n', 'Nimbus', 'nimbus.example'), ('pa-a', 'Acme Resellers', ''), ('pa-z', 'Zeta', '')`,
+		`INSERT INTO partners (id, name) VALUES ('pa-n', 'Nimbus'), ('pa-a', 'Acme Resellers'), ('pa-z', 'Zeta')`,
 		`INSERT INTO deals (id, name, stage, updated_at) VALUES ('d-old', 'Old deal', 'prospect', '2020-01-01 00:00:00')`,
 	})
 	api := replayAPI(&App{})
@@ -131,8 +152,8 @@ func TestDealPartners(t *testing.T) {
 	if got := partnerLabels(made.Deal); got != "Nimbus,Zeta" {
 		t.Fatalf("created with partners %q", got)
 	}
-	if made.Deal.Partners[0].Domain == nil || *made.Deal.Partners[0].Domain != "nimbus.example" {
-		t.Fatalf("partner chip without its domain: %+v", made.Deal.Partners[0])
+	if made.Deal.Partners[0].Domain != nil {
+		t.Fatalf("a partner chip has no domain: %+v", made.Deal.Partners[0])
 	}
 	id := made.Deal.ID
 
@@ -228,7 +249,7 @@ func TestDealPartners(t *testing.T) {
 }
 
 func TestPartnersAsARecordType(t *testing.T) {
-	recordedDB(t, []string{`INSERT INTO partners (id, name, domain) VALUES ('pa-n', 'Nimbus', 'nimbus.example'), ('pa-a', 'Acme Resellers', '')`})
+	recordedDB(t, []string{`INSERT INTO partners (id, name) VALUES ('pa-n', 'Nimbus'), ('pa-a', 'Acme Resellers')`})
 	api := replayAPI(&App{})
 	ctx := context.Background()
 
@@ -261,7 +282,7 @@ func TestPartnersAsARecordType(t *testing.T) {
 	// Pickers, values and views.
 	var records recordsBody
 	partnersCall(t, api, "GET", "/api/records?entity=partner&search=nim", "", 200, &records)
-	if len(records.Records) != 1 || records.Records[0].Label != "Nimbus" || records.Records[0].Domain == nil {
+	if len(records.Records) != 1 || records.Records[0].Label != "Nimbus" || records.Records[0].Domain != nil {
 		t.Fatalf("records: %+v", records)
 	}
 	var values pickerValuesBody

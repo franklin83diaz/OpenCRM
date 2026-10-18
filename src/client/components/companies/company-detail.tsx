@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Mail, Star, LayoutGrid, Activity as ActivityIcon, Phone, Globe, Building2, Tag, AtSign, Users, StickyNote, Calendar, Clock, CheckSquare, BadgeCheck, CalendarClock } from "lucide-react";
 import { useCrm } from "@/context";
-import { EntityIcon, CategoryBadge } from "@/components/shared";
+import { EntityIcon } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs, FutureSection } from "@/components/record-page";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ValuesMenu } from "@/components/cell-editors";
+import { ValuesField } from "@/components/value-fields";
 import { TasksSection } from "@/components/tasks/tasks-section";
 import { cn, formatDate } from "@/lib/utils";
 import type { Company, Activity } from "@/types";
@@ -104,7 +103,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
               </Attr>
               <Attr icon={Building2} label="Name"><span className="px-2 text-sm">{company.name}</span></Attr>
               <Attr icon={Tag} label="Industry">
-                <IndustryField value={company.industry} onSave={(v) => saveField({ industry: v })} />
+                <ValuesField entity="company" field="industry" label="industry" value={company.industry} onSave={(v) => saveField({ industry: v })} />
               </Attr>
               <Attr icon={AtSign} label="Email">
                 <InlineField type="email" value={company.email} placeholder="Set email…" onSave={(v) => saveField({ email: v })}
@@ -189,23 +188,5 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
         </main>
       </div>
     </div>
-  );
-}
-
-/** The industry as its own control: the pill (or a placeholder) opens the values already in use, or a new one. */
-function IndustryField({ value, onSave }: { value: string; onSave: (v: string) => Promise<void> }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button type="button" aria-label={value ? "Change industry" : "Set industry"} className="flex h-8 w-full items-center rounded-[0.5rem] px-2 text-left text-sm hover:bg-secondary">
-          {value ? <CategoryBadge value={value} /> : <span className="text-faint">Set industry…</span>}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-0">
-        <ValuesMenu entity="company" field="industry" value={value || null} emptyLabel="No industry"
-          onPick={(v) => { setOpen(false); void onSave(v ?? ""); }} />
-      </PopoverContent>
-    </Popover>
   );
 }

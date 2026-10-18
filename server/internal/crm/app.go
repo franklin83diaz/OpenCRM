@@ -26,6 +26,8 @@ type App struct {
 	done doneOnce
 	// adminMu keeps two first logins from both creating the first admin.
 	adminMu sync.Mutex
+	// columnsMu keeps two first requests from both adding columns (columns.go).
+	columnsMu sync.Mutex
 	// logins is the login limiter, made on first use.
 	loginsOnce sync.Once
 	logins     *auth.Limiter
@@ -48,9 +50,10 @@ func register(fn func(rt *web.Router, app *App)) {
 }
 
 // New builds the API: every registered route, discovery and the not-found
-// answer, behind the auth middleware that signs each /api request in.
+// answer, behind the auth middleware that signs each /api request in, on a
+// database given the columns added since its tables were made.
 func New(app *App) http.Handler {
-	return auth.Middleware(app.router())
+	return auth.Middleware(app.withColumns(app.router()))
 }
 
 // router is the routes alone, with no one signed in.
