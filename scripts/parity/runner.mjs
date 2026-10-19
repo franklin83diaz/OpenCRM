@@ -94,7 +94,7 @@ function makeCaller(base, record, auth) {
 // or a company's valid fields.
 const POST_PORT_DEAL_KEYS = ["partners", "recurring_value", "owner_id", "owner"];
 const POST_PORT_STATS_KEYS = ["partners", "dealRecurringValue", "customerUsers", "tickets", "openTickets"];
-const POST_PORT_KEYS = ["main_contact_id", "main_contact", "main_partner_id", "main_partner"]; // a company's
+const POST_PORT_KEYS = ["main_contact_id", "main_contact", "main_contact_company", "main_partner_id", "main_partner"]; // a company's
 const POST_PORT_DEAL_FIELDS = ["partner_ids", "recurring_value", "owner_id"];
 const POST_PORT_COMPANY_FIELDS = ["main_contact_id", "main_partner_id"];
 function withoutPartners(v) {

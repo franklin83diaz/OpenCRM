@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlarmClock, Check, PhoneCall, TriangleAlert, CalendarCheck, CalendarClock } from "lucide-react";
+import { AlarmClock, Check, PhoneCall, TriangleAlert, CalendarCheck, CalendarClock, MoreHorizontal, UserMinus } from "lucide-react";
 import { useCrm } from "@/context";
 import { api } from "@/api";
 import { EntityIcon, EmptyState, PageHeader } from "@/components/shared";
@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Eyebrow, HEALTH, HealthPill, StatusPill, daysAgo, sightNotice, tzOffset } from "@/components/health";
 import { RecordChip } from "@/lib/relations";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { RemoveCustomerDialog } from "@/components/customers/remove-customer-dialog";
+import { OtherCompany } from "@/components/other-company";
 import { cn, formatDate } from "@/lib/utils";
-import type { CustomersOverview, FocusItem } from "@/types";
+import type { CustomerRow, CustomersOverview, FocusItem } from "@/types";
 
 const FOCUS_ICON: Record<FocusItem["kind"], typeof AlarmClock> = {
   overdue: AlarmClock,
@@ -27,6 +30,7 @@ const FOCUS_ICON: Record<FocusItem["kind"], typeof AlarmClock> = {
 export function CustomersPage({ navigate }: { navigate: (to: string) => void }) {
   const { setError, changes } = useCrm();
   const [data, setData] = useState<CustomersOverview | null>(null);
+  const [removing, setRemoving] = useState<CustomerRow | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -121,7 +125,7 @@ export function CustomersPage({ navigate }: { navigate: (to: string) => void }) 
                   <TableHeader>
                     <TableRow>
                       <TableHead pinned width={220}>Company</TableHead>
-                      <TableHead width={170}>Main contact</TableHead>
+                      <TableHead width={230}>Main contact</TableHead>
                       <TableHead width={170}>Main partner</TableHead>
                       <TableHead width={340}>Status</TableHead>
                       <TableHead width={120}>Last contact</TableHead>
@@ -133,14 +137,37 @@ export function CustomersPage({ navigate }: { navigate: (to: string) => void }) 
                   </TableHeader>
                   <TableBody>
                     {data.customers.map((c) => (
-                      <TableRow key={c.id} className="cursor-pointer" onClick={() => open(c.id)}>
+                      <TableRow key={c.id} className="group/row cursor-pointer" onClick={() => open(c.id)}>
                         <TableCell pinned>
-                          <a href={`/companies/${encodeURIComponent(c.id)}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); open(c.id); }} className="flex min-w-0 items-center gap-2 font-medium">
-                            <EntityIcon name={c.name} domain={c.domain} className="size-5" />
-                            <span className="truncate">{c.name}</span>
-                          </a>
+                          <div className="flex min-w-0 items-center gap-1">
+                            <a href={`/companies/${encodeURIComponent(c.id)}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); open(c.id); }} className="flex min-w-0 flex-1 items-center gap-2 font-medium">
+                              <EntityIcon name={c.name} domain={c.domain} className="size-5" />
+                              <span className="truncate">{c.name}</span>
+                            </a>
+                            {/* In the pinned column, so it is in reach however wide the table. */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="icon" variant="ghost" aria-label={`Actions for ${c.name}`} onClick={(e) => e.stopPropagation()}
+                                  className="size-6 shrink-0 text-muted-foreground opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-100 [[data-agent]_&]:opacity-100">
+                                  <MoreHorizontal className="size-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem onClick={() => setRemoving(c)}>
+                                  <UserMinus className="size-4" /> Remove as customer
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
-                        <TableCell>{c.main_contact ? <RecordChip entity="contact" record={c.main_contact} /> : <span className="text-faint">Not set</span>}</TableCell>
+                        <TableCell>
+                          {c.main_contact ? (
+                            <span className="flex min-w-0 items-center gap-1">
+                              <RecordChip entity="contact" record={c.main_contact} />
+                              {c.main_contact_company && c.main_contact_company.id !== c.id && <OtherCompany company={c.main_contact_company} title={`${c.main_contact.label} works at ${c.main_contact_company.label}`} />}
+                            </span>
+                          ) : <span className="text-faint">Not set</span>}
+                        </TableCell>
                         <TableCell>{c.main_partner ? <RecordChip entity="partner" record={c.main_partner} /> : <span className="text-faint">Not set</span>}</TableCell>
                         <TableCell>
                           <div className="flex min-w-0 items-center gap-2" title={c.reasons.join("\n") || undefined}>
@@ -165,6 +192,7 @@ export function CustomersPage({ navigate }: { navigate: (to: string) => void }) 
           </div>
         </div>
       )}
+      <RemoveCustomerDialog company={removing} onClose={() => setRemoving(null)} />
     </>
   );
 }

@@ -30,6 +30,11 @@
   "summary": "Delete several companies"
  },
  {
+  "method": "POST",
+  "path": "/api/companies/{id}/remove-customer",
+  "summary": "Make a company no longer a customer"
+ },
+ {
   "method": "GET",
   "path": "/api/partners",
   "summary": "List partners with pagination, search, and filtering"

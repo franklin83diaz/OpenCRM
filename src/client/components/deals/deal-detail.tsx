@@ -7,8 +7,8 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
 import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
-import { RecordChip, RelationInput, recordHref } from "@/lib/relations";
-import { go } from "@/hooks/use-router";
+import { RecordChip, RelationInput } from "@/lib/relations";
+import { OtherCompany } from "@/components/other-company";
 import { OwnerField, memberName } from "@/components/deals/owner-field";
 import { DealPartners } from "@/components/deals/deal-partners";
 import { formatMoney, colorClasses, cn } from "@/lib/utils";
@@ -107,7 +107,6 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
     : undefined;
   // Shown beside the contact when it isn't the deal's company, as a link to it.
   const otherCompany = contactCompany && contactCompany.id !== deal.company_id ? contactCompany : null;
-  const otherCompanyHref = otherCompany ? recordHref("company", otherCompany.id) : undefined;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -156,16 +155,7 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
               <Attr icon={User} label="Contact">
                 <RelationInput link entity="contact" value={deal.contact_id} known={contact} placeholder="Set contact…" emptyLabel="No contact"
                   onChange={(v) => void saveField({ contact_id: v })}
-                  suffix={otherCompany && otherCompanyHref && (
-                    <a
-                      href={otherCompanyHref}
-                      onClick={(e) => { if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); go(otherCompanyHref); } }}
-                      title={`${contactName || "The contact"} works at ${otherCompany.label}, not at this deal's company`}
-                      className="min-w-0 truncate text-[0.8125rem] text-muted-foreground underline decoration-border underline-offset-2 hover:text-foreground hover:decoration-foreground"
-                    >
-                      ({otherCompany.label})
-                    </a>
-                  )} />
+                  suffix={otherCompany && <OtherCompany company={otherCompany} title={`${contactName || "The contact"} works at ${otherCompany.label}, not at this deal's company`} />} />
               </Attr>
               <RelationAttrs defs={relationDefs} row={deal} onSave={(key, v) => saveField({ [key]: v } as Partial<Deal>)} />
             </dl>

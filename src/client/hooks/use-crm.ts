@@ -240,6 +240,12 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     await recordsChanged();
   }, [recordsChanged]);
 
+  // No longer a customer: the company stays, its timeline says it was one.
+  const removeCustomer = useCallback(async (id: string) => {
+    await api("POST", `/api/companies/${encodeURIComponent(id)}/remove-customer`);
+    await recordsChanged();
+  }, [recordsChanged]);
+
   const deleteCompanies = useCallback(async (ids: string[]) => {
     await api("POST", "/api/companies/bulk-delete", { ids });
     await Promise.all([fetchCompanies(companiesPag), fetchStats()]);
@@ -396,7 +402,7 @@ export function useCrmState(isAgent: boolean): CrmContextValue {
     contacts, contactsPag, setContactsPage: cSet.setPage, setContactsSort: cSet.setSort, setContactsSearch: cSet.setSearch, setContactsFilters: cSet.setFilters, setContactsView: cSet.setView,
     addContact, updateContact, deleteContacts, fetchContact, fetchCompany,
     companies, companiesPag, setCompaniesPage: coSet.setPage, setCompaniesSort: coSet.setSort, setCompaniesSearch: coSet.setSearch, setCompaniesFilters: coSet.setFilters, setCompaniesView: coSet.setView,
-    addCompany, updateCompany, deleteCompanies,
+    addCompany, updateCompany, deleteCompanies, removeCustomer,
     partners, partnersPag, setPartnersPage: pSet.setPage, setPartnersSort: pSet.setSort, setPartnersSearch: pSet.setSearch, setPartnersFilters: pSet.setFilters, setPartnersView: pSet.setView,
     addPartner, fetchPartner, updatePartner, deletePartners,
     customerUsers, customerUsersPag, setCustomerUsersPage: uSet.setPage, setCustomerUsersSort: uSet.setSort, setCustomerUsersSearch: uSet.setSearch, setCustomerUsersFilters: uSet.setFilters, setCustomerUsersView: uSet.setView,

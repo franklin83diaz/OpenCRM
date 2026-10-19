@@ -161,6 +161,7 @@ func withoutPartners(text string) string {
 			}
 			delete(v, "main_contact_id") // a company's
 			delete(v, "main_contact")
+			delete(v, "main_contact_company")
 			delete(v, "main_partner_id")
 			delete(v, "main_partner")
 			// A deal's valid fields: a company has an owner_id of its own in the replays.

@@ -42,9 +42,11 @@ type CustomerRow struct {
 	Expansion     int `json:"expansion"`
 	Risks         int `json:"risks"`
 	// MainContact and MainPartner are, with the company, who the customer is
-	// (nil when it has none, or the contact moved to another company).
-	MainContact *RelationRecord `json:"main_contact"`
-	MainPartner *RelationRecord `json:"main_partner"`
+	// (nil when it has none). The main contact may work at another company
+	// (a building's property manager), which MainContactCompany names.
+	MainContact        *RelationRecord `json:"main_contact"`
+	MainContactCompany *RelationRecord `json:"main_contact_company"`
+	MainPartner        *RelationRecord `json:"main_partner"`
 }
 
 // UpcomingCall is a call with a customer in the next seven days.
@@ -585,8 +587,9 @@ func withCustomerPeople(ctx context.Context, customers []CustomerRow) error {
 		ids[i] = c.ID
 	}
 	rows, err := InChunks(ctx, ids, func(marks string) string {
-		return `SELECT co.id AS company, ct.id AS contact_id, ` + recordLabel(Contact, "ct") + ` AS contact_label, p.id AS partner_id, p.name AS partner_label
-       FROM companies co LEFT JOIN contacts ct ON ct.id = co.main_contact_id AND ct.company_id = co.id LEFT JOIN partners p ON p.id = co.main_partner_id
+		return `SELECT co.id AS company, ct.id AS contact_id, ` + recordLabel(Contact, "ct") + ` AS contact_label,
+         cc.id AS contact_company_id, cc.name AS contact_company_label, cc.domain AS contact_company_domain, p.id AS partner_id, p.name AS partner_label
+       FROM companies co LEFT JOIN contacts ct ON ct.id = co.main_contact_id LEFT JOIN companies cc ON cc.id = ct.company_id LEFT JOIN partners p ON p.id = co.main_partner_id
        WHERE co.id IN (` + marks + `) AND (co.main_contact_id IS NOT NULL OR co.main_partner_id IS NOT NULL)`
 	})
 	if err != nil {
@@ -603,6 +606,9 @@ func withCustomerPeople(ctx context.Context, customers []CustomerRow) error {
 		}
 		if id := colText(r["contact_id"]); id != "" {
 			customers[i].MainContact = &RelationRecord{ID: id, Label: colText(r["contact_label"])}
+		}
+		if id := colText(r["contact_company_id"]); id != "" {
+			customers[i].MainContactCompany = &RelationRecord{ID: id, Label: colText(r["contact_company_label"]), Domain: nullableText(r["contact_company_domain"])}
 		}
 		if id := colText(r["partner_id"]); id != "" {
 			customers[i].MainPartner = &RelationRecord{ID: id, Label: colText(r["partner_label"])}

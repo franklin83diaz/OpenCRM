@@ -61,10 +61,12 @@ export interface Company {
   customer_since?: string | null;
   /** The next renewal (YYYY-MM-DD); null = none to watch. */
   renewal_date?: string | null;
-  /** Its main contact, one of its contacts; null = none chosen. */
+  /** Its main contact, who may work at another company (a building's property manager); null = none chosen. */
   main_contact_id?: string | null;
-  /** The main contact as a record (single-company reads); null when none, or they moved to another company. */
+  /** The main contact as a record (single-company reads); null when none. */
   main_contact?: RelationRecord | null;
+  /** The company the main contact works at, this one or another (single-company reads); null when none. */
+  main_contact_company?: RelationRecord | null;
   /** The partner who looks after it; null = none chosen. */
   main_partner_id?: string | null;
   /** The main partner as a record (single-company reads); null when none. */
@@ -316,8 +318,9 @@ export interface CustomerRow {
   ours_open: number;
   ours_overdue: number;
   theirs_open: number;
-  /** With the company, who the customer is: its main contact and its main partner. */
+  /** With the company, who the customer is: its main contact (maybe another company's) and its main partner. */
   main_contact?: RelationRecord | null;
+  main_contact_company?: RelationRecord | null;
   main_partner?: RelationRecord | null;
 }
 

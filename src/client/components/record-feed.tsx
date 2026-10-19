@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Calendar, Mail, MessageSquare, Phone, Plus, StickyNote, Trophy, type LucideIcon } from "lucide-react";
+import { BadgeX, Calendar, Mail, MessageSquare, Phone, Plus, StickyNote, Trophy, type LucideIcon } from "lucide-react";
 import { useCrm } from "@/context";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,8 @@ const ACTIVITY_STYLE: Record<string, { icon: LucideIcon; className: string; kind
   note: { icon: StickyNote, className: "bg-secondary text-muted-foreground" },
   slack: { icon: MessageSquare, className: "bg-cat-1-tint text-cat-1-text", kind: "Slack" },
   stage_change: { icon: Trophy, className: "bg-success-tint text-success" },
+  // A company that stopped being a customer: its body says since when it was one.
+  customer_change: { icon: BadgeX, className: "bg-warning-tint text-warning" },
 };
 
 function parseMeta(meta: string): Record<string, unknown> {
@@ -43,18 +45,29 @@ export function formatTimestamp(createdAt: string): string {
 
 const newestFirst = (list: Activity[]) => [...list].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
+/** What an activity says: its body, or for a customer that ended, since when it was one in the reader's format. */
+function bodyOf(a: Activity, meta: Record<string, unknown>): string {
+  if (a.type === "customer_change" && typeof meta.customer_since === "string") {
+    const since = new Date(`${meta.customer_since}T00:00:00`);
+    if (!Number.isNaN(since.getTime())) return `No longer a customer (a customer since ${since.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })})`;
+  }
+  return a.body;
+}
+
 function FeedItem({ a }: { a: Activity }) {
   const style = ACTIVITY_STYLE[a.type] ?? ACTIVITY_STYLE.note;
   const Icon = style.icon;
-  const meta = metaLine(parseMeta(a.meta));
+  const parsed = parseMeta(a.meta);
+  const meta = metaLine(parsed);
+  const body = bodyOf(a, parsed);
   return (
     <li className="flex items-start gap-3 px-3.5 py-2.5 [&+li]:border-t [&+li]:border-border">
       <span className={cn("mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full", style.className)}><Icon className="size-3" /></span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        {(a.body || style.kind) && (
+        {(body || style.kind) && (
           <p className="whitespace-pre-wrap text-sm">
-            {style.kind && <span className="font-medium">{style.kind}{a.body ? ": " : ""}</span>}
-            {a.body}
+            {style.kind && <span className="font-medium">{style.kind}{body ? ": " : ""}</span>}
+            {body}
           </p>
         )}
         {meta && <p className="text-xs text-muted-foreground">{meta}</p>}

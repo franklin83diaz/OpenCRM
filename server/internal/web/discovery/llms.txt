@@ -8,10 +8,11 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 ## API
 - `GET /api/stats` — Get dashboard statistics
 - `GET /api/companies` — List companies with pagination, search, and filtering
-- `POST /api/companies` — Create a new company; main_partner_id is the partner who looks after it (null for none)
-- `PUT /api/companies/{id}` — Update a company; main_contact_id is one of its contacts, main_partner_id a partner (null for none)
+- `POST /api/companies` — Create a new company; main_contact_id is any contact (of this company or another), main_partner_id the partner who looks after it (null for none)
+- `PUT /api/companies/{id}` — Update a company; main_contact_id is any contact, of this company or another (a building's property manager), main_partner_id a partner (null for none)
 - `DELETE /api/companies/{id}` — Delete a company
 - `POST /api/companies/bulk-delete` — Delete several companies
+- `POST /api/companies/{id}/remove-customer` — Make a company no longer a customer: clears customer_since and renewal_date, logs it on its timeline; nothing else changes
 - `GET /api/partners` — List partners with pagination, search, and filtering
 - `GET /api/partners/{id}` — Get one partner
 - `POST /api/partners` — Create a partner

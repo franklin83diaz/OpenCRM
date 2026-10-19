@@ -35,6 +35,10 @@ Authorization: Bearer crm_…
   deal with). `GET /api/customer-users?company_id=` lists one customer's. The
   company must be a customer (it has a `customer_since`): any other is a 400.
   `GET /api/records?entity=company&customers=1&search=` finds them by name.
+- A company is a customer while it has a `customer_since`. `POST
+  /api/companies/{id}/remove-customer` ends that: it clears `customer_since`
+  and `renewal_date` and logs a `customer_change` activity (both dates in its
+  `meta`); nothing else changes. A later won deal makes it a customer again.
 - Tickets are a customer's requests and problems: `{ subject, description,
   status, priority, company_id, customer_user_id, owner_id, due_date }`.
   `status`: `open` (the default), `in_progress`, `waiting` (on the customer),
@@ -52,12 +56,15 @@ Authorization: Bearer crm_…
   puts undated ones last. Company and customer user filters take
   `count:tickets`.
 - A company may have a main contact and a main partner: the customer is the
-  company, its main contact and its main partner. `PUT /api/companies/{id}`
-  `{ main_contact_id }`, one of its own contacts (400 otherwise; `null`
-  clears it); `POST`/`PUT` `{ main_partner_id }`, any partner (400 for an id
-  that names none; `null` or `""` clears it). `GET /api/companies/{id}`, and
-  the answers to `POST` and `PUT`, carry `main_contact` and `main_partner`
-  (each `{ id, label }` or `null`).
+  company, its main contact and its main partner. `POST`/`PUT`
+  `{ main_contact_id }`: any contact, of this company or another (a
+  building's main contact is often the property manager at the management
+  firm); `{ main_partner_id }`: any partner. An id that names none is a 400;
+  `null` or `""` clears it. `GET /api/companies/{id}`, and the answers to
+  `POST` and `PUT`, carry `main_contact`, `main_contact_company` (the company
+  that contact works at, or `null`) and `main_partner` (each `{ id, label }`
+  or `null`). The companies a contact is the main contact of:
+  `GET /api/companies?filters=[{"field":"main_contact_id","op":"is","value":["<id>"]}]`.
 - Contacts belong to companies. A deal has its own `company_id` and `contact_id`,
   both optional. Setting a contact on a deal with no company gives it the
   contact's company; send `company_id` to set or clear it yourself.

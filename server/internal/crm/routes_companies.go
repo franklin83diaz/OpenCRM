@@ -2,6 +2,7 @@ package crm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -29,6 +30,7 @@ func init() {
 		rt.Handle("PUT /api/companies/{id}", app.updateCompany)
 		rt.Handle("DELETE /api/companies/{id}", app.deleteCompany)
 		rt.Handle("POST /api/companies/bulk-delete", app.bulkDeleteCompanies)
+		rt.Handle("POST /api/companies/{id}/remove-customer", app.removeCustomer)
 	})
 }
 
@@ -155,6 +157,8 @@ var createCompanyFields = []stringField{
 	{key: "phone", optional: true},
 	{key: "email", optional: true},
 	{key: "notes", optional: true},
+	// The company's main contact, who may work at another company; null or "" for none.
+	{key: "main_contact_id", optional: true, nullable: true},
 	// The partner who looks after the company; null or "" for none.
 	{key: "main_partner_id", optional: true, nullable: true},
 }
@@ -188,24 +192,30 @@ func readCompany(ctx context.Context, id string) (companyBody, error) {
 	return companyBody{row}, withMainContact(ctx, row)
 }
 
-// withMainContact sets a company row's `main_contact` and `main_partner`: who
-// the customer is beyond the company. main_contact is its main contact as a
-// record ({id, label}), or null when it has none, or the contact has since
-// moved to another company; main_partner the partner who looks after it, or
-// null. No query for one it has none of.
+// withMainContact sets a company row's `main_contact`, `main_contact_company`
+// and `main_partner`: who the customer is beyond the company. main_contact is
+// its main contact as a record ({id, label}), or null when it has none; it
+// may work at another company (a building's property manager works at the
+// management firm), which main_contact_company names (null when they have
+// none). main_partner is the partner who looks after it, or null. No query
+// for one it has none of.
 func withMainContact(ctx context.Context, row db.Row) error {
 	if row == nil {
 		return nil
 	}
 	row["main_contact"] = nil
+	row["main_contact_company"] = nil
 	row["main_partner"] = nil
 	if id := colText(row["main_contact_id"]); id != "" {
-		found, err := db.Get(ctx, "SELECT "+recordColumns(Contact, "t")+" FROM contacts t WHERE t.id = ? AND t.company_id = ?", id, row["id"])
+		found, err := db.Get(ctx, "SELECT "+recordColumns(Contact, "t")+", co.id AS company_id, co.name AS company_name, co.domain AS company_domain FROM contacts t LEFT JOIN companies co ON co.id = t.company_id WHERE t.id = ?", id)
 		if err != nil {
 			return err
 		}
 		if found != nil {
 			row["main_contact"] = toRecord(found)
+			if cid := colText(found["company_id"]); cid != "" {
+				row["main_contact_company"] = RelationRecord{ID: cid, Label: colText(found["company_name"]), Domain: nullableText(found["company_domain"])}
+			}
 		}
 	}
 	if id := colText(row["main_partner_id"]); id != "" {
@@ -239,14 +249,23 @@ func mainPartnerID(ctx context.Context, body map[string]any) (partner any, sent 
 	return nil, true, fmt.Sprintf(`main_partner_id: no partner with id "%s".`, id), nil
 }
 
-// mainContactProblem is the 400 answer for a main_contact_id that isn't one
-// of the company's contacts; "" when it is.
-func mainContactProblem(ctx context.Context, companyID, contactID string) (string, error) {
-	found, err := db.Get(ctx, "SELECT id FROM contacts WHERE id = ? AND company_id = ?", contactID, companyID)
-	if err != nil || found != nil {
-		return "", err
+// mainContactID reads a write's main_contact_id: the contact, of this company
+// or any other, or nil for none (null or ""); sent is false when the write
+// leaves it alone. problem is the 400 answer for an id that names no contact.
+func mainContactID(ctx context.Context, body map[string]any) (contact any, sent bool, problem string, err error) {
+	v, sent := body["main_contact_id"]
+	if !sent {
+		return nil, false, "", nil
 	}
-	return fmt.Sprintf(`main_contact_id: "%s" is not one of this company's contacts.`, contactID), nil
+	id, _ := v.(string)
+	if id = js.Trim(id); id == "" {
+		return nil, true, "", nil
+	}
+	found, err := db.Get(ctx, "SELECT id FROM contacts WHERE id = ?", id)
+	if err != nil || found != nil {
+		return id, true, "", err
+	}
+	return nil, true, fmt.Sprintf(`main_contact_id: no contact with id "%s".`, id), nil
 }
 
 // createCompany creates a company. Custom fields may be sent flat or in
@@ -271,8 +290,12 @@ func (app *App) createCompany(w http.ResponseWriter, r *http.Request) error {
 		if name == "" {
 			return fail(400, "Name is required")
 		}
-		if trimmedText(body, "main_contact_id") != "" {
-			return fail(400, "main_contact_id: a new company has no contacts yet. Set it once it has one")
+		mainContact, mainContactSent, problem, err := mainContactID(ctx, body)
+		if err != nil {
+			return 0, nil, err
+		}
+		if problem != "" {
+			return fail(400, problem)
 		}
 		mainPartner, mainPartnerSent, problem, err := mainPartnerID(ctx, body)
 		if err != nil {
@@ -286,6 +309,12 @@ func (app *App) createCompany(w http.ResponseWriter, r *http.Request) error {
 		if _, err := db.Run(ctx, "INSERT INTO companies (id, name, domain, industry, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
 			id, name, trimmedText(body, "domain"), trimmedText(body, "industry"), trimmedText(body, "phone"), trimmedText(body, "email"), trimmedText(body, "notes")); err != nil {
 			return 0, nil, err
+		}
+		// Their own write, so the insert stays the one every company makes.
+		if mainContactSent && mainContact != nil {
+			if _, err := db.Run(ctx, "UPDATE companies SET main_contact_id = ? WHERE id = ?", mainContact, id); err != nil {
+				return 0, nil, err
+			}
 		}
 		if mainPartnerSent && mainPartner != nil {
 			if _, err := db.Run(ctx, "UPDATE companies SET main_partner_id = ? WHERE id = ?", mainPartner, id); err != nil {
@@ -315,7 +344,8 @@ var updateCompanyFields = []stringField{
 	// The next renewal as YYYY-MM-DD; null or "" clears it. Move it on after
 	// each renewal.
 	{key: "renewal_date", optional: true, nullable: true},
-	// One of the company's contacts; null or "" clears it.
+	// The company's main contact, who may work at another company (a
+	// building's property manager); null or "" clears it.
 	{key: "main_contact_id", optional: true, nullable: true},
 	// The partner who looks after the company; null or "" clears it.
 	{key: "main_partner_id", optional: true, nullable: true},
@@ -370,12 +400,16 @@ func (app *App) updateCompany(w http.ResponseWriter, r *http.Request) error {
 			fields = append(fields, "renewal_date = ?")
 			params = append(params, orNull(day))
 		}
-		mainContact, mainSent := body["main_contact_id"]
-		mainContactID, _ := mainContact.(string)
-		mainContactID = js.Trim(mainContactID)
-		if mainSent {
+		mainContact, mainContactSent, problem, err := mainContactID(ctx, body)
+		if err != nil {
+			return 0, nil, err
+		}
+		if problem != "" {
+			return fail(400, problem)
+		}
+		if mainContactSent {
 			fields = append(fields, "main_contact_id = ?")
-			params = append(params, orNull(mainContactID))
+			params = append(params, mainContact)
 		}
 		mainPartner, mainPartnerSent, problem, err := mainPartnerID(ctx, body)
 		if err != nil {
@@ -399,15 +433,6 @@ func (app *App) updateCompany(w http.ResponseWriter, r *http.Request) error {
 		}
 		if exists == nil {
 			return fail(404, "Company not found")
-		}
-		if mainContactID != "" {
-			problem, err := mainContactProblem(ctx, id, mainContactID)
-			if err != nil {
-				return 0, nil, err
-			}
-			if problem != "" {
-				return fail(400, problem)
-			}
 		}
 
 		if len(fields) > 0 {
@@ -463,5 +488,42 @@ func (app *App) bulkDeleteCompanies(w http.ResponseWriter, r *http.Request) erro
 	return tryJSON(w, func() (int, any, error) {
 		out, err := bulkDelete(ctx, Company, v.(map[string]any)["ids"].([]any))
 		return 200, out, err
+	})
+}
+
+// removeCustomer makes a company no longer a customer, and nothing more: its
+// customer_since and renewal_date are cleared, and its timeline keeps that it
+// was one (a customer_change activity, with both dates in its meta). Its
+// contacts, deals, customer users and tickets stay its own. A later won deal,
+// or a customer_since set by hand, makes it a customer again. 400 when it
+// isn't one; answers the company.
+func (app *App) removeCustomer(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	return tryJSON(w, func() (int, any, error) {
+		company, err := db.Get(ctx, "SELECT id, customer_since, renewal_date FROM companies WHERE id = ?", id)
+		if err != nil {
+			return 0, nil, err
+		}
+		if company == nil {
+			return fail(404, "Company not found")
+		}
+		since := js.Trim(colText(company["customer_since"]))
+		if since == "" {
+			return fail(400, "This company isn't a customer")
+		}
+		if _, err := db.Run(ctx, "UPDATE companies SET customer_since = NULL, renewal_date = NULL, updated_at = datetime('now') WHERE id = ?", id); err != nil {
+			return 0, nil, err
+		}
+		meta, err := json.Marshal(map[string]any{"customer_since": since, "renewal_date": textOf(company["renewal_date"])})
+		if err != nil {
+			return 0, nil, err
+		}
+		if _, err := db.Run(ctx, "INSERT INTO activities (id, entity_type, entity_id, type, body, meta) VALUES (?, 'company', ?, 'customer_change', ?, ?)",
+			js.UUID(), id, "No longer a customer (a customer since "+since+")", string(meta)); err != nil {
+			return 0, nil, err
+		}
+		updated, err := readCompany(ctx, id)
+		return 200, updated, err
 	})
 }

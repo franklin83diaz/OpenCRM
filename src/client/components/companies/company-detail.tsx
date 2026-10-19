@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mail, Star, IdCard, LayoutGrid, Activity as ActivityIcon, Phone, Globe, Building2, Tag, AtSign, Users, StickyNote, Calendar, Clock, CheckSquare, BadgeCheck, CalendarClock, LifeBuoy, UserRoundCheck, Network } from "lucide-react";
+import { ArrowLeft, Mail, Star, IdCard, LayoutGrid, Activity as ActivityIcon, Phone, Globe, Building2, Tag, AtSign, Users, StickyNote, Calendar, Clock, CheckSquare, BadgeCheck, CalendarClock, LifeBuoy, UserRoundCheck, Network, UserMinus } from "lucide-react";
 import { useCrm } from "@/context";
 import { EntityIcon } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -11,16 +11,12 @@ import { api } from "@/api";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { ValuesField } from "@/components/value-fields";
 import { TasksSection } from "@/components/tasks/tasks-section";
-import { ScopedRecordField } from "@/components/scoped-record-field";
+import { MainContactField } from "@/components/companies/main-contact-field";
+import { OtherCompany } from "@/components/other-company";
 import { RecordTickets, useOpenTicketCount } from "@/components/tickets/record-tickets";
+import { RemoveCustomerDialog } from "@/components/customers/remove-customer-dialog";
 import { cn, formatDate } from "@/lib/utils";
 import type { Company, Activity, Contact, Deal, RelationRecord, Task } from "@/types";
-
-/** A company's contacts, by name, for its main-contact picker. */
-async function contactsOf(companyId: string): Promise<RelationRecord[]> {
-  const { contacts } = await api<{ contacts: Contact[] }>("GET", `/api/contacts?company_id=${encodeURIComponent(companyId)}&limit=100&sort=first_name&order=asc`);
-  return contacts.map((c) => ({ id: c.id, label: `${c.first_name} ${c.last_name}`.trim(), domain: null }));
-}
 
 // The company record page: same anatomy as a contact (DESIGN.md → Record
 // pages), with the company's own attributes and tiles. Every value is the
@@ -38,6 +34,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
   const shows = (key: string) => panel || tab === key;
   const openTickets = useOpenTicketCount({ companyId: id });
   const partners = useCompanyPartners(id, company?.main_partner);
+  const [removingCustomer, setRemovingCustomer] = useState(false);
   // The tab's count while the Tasks tab isn't open: the company's open tasks.
   useEffect(() => {
     let alive = true;
@@ -116,6 +113,11 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
             <Button variant="outline" size="sm" onClick={() => navigate(`/customer-users?filters=${encodeURIComponent(JSON.stringify([{ field: "company_id", op: "is", value: [company.id] }]))}`)}>
               <IdCard className="size-4" /> Customer users
             </Button>
+            {company.customer_since && (
+              <Button variant="outline" size="sm" onClick={() => setRemovingCustomer(true)}>
+                <UserMinus className="size-4" /> Remove as customer
+              </Button>
+            )}
           </div>
 
           <DetailsSection title="Record details">
@@ -126,8 +128,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
               </Attr>
               <Attr icon={Building2} label="Name"><span className="px-2 text-sm">{company.name}</span></Attr>
               <Attr icon={UserRoundCheck} label="Main contact">
-                <ScopedRecordField link entity="contact" label="main contact" value={company.main_contact?.id ?? null} known={company.main_contact}
-                  placeholder="Set main contact…" emptyLabel="No main contact" load={() => contactsOf(company.id)}
+                <MainContactField companyId={company.id} companyName={company.name} value={company.main_contact} contactCompany={company.main_contact_company}
                   onChange={(v) => saveField({ main_contact_id: v })} />
               </Attr>
               <Attr icon={Network} label="Main partner">
@@ -173,7 +174,8 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
           {!panel && <RecordTabs active={tab} onChange={setTab} tabs={[
             { key: "overview", label: "Overview", icon: LayoutGrid },
             { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
-            { key: "team", label: "Team", icon: Users, count: (company.contact_count ?? 0) + (partners?.length ?? 0) },
+            // Its people, a main contact from another company (a property manager), and its partners.
+            { key: "team", label: "Team", icon: Users, count: (company.contact_count ?? 0) + (company.main_contact && company.main_contact_company?.id !== company.id ? 1 : 0) + (partners?.length ?? 0) },
             { key: "notes", label: "Notes", icon: StickyNote, count: noteCount },
             { key: "tasks", label: "Tasks", icon: CheckSquare, count: taskCount },
             { key: "tickets", label: "Tickets", icon: LifeBuoy, count: openTickets ?? 0 },
@@ -185,7 +187,12 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
                 <h2 className="text-sm font-medium">Highlights</h2>
                 <div className="grid grid-cols-3 gap-3">
                   <Tile icon={Globe} label="Domain" empty="No domain" value={host && <a href={`https://${host}`} target="_blank" rel="noreferrer" className="text-info hover:underline">{host}</a>} />
-                  <Tile icon={UserRoundCheck} label="Main contact" empty="No main contact" value={company.main_contact && <RecordChip entity="contact" record={company.main_contact} />} />
+                  <Tile icon={UserRoundCheck} label="Main contact" empty="No main contact" value={company.main_contact && (
+                    <span className="flex min-w-0 items-center gap-1">
+                      <RecordChip entity="contact" record={company.main_contact} />
+                      {company.main_contact_company && company.main_contact_company.id !== company.id && <OtherCompany company={company.main_contact_company} />}
+                    </span>
+                  )} />
                   <Tile icon={Network} label="Main partner" empty="No main partner" value={company.main_partner && <RecordChip entity="partner" record={company.main_partner} />} />
                   <Tile icon={Users} label="Team" empty="No team" value={company.contact_count ? `${company.contact_count} ${company.contact_count === 1 ? "person" : "people"}` : undefined} />
                   <Tile icon={Tag} label="Industry" empty="No industry" value={company.industry} />
@@ -198,7 +205,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
 
             {!panel && tab === "team" && (
               <CompanyTeam companyId={company.id} partners={partners}
-                mainContactId={company.main_contact?.id ?? null} onMainContact={(v) => saveField({ main_contact_id: v })}
+                mainContact={company.main_contact ?? null} mainContactCompany={company.main_contact_company ?? null} onMainContact={(v) => saveField({ main_contact_id: v })}
                 mainPartnerId={company.main_partner?.id ?? null} onMainPartner={(v) => saveField({ main_partner_id: v })} />
             )}
 
@@ -215,6 +222,7 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
           </div>
         </main>
       </div>
+      <RemoveCustomerDialog company={removingCustomer ? company : null} onClose={() => setRemovingCustomer(false)} />
     </div>
   );
 }
@@ -270,10 +278,12 @@ function MainStar({ name, role, main, onClick }: { name: string; role: string; m
  * the partners who worked its deals. Its main contact and its main partner
  * come first, marked Main; a star makes another one main.
  */
-function CompanyTeam({ companyId, partners, mainContactId, onMainContact, mainPartnerId, onMainPartner }: {
+function CompanyTeam({ companyId, partners, mainContact, mainContactCompany, onMainContact, mainPartnerId, onMainPartner }: {
   companyId: string;
   partners: TeamPartner[] | null;
-  mainContactId: string | null;
+  /** The main contact, who may work at another company (`mainContactCompany`). */
+  mainContact: RelationRecord | null;
+  mainContactCompany: RelationRecord | null;
   onMainContact: (id: string | null) => void | Promise<void>;
   mainPartnerId: string | null;
   onMainPartner: (id: string | null) => void | Promise<void>;
@@ -288,20 +298,34 @@ function CompanyTeam({ companyId, partners, mainContactId, onMainContact, mainPa
   }, [companyId, changes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const count = (n: number) => <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{n}</span>;
+  const mainContactId = mainContact?.id ?? null;
+  // A main contact who isn't one of this company's own people.
+  const external = mainContact && people && !people.some((p) => p.id === mainContact.id) ? mainContact : null;
   const mainFirst = <T,>(list: T[], isMain: (x: T) => boolean) => [...list.filter(isMain), ...list.filter((x) => !isMain(x))];
 
   return (
     <section className="flex flex-col gap-6" aria-label="Team">
       <div className="flex flex-col gap-3">
-        <h2 className="inline-flex items-center gap-2 text-sm font-medium">Contacts {count(people?.length ?? 0)}</h2>
+        <h2 className="inline-flex items-center gap-2 text-sm font-medium">Contacts {count((people?.length ?? 0) + (external ? 1 : 0))}</h2>
         {people === null ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : people.length === 0 ? (
-          <p className="text-sm text-faint">No contacts at this company yet.</p>
+        ) : people.length === 0 && !external ? (
+          <p className="text-sm text-faint">No contacts at this company yet. Its main contact can be anyone's, set under Main contact.</p>
         ) : (
           <>
-            {!mainContactId && <p className="text-[0.8125rem] text-muted-foreground">No main contact yet: pick one with its star.</p>}
+            {!mainContactId && <p className="text-[0.8125rem] text-muted-foreground">No main contact yet: star one of them, or set anyone (from any company) under Main contact.</p>}
             <ul className="flex flex-col rounded-md bg-card shadow-edge">
+              {/* The main contact from another company (a property manager) leads the team. */}
+              {external && (
+                <li className="group/row flex h-11 items-center gap-3 px-3.5 [&+li]:border-t [&+li]:border-border">
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <RecordChip entity="contact" record={external} />
+                    {mainBadge}
+                    {mainContactCompany && mainContactCompany.id !== companyId && <OtherCompany company={mainContactCompany} title={`${external.label} works at ${mainContactCompany.label}`} />}
+                  </span>
+                  <MainStar name={external.label} role="main contact" main onClick={() => void onMainContact(null)} />
+                </li>
+              )}
               {mainFirst(people, (p) => p.id === mainContactId).map((p) => {
                 const name = `${p.first_name} ${p.last_name}`.trim();
                 const main = p.id === mainContactId;

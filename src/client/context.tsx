@@ -31,6 +31,8 @@ export interface CrmContextValue {
   addCompany: (data: Partial<Company>) => Promise<void>;
   updateCompany: (id: string, data: Partial<Company>) => Promise<void>;
   deleteCompanies: (ids: string[]) => Promise<void>;
+  /** Makes the company no longer a customer (it stays a company). */
+  removeCustomer: (id: string) => Promise<void>;
 
   // Partners
   partners: Partner[];

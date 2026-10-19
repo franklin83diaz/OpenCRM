@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
 import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
+import { MainContactOf } from "@/components/companies/main-contact-field";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RelationInput } from "@/lib/relations";
 import { Separator } from "@/components/ui/separator";
@@ -152,6 +153,8 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
             </dl>
             <button type="button" className="mt-1 h-8 text-[0.8125rem] text-muted-foreground hover:text-foreground">View all values</button>
           </DetailsSection>
+
+          <MainContactOf contactId={contact.id} />
 
           <RelationSections defs={relationDefs} row={contact} />
 
