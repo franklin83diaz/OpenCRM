@@ -5,7 +5,7 @@ import { Avatar } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
-import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
+import { RecordActivity, formatTimestamp } from "@/components/record-feed";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RelationInput } from "@/lib/relations";
 import { RecordTickets, useOpenTicketCount } from "@/components/tickets/record-tickets";
@@ -23,7 +23,6 @@ export function CustomerUserDetail({ id, navigate, panel = false }: { id: string
   const [activities, setActivities] = useState<Activity[]>([]);
   // The full page shows one tab at a time; the panel, everything in one column.
   const [tab, setTab] = useState("overview");
-  const [noteOpen, setNoteOpen] = useState(false);
   const shows = (key: string) => panel || tab === key;
   const openTickets = useOpenTicketCount({ customerUserId: id });
 
@@ -127,7 +126,6 @@ export function CustomerUserDetail({ id, navigate, panel = false }: { id: string
           {!panel && <RecordTabs active={tab} onChange={setTab} tabs={[
             { key: "overview", label: "Overview", icon: LayoutGrid },
             { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
-            { key: "notes", label: "Notes", icon: StickyNote, count: activities.filter((a) => a.type === "note").length },
             { key: "tickets", label: "Tickets", icon: LifeBuoy, count: openTickets ?? 0 },
           ]} />}
 
@@ -145,10 +143,8 @@ export function CustomerUserDetail({ id, navigate, panel = false }: { id: string
 
             {shows("tickets") && <RecordTickets companyId={user.company_id} customerUserId={user.id} />}
 
-            {shows("activity") && <ActivityFeed activities={activities} />}
-
-            {shows("notes") && (
-              <NotesSection entity="customer_user" recordId={user.id} activities={activities} open={noteOpen} onOpenChange={setNoteOpen}
+            {shows("activity") && (
+              <RecordActivity entity="customer_user" recordId={user.id} activities={activities}
                 onAdded={async () => setActivities(await fetchActivities("customer_user", user.id))} />
             )}
           </div>

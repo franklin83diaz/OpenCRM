@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
-import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
+import { RecordActivity, formatTimestamp } from "@/components/record-feed";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RelationInput } from "@/lib/relations";
 import { OtherCompany } from "@/components/other-company";
@@ -36,7 +36,6 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
   const [activities, setActivities] = useState<Activity[]>([]);
   // The full page shows one tab at a time; the panel, everything in one column.
   const [tab, setTab] = useState("overview");
-  const [noteOpen, setNoteOpen] = useState(false);
   const shows = (key: string) => panel || tab === key;
 
   const saveField = async (patch: Partial<Deal>) => {
@@ -96,7 +95,6 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
   }
 
   const recent = [...activities].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const noteCount = activities.filter((a) => a.type === "note").length;
   const stage = stages.find((s) => s.key === deal.stage);
   const contactName = `${deal.contact_first_name ?? ""} ${deal.contact_last_name ?? ""}`.trim();
   const company: RelationRecord | undefined = deal.company_id && deal.company_name != null
@@ -177,7 +175,6 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
           {!panel && <RecordTabs active={tab} onChange={setTab} tabs={[
             { key: "overview", label: "Overview", icon: LayoutGrid },
             { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
-            { key: "notes", label: "Notes", icon: StickyNote, count: noteCount },
           ]} />}
 
           <div className={cn("flex flex-col gap-8", panel ? "p-4" : "p-6")}>
@@ -221,10 +218,8 @@ export function DealDetail({ id, navigate, panel = false }: { id: string; naviga
 
             {shows("overview") && <TasksSection companyId={deal.company_id} dealId={deal.id} />}
 
-            {shows("activity") && <ActivityFeed activities={activities} />}
-
-            {shows("notes") && (
-              <NotesSection entity="deal" recordId={deal.id} activities={activities} open={noteOpen} onOpenChange={setNoteOpen}
+            {shows("activity") && (
+              <RecordActivity entity="deal" recordId={deal.id} activities={activities}
                 onAdded={async () => setActivities(await fetchActivities("deal", deal.id))} />
             )}
           </div>

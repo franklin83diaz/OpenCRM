@@ -5,7 +5,7 @@ import { EntityIcon } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
-import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
+import { RecordActivity, formatTimestamp } from "@/components/record-feed";
 import { RecordChip, RelationInput } from "@/lib/relations";
 import { api } from "@/api";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
@@ -30,7 +30,6 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
   const [taskCount, setTaskCount] = useState(0);
   // The full page shows one tab at a time; the panel, everything in one column.
   const [tab, setTab] = useState("overview");
-  const [noteOpen, setNoteOpen] = useState(false);
   const shows = (key: string) => panel || tab === key;
   const openTickets = useOpenTicketCount({ companyId: id });
   const partners = useCompanyPartners(id, company?.main_partner);
@@ -84,7 +83,6 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
   }
 
   const recent = [...activities].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const noteCount = activities.filter((a) => a.type === "note").length;
   const host = (company.domain || "").replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
 
   return (
@@ -176,7 +174,6 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
             { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
             // Its people, a main contact from another company (a property manager), and its partners.
             { key: "team", label: "Team", icon: Users, count: (company.contact_count ?? 0) + (company.main_contact && company.main_contact_company?.id !== company.id ? 1 : 0) + (partners?.length ?? 0) },
-            { key: "notes", label: "Notes", icon: StickyNote, count: noteCount },
             { key: "tasks", label: "Tasks", icon: CheckSquare, count: taskCount },
             { key: "tickets", label: "Tickets", icon: LifeBuoy, count: openTickets ?? 0 },
           ]} />}
@@ -213,10 +210,8 @@ export function CompanyDetail({ id, navigate, panel = false }: { id: string; nav
 
             {shows("tickets") && <RecordTickets companyId={company.id} customer={!!company.customer_since} />}
 
-            {shows("activity") && <ActivityFeed activities={activities} />}
-
-            {shows("notes") && (
-              <NotesSection entity="company" recordId={company.id} activities={activities} open={noteOpen} onOpenChange={setNoteOpen}
+            {shows("activity") && (
+              <RecordActivity entity="company" recordId={company.id} activities={activities}
                 onAdded={async () => setActivities(await fetchActivities("company", company.id))} />
             )}
           </div>

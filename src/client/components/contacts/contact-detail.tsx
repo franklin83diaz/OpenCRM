@@ -5,7 +5,7 @@ import { Avatar, CategoryBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
-import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
+import { RecordActivity, formatTimestamp } from "@/components/record-feed";
 import { MainContactOf } from "@/components/companies/main-contact-field";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RelationInput } from "@/lib/relations";
@@ -24,7 +24,8 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
 
   // The full page shows one tab at a time; the panel, everything in one column.
   const [tab, setTab] = useState("overview");
-  const [noteOpen, setNoteOpen] = useState(false);
+  // Bumped by "Add note": the timeline's note box takes the cursor.
+  const [noteFocus, setNoteFocus] = useState(0);
   const shows = (key: string) => panel || tab === key;
 
   // Click-to-edit saves one field, then re-reads the record so derived columns
@@ -89,19 +90,17 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
     : undefined;
   const fullName = `${contact.first_name} ${contact.last_name}`.trim() || "Contact";
 
-  // "Add note" beside the email button: the Notes tab, with the box open.
+  // "Add note" beside the email button: the Activity tab, the cursor in its note box.
   const startNote = () => {
-    setTab("notes");
-    setNoteOpen(true);
+    setTab("activity");
+    setNoteFocus((n) => n + 1);
   };
 
-  const noteCount = activities.filter((a) => a.type === "note").length;
   const recent = [...activities].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const tabs: Array<{ key: string; label: string; icon: typeof Mail; count?: number }> = [
     { key: "overview", label: "Overview", icon: LayoutGrid },
     { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
-    { key: "notes", label: "Notes", icon: StickyNote, count: noteCount },
   ];
 
   return (
@@ -182,10 +181,9 @@ export function ContactDetail({ id, navigate, panel = false }: { id: string; nav
               </section>
             )}
 
-            {shows("activity") && <ActivityFeed activities={activities} empty="No activity yet. Add a note to start the timeline." />}
-
-            {shows("notes") && (
-              <NotesSection entity="contact" recordId={contact.id} activities={activities} open={noteOpen} onOpenChange={setNoteOpen} onAdded={reloadActivities} />
+            {shows("activity") && (
+              <RecordActivity entity="contact" recordId={contact.id} activities={activities} focus={noteFocus}
+                onAdded={reloadActivities} />
             )}
           </div>
         </main>

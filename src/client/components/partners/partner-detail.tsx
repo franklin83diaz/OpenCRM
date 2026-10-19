@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { InlineField } from "@/components/ui/inline-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RecordTopBar, Attr, DetailsSection, Tile, RecordTabs } from "@/components/record-page";
-import { ActivityFeed, NotesSection, formatTimestamp } from "@/components/record-feed";
+import { RecordActivity, formatTimestamp } from "@/components/record-feed";
 import { RelationAttrs, RelationSections } from "@/components/record-relations";
 import { RecordChip, RecordPicker } from "@/lib/relations";
 import { cn, colorClasses, formatMoney } from "@/lib/utils";
@@ -27,7 +27,6 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
   const [activities, setActivities] = useState<Activity[]>([]);
   // The full page shows one tab at a time; the panel, everything in one column.
   const [tab, setTab] = useState("overview");
-  const [noteOpen, setNoteOpen] = useState(false);
   const shows = (key: string) => panel || tab === key;
 
   const fetchDeals = () =>
@@ -140,7 +139,6 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
             { key: "overview", label: "Overview", icon: LayoutGrid },
             { key: "deals", label: "Deals", icon: Handshake, count: dealCount },
             { key: "activity", label: "Activity", icon: ActivityIcon, count: activities.length },
-            { key: "notes", label: "Notes", icon: StickyNote, count: activities.filter((a) => a.type === "note").length },
           ]} />}
 
           <div className={cn("flex flex-col gap-8", panel ? "p-4" : "p-6")}>
@@ -161,10 +159,8 @@ export function PartnerDetail({ id, navigate, panel = false }: { id: string; nav
 
             {shows("deals") && <PartnerDeals partnerId={partner.id} deals={deals} />}
 
-            {shows("activity") && <ActivityFeed activities={activities} />}
-
-            {shows("notes") && (
-              <NotesSection entity="partner" recordId={partner.id} activities={activities} open={noteOpen} onOpenChange={setNoteOpen}
+            {shows("activity") && (
+              <RecordActivity entity="partner" recordId={partner.id} activities={activities}
                 onAdded={async () => setActivities(await fetchActivities("partner", partner.id))} />
             )}
           </div>

@@ -1,13 +1,13 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { BadgeX, Calendar, Mail, MessageSquare, Phone, Plus, StickyNote, Trophy, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { BadgeX, Calendar, Mail, MessageSquare, Phone, StickyNote, Trophy, type LucideIcon } from "lucide-react";
 import { useCrm } from "@/context";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { Activity, EntityType } from "@/types";
 
-// A record's timeline, as every record page shows it: its activity, and its
-// notes with the box to write one. Activities the CRM no longer makes
+// A record's timeline, as every record page shows it: its activity, notes
+// among it, with the box to write one. Activities the CRM no longer makes
 // (emails, meetings, Slack) keep their look on records that have them.
 
 const ACTIVITY_STYLE: Record<string, { icon: LucideIcon; className: string; kind?: string }> = {
@@ -77,44 +77,33 @@ function FeedItem({ a }: { a: Activity }) {
   );
 }
 
-/** Everything that happened on the record, newest first. */
-export function ActivityFeed({ activities, empty = "No activity yet." }: { activities: Activity[]; empty?: string }) {
-  const list = newestFirst(activities);
-  return (
-    <section className="flex flex-col gap-3" aria-label="Activity">
-      <h2 className="inline-flex items-center gap-2 text-sm font-medium">
-        Activity {list.length > 0 && <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{list.length}</span>}
-      </h2>
-      {list.length === 0 ? (
-        <p className="text-sm text-faint">{empty}</p>
-      ) : (
-        <ul className="flex flex-col rounded-md bg-card shadow-edge">
-          {list.map((a) => <FeedItem key={a.id} a={a} />)}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 /**
- * The record's notes, newest first, and + to write one: a box that saves on
- * "Add note" (or Ctrl/⌘+Enter) and closes on Cancel (or Escape). `open`
- * lets the page open the box from elsewhere (an "Add note" button). A note
- * saved, `onAdded` re-reads the timeline.
+ * A record's timeline, newest first: everything that happened on it (notes,
+ * stage changes, calls…) with the box to write a note on top, always there.
+ * "Notes" narrows it to the notes. Ctrl/⌘+Enter (or "Add note") saves,
+ * Escape clears. `focus` changing puts the cursor in the box (an "Add note"
+ * button elsewhere on the page). A note saved, `onAdded` re-reads the
+ * timeline.
  */
-export function NotesSection({ entity, recordId, activities, open, onOpenChange, onAdded }: {
+export function RecordActivity({ entity, recordId, activities, onAdded, focus = 0 }: {
   entity: EntityType;
   recordId: string;
   activities: Activity[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   onAdded: () => Promise<void> | void;
+  focus?: number;
 }) {
   const { addNote, setError } = useCrm();
   const [body, setBody] = useState("");
+  const [focused, setFocused] = useState(false);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { if (open) setBody(""); }, [open]);
-  const notes = newestFirst(activities.filter((a) => a.type === "note"));
+  const [only, setOnly] = useState<"all" | "notes">("all");
+  const box = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { if (focus) box.current?.focus(); }, [focus]);
+
+  const all = newestFirst(activities);
+  const notes = all.filter((a) => a.type === "note");
+  const list = only === "notes" ? notes : all;
+  const writing = focused || body.trim() !== "";
 
   const save = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -123,7 +112,7 @@ export function NotesSection({ entity, recordId, activities, open, onOpenChange,
     setSaving(true);
     try {
       await addNote(entity, recordId, text);
-      onOpenChange(false);
+      setBody("");
       await onAdded();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save the note");
@@ -132,45 +121,53 @@ export function NotesSection({ entity, recordId, activities, open, onOpenChange,
     }
   };
 
+  const filter = (key: "all" | "notes", label: string, n: number) => (
+    <button type="button" aria-pressed={only === key} onClick={() => setOnly(key)}
+      className={cn("inline-flex h-7 items-center gap-1.5 rounded-sm px-2 text-[0.8125rem]", only === key ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:text-foreground")}>
+      {label} <span className="tabular text-xs text-muted-foreground">{n}</span>
+    </button>
+  );
+
   return (
-    <section className="flex flex-col gap-3" aria-label="Notes">
-      <div className="flex h-9 items-center justify-between">
-        <h2 className="inline-flex items-center gap-2 text-sm font-medium">
-          Notes <span className="rounded-xs bg-secondary px-1.5 text-xs tabular text-muted-foreground">{notes.length}</span>
-        </h2>
-        <Button variant="ghost" size="icon" aria-label="Add a note" title="Add a note" aria-expanded={open} onClick={() => onOpenChange(!open)}>
-          <Plus className="size-4" />
-        </Button>
+    <section className="flex flex-col gap-3" aria-label="Activity">
+      <div className="flex h-9 items-center justify-between gap-2">
+        <h2 className="text-sm font-medium">Activity</h2>
+        <div className="flex items-center gap-0.5" aria-label="Show">
+          {filter("all", "All", all.length)}
+          {filter("notes", "Notes", notes.length)}
+        </div>
       </div>
-      {open && (
-        <form onSubmit={(e) => void save(e)} className="flex flex-col gap-2 rounded-md bg-card p-3 shadow-edge">
-          <Textarea
-            autoFocus
-            aria-label="Note"
-            placeholder="Write a note…"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void save(); }
-              if (e.key === "Escape") { e.preventDefault(); onOpenChange(false); }
-            }}
-          />
-          <div className="flex justify-end gap-2">
-            <Button type="button" size="sm" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" size="sm" disabled={saving || !body.trim()}>{saving ? "Saving…" : "Add note"}</Button>
+
+      <form onSubmit={(e) => void save(e)} className="flex flex-col gap-2">
+        <Textarea
+          ref={box}
+          aria-label="Note"
+          placeholder="Write a note…"
+          value={body}
+          rows={writing ? 3 : 1}
+          className={cn("resize-none", writing ? "min-h-20" : "h-9 min-h-9 overflow-hidden py-1.5")}
+          onChange={(e) => setBody(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void save(); }
+            if (e.key === "Escape") { e.preventDefault(); setBody(""); box.current?.blur(); }
+          }}
+        />
+        {writing && (
+          <div className="flex items-center justify-end gap-2">
+            <span className="mr-auto text-xs text-muted-foreground">Ctrl+Enter to save</span>
+            <Button type="button" size="sm" variant="ghost" onMouseDown={(e) => e.preventDefault()} onClick={() => { setBody(""); box.current?.blur(); }}>Cancel</Button>
+            <Button type="submit" size="sm" disabled={saving || !body.trim()} onMouseDown={(e) => e.preventDefault()}>{saving ? "Saving…" : "Add note"}</Button>
           </div>
-        </form>
-      )}
-      {notes.length === 0 ? (
-        !open && <p className="text-sm text-faint">No notes yet.</p>
+        )}
+      </form>
+
+      {list.length === 0 ? (
+        <p className="text-sm text-faint">{only === "notes" ? "No notes yet." : "Nothing here yet. Write a note to start the timeline."}</p>
       ) : (
         <ul className="flex flex-col rounded-md bg-card shadow-edge">
-          {notes.map((n) => (
-            <li key={n.id} className="flex flex-col gap-1 px-3.5 py-2.5 [&+li]:border-t [&+li]:border-border">
-              <p className="whitespace-pre-wrap text-sm">{n.body}</p>
-              <span className="tabular text-xs text-muted-foreground">{formatTimestamp(n.created_at)}</span>
-            </li>
-          ))}
+          {list.map((a) => <FeedItem key={a.id} a={a} />)}
         </ul>
       )}
     </section>
