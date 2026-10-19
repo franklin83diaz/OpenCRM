@@ -76,15 +76,23 @@ func ticketSortSQL(ctx context.Context, sort string, cols map[string]bool, many 
 	return listSortSQL(ctx, Ticket, "t", sort, cols, many)
 }
 
-// ticketsWhere is the list's WHERE: search (subject, description),
+// ticketsWhere is the list's WHERE: search (subject, description, and the
+// reporting customer user's name, email and phone),
 // company_id, customer_user_id, owner_id, status and filters. Shared by the
 // list and its footer aggregates.
 func ticketsWhere(q map[string]any, cols map[string]bool, many map[string]ManyLink) (string, []any, error) {
 	where := []string{}
 	params := []any{}
 	if search := js.Trim(textAt(q, "search")); search != "" {
-		where = append(where, "(t.subject LIKE ? OR t.description LIKE ?)")
-		params = append(params, "%"+search+"%", "%"+search+"%")
+		like := "%" + search + "%"
+		cond := "t.subject LIKE ? OR t.description LIKE ? OR cu.name LIKE ? OR cu.email LIKE ?"
+		params = append(params, like, like, like, like)
+		// A phone number finds the reporter's however either was written.
+		if digits := phoneDigits(search); digits != "" {
+			cond += " OR " + bareDigitsSQL("cu.phone") + " LIKE ?"
+			params = append(params, "%"+digits+"%")
+		}
+		where = append(where, "("+cond+")")
 	}
 	for _, key := range []string{"company_id", "customer_user_id", "owner_id", "status"} {
 		if v := textAt(q, key); v != "" {
@@ -145,7 +153,8 @@ type ticketsPage struct {
 	Limit   float64  `json:"limit"`
 }
 
-// listTickets lists tickets with pagination, search (subject, description),
+// listTickets lists tickets with pagination, search (subject, description,
+// the reporter's name, email and phone),
 // company_id, customer_user_id, owner_id, status and filters, sorted by any
 // real column (see ticketSortSQL). Each has its company's and customer user's
 // names, its owner, and its relations.

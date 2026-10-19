@@ -179,7 +179,7 @@ export function CustomerUsersPage({ navigate, openId, viewParam, filtersParam }:
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search customer users…"
+                placeholder="Name, email or phone…"
                 aria-label="Search customer users"
                 className="h-7 w-56 pl-8"
               />

@@ -313,13 +313,13 @@ List endpoints take `filters`: a JSON list, ANDed, of rules `{field, op, value}`
 | PUT | `/api/partners/:id` | Update a partner |
 | DELETE | `/api/partners/:id` | Delete a partner (its deals stay, without it) |
 | POST | `/api/partners/bulk-delete` | Delete several partners (`{ ids }`) |
-| GET | `/api/customer-users` | List customer users (paginated, sortable, searchable; `company_id` for one customer's) |
+| GET | `/api/customer-users` | List customer users (paginated, sortable; `search` matches the name, email or phone, a phone by its digits however it was typed; `company_id` for one customer's) |
 | GET | `/api/customer-users/:id` | Get a single customer user |
 | POST | `/api/customer-users` | Create a customer user (`{ name, email?, phone?, company_id?, notes? }`; the company must be a customer) |
 | PUT | `/api/customer-users/:id` | Update a customer user |
 | DELETE | `/api/customer-users/:id` | Delete a customer user |
 | POST | `/api/customer-users/bulk-delete` | Delete several customer users (`{ ids }`) |
-| GET | `/api/tickets` | List tickets (paginated, sortable, searchable; `company_id`, `customer_user_id`, `owner_id`, `status`). `sort=status` and `sort=priority` follow the workflow and the urgency, `owner_id` the owner's name; undated tickets sort last by `due_date` |
+| GET | `/api/tickets` | List tickets (paginated, sortable; `search` matches the subject, the description and the reporter's name, email or phone, a phone by its digits however it was typed; `company_id`, `customer_user_id`, `owner_id`, `status`). `sort=status` and `sort=priority` follow the workflow and the urgency, `owner_id` the owner's name; undated tickets sort last by `due_date` |
 | GET | `/api/tickets/:id` | Get a single ticket |
 | POST | `/api/tickets` | Create a ticket (`{ subject, company_id, description?, status?, priority?, customer_user_id?, owner_id?, due_date? }`; the company must be a customer, and is the customer user's when left out; open and medium unless sent) |
 | PUT | `/api/tickets/:id` | Update a ticket (moving it to another customer drops a customer user who isn't theirs) |

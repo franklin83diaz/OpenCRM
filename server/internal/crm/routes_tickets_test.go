@@ -150,3 +150,42 @@ func TestTickets(t *testing.T) {
 		t.Fatalf("views: %s", raw)
 	}
 }
+
+// Tickets are found by who reported them: the customer user's name, email, or
+// phone typed any way.
+func TestTicketSearchByReporter(t *testing.T) {
+	recordedDB(t, []string{
+		`INSERT INTO companies (id, name, customer_since) VALUES ('co-a', 'Acme', '2025-01-01')`,
+		`INSERT INTO customer_users (id, name, email, phone, company_id) VALUES ('cu-ann', 'Ann Lee', 'ann@acme.example', '+1 (555) 123-4567', 'co-a'), ('cu-bo', 'Bo Ray', 'bo@acme.example', '555.987.6543', 'co-a')`,
+		`INSERT INTO tickets (id, subject, company_id, customer_user_id) VALUES ('t-1', 'Login fails', 'co-a', 'cu-ann'), ('t-2', 'Invoice copy', 'co-a', 'cu-bo'), ('t-3', 'Export 555', 'co-a', NULL)`,
+	})
+	api := replayAPI(&App{})
+	var page struct{ Tickets []ticketJSON }
+	for search, want := range map[string]string{
+		"ann@acme":       "t-1",
+		"ACME.EXAMPLE":   "t-1,t-2",
+		"Bo Ray":         "t-2",
+		"5551234567":     "t-1",
+		"555-123-4567":   "t-1",
+		"(555) 987":      "t-2",
+		"987 6543":       "t-2",
+		"555":            "t-1,t-2,t-3",
+		"login":          "t-1",
+		"12":             "",
+		"nobody@nowhere": "",
+	} {
+		partnersCall(t, api, "GET", "/api/tickets?sort=id&order=asc&search="+url.QueryEscape(search), "", 200, &page)
+		got := []string{}
+		for _, tk := range page.Tickets {
+			got = append(got, tk.ID)
+		}
+		if strings.Join(got, ",") != want {
+			t.Errorf("search %q: %v, want %q", search, got, want)
+		}
+	}
+	// The footer aggregates count the same tickets.
+	raw := partnersCall(t, api, "GET", "/api/tickets/aggregates?search="+url.QueryEscape("555 123")+"&ops="+url.QueryEscape(`[{"key":"subject","op":"count"}]`), "", 200, nil)
+	if !strings.Contains(raw, `"subject":1`) {
+		t.Errorf("aggregates: %s", raw)
+	}
+}

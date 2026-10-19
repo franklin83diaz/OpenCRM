@@ -223,7 +223,7 @@ export function TicketsPage({ navigate, openId, viewParam, filtersParam, board =
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search tickets…"
+                placeholder="Subject, email or phone…"
                 aria-label="Search tickets"
                 className="h-7 w-56 pl-8"
               />

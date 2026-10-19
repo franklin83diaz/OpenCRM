@@ -19,13 +19,13 @@ Every `/api` endpoint but `POST /api/auth/login` and `GET /api/openapi.json` nee
 - `PUT /api/partners/{id}` — Update a partner
 - `DELETE /api/partners/{id}` — Delete a partner; its deals stay, without it
 - `POST /api/partners/bulk-delete` — Delete several partners
-- `GET /api/customer-users` — List customer users (the people who use the product at a customer) with pagination, search, and filtering (company_id: one customer's)
+- `GET /api/customer-users` — List customer users (the people who use the product at a customer) with pagination, search (name, email, or phone typed any way), and filtering (company_id: one customer's)
 - `GET /api/customer-users/{id}` — Get one customer user
 - `POST /api/customer-users` — Create a customer user: {name, email?, phone?, company_id?, notes?}
 - `PUT /api/customer-users/{id}` — Update a customer user
 - `DELETE /api/customer-users/{id}` — Delete a customer user
 - `POST /api/customer-users/bulk-delete` — Delete several customer users
-- `GET /api/tickets` — List tickets (a customer's requests and problems) with pagination, search, and filtering (company_id, customer_user_id, owner_id, status)
+- `GET /api/tickets` — List tickets (a customer's requests and problems) with pagination, search (subject, description, and the reporter's name, email or phone, typed any way), and filtering (company_id, customer_user_id, owner_id, status)
 - `GET /api/tickets/{id}` — Get one ticket
 - `POST /api/tickets` — Create a ticket: {subject, company_id, description?, status?, priority?, customer_user_id?, owner_id?, due_date?}; company_id is a customer (left out, the customer user's)
 - `PUT /api/tickets/{id}` — Update a ticket

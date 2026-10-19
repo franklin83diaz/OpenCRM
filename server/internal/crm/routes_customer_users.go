@@ -40,14 +40,21 @@ const customerUserFrom = ` FROM customer_users u LEFT JOIN companies co ON u.com
 
 const customerUserSelect = `SELECT u.*, co.name as company_name, co.domain as company_domain` + customerUserFrom
 
-// customerUsersWhere is the list's WHERE: search (name, email), company_id
+// customerUsersWhere is the list's WHERE: search (name, email, phone typed any way), company_id
 // and filters. Shared by the list and its footer aggregates.
 func customerUsersWhere(q map[string]any, cols map[string]bool, many map[string]ManyLink) (string, []any, error) {
 	where := []string{}
 	params := []any{}
 	if search := js.Trim(textAt(q, "search")); search != "" {
-		where = append(where, "(u.name LIKE ? OR u.email LIKE ?)")
-		params = append(params, "%"+search+"%", "%"+search+"%")
+		like := "%" + search + "%"
+		cond := "u.name LIKE ? OR u.email LIKE ?"
+		params = append(params, like, like)
+		// A phone number finds theirs however either was written.
+		if digits := phoneDigits(search); digits != "" {
+			cond += " OR " + bareDigitsSQL("u.phone") + " LIKE ?"
+			params = append(params, "%"+digits+"%")
+		}
+		where = append(where, "("+cond+")")
 	}
 	if companyID := textAt(q, "company_id"); companyID != "" {
 		where = append(where, "u.company_id = ?")
@@ -103,7 +110,7 @@ type customerUsersPage struct {
 }
 
 // listCustomerUsers lists customer users with pagination, search (name,
-// email), company_id and filters, sorted by any real column (company_id by
+// email, phone), company_id and filters, sorted by any real column (company_id by
 // the company's name). Each has its company's name and domain, and its
 // relations.
 func (app *App) listCustomerUsers(w http.ResponseWriter, r *http.Request) error {

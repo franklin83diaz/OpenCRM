@@ -32,7 +32,9 @@ Authorization: Bearer crm_…
 - `GET/POST/PUT/DELETE /api/contacts` · `/api/companies` · `/api/partners` · `/api/customer-users` · `/api/tickets` · `/api/deals`
 - Customer users are the people who use the product at a customer: `{ name,
   email, phone, company_id, notes }`, kept apart from contacts (the people we
-  deal with). `GET /api/customer-users?company_id=` lists one customer's. The
+  deal with). `GET /api/customer-users?company_id=` lists one customer's;
+  `search` finds them by name, email or phone (digits match however either
+  side was written). The
   company must be a customer (it has a `customer_since`): any other is a 400.
   `GET /api/records?entity=company&customers=1&search=` finds them by name.
 - A company is a customer while it has a `customer_since`. `POST
@@ -51,7 +53,9 @@ Authorization: Bearer crm_…
   moving a ticket to another customer drops one who isn't theirs. `owner_id`
   is an account (`GET /api/team`) or `null`; `due_date` is `YYYY-MM-DD` or
   `null`. Reads carry `company_name`, `customer_user_name`, `customer_user_email`
-  and `owner`. `GET /api/tickets?company_id=&customer_user_id=&owner_id=&status=`
+  and `owner`. `search` finds a ticket by its subject or description, or by
+  its reporter's name, email or phone (digits match however either side was
+  written). `GET /api/tickets?company_id=&customer_user_id=&owner_id=&status=`
   filters; `sort=status`/`priority` follow the workflow/urgency, `sort=due_date`
   puts undated ones last. Company and customer user filters take
   `count:tickets`.

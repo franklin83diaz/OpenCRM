@@ -128,3 +128,38 @@ func TestCustomerUsers(t *testing.T) {
 		t.Fatalf("views: %s", raw)
 	}
 }
+
+// Customer users are found by name, email, or phone typed any way.
+func TestCustomerUserSearch(t *testing.T) {
+	recordedDB(t, []string{
+		`INSERT INTO companies (id, name, customer_since) VALUES ('co-a', 'Acme', '2025-01-01')`,
+		`INSERT INTO customer_users (id, name, email, phone, company_id) VALUES ('cu-ann', 'Ann Lee', 'ann@acme.example', '+1 (555) 123-4567', 'co-a'), ('cu-bo', 'Bo Ray', 'bo@beta.example', '555.987.6543', 'co-a'), ('cu-cy', 'Cy 555', '', '', NULL)`,
+	})
+	api := replayAPI(&App{})
+	var page struct {
+		CustomerUsers []customerUserJSON `json:"customer_users"`
+	}
+	for search, want := range map[string]string{
+		"ann@acme":     "cu-ann",
+		"BETA.example": "cu-bo",
+		"Bo Ray":       "cu-bo",
+		"5551234567":   "cu-ann",
+		"555-123-4567": "cu-ann",
+		"(555) 987":    "cu-bo",
+		"555":          "cu-ann,cu-bo,cu-cy",
+		"12":           "",
+	} {
+		partnersCall(t, api, "GET", "/api/customer-users?sort=id&order=asc&search="+url.QueryEscape(search), "", 200, &page)
+		got := []string{}
+		for _, u := range page.CustomerUsers {
+			got = append(got, u.ID)
+		}
+		if strings.Join(got, ",") != want {
+			t.Errorf("search %q: %v, want %q", search, got, want)
+		}
+	}
+	raw := partnersCall(t, api, "GET", "/api/customer-users/aggregates?search="+url.QueryEscape("987 6543")+"&ops="+url.QueryEscape(`[{"key":"name","op":"count"}]`), "", 200, nil)
+	if !strings.Contains(raw, `"name":1`) {
+		t.Errorf("aggregates: %s", raw)
+	}
+}
